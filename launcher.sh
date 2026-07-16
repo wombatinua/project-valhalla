@@ -50,6 +50,67 @@ ensure_requests() {
     printf '\nDependency installed successfully.\n'
 }
 
+find_fzf() {
+    if command -v fzf >/dev/null 2>&1; then
+        command -v fzf
+        return
+    fi
+    for candidate in \
+        /home/linuxbrew/.linuxbrew/bin/fzf \
+        /opt/homebrew/bin/fzf \
+        /usr/local/bin/fzf
+    do
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return
+        fi
+    done
+    return 1
+}
+
+find_brew() {
+    if command -v brew >/dev/null 2>&1; then
+        command -v brew
+        return
+    fi
+    for candidate in \
+        /home/linuxbrew/.linuxbrew/bin/brew \
+        /opt/homebrew/bin/brew \
+        /usr/local/bin/brew
+    do
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return
+        fi
+    done
+    return 1
+}
+
+ensure_fzf() {
+    FZF_BIN=$(find_fzf 2>/dev/null || true)
+    if [ -n "$FZF_BIN" ]; then
+        export FZF_BIN
+        return
+    fi
+
+    BREW_BIN=$(find_brew 2>/dev/null || true)
+    if [ -z "$BREW_BIN" ]; then
+        return
+    fi
+
+    screen_header 'Optional TUI setup'
+    printf 'Installing fzf with Homebrew for searchable Director menus...\n\n'
+    if "$BREW_BIN" install fzf; then
+        FZF_BIN=$(find_fzf 2>/dev/null || true)
+        if [ -n "$FZF_BIN" ]; then
+            export FZF_BIN
+            printf '\nfzf installed successfully.\n'
+        fi
+    else
+        printf '\nfzf installation failed; numbered Director menus will be used instead.\n'
+    fi
+}
+
 read_value() {
     prompt=$1
     printf '%s' "$prompt"
@@ -57,6 +118,36 @@ read_value() {
         printf '\n'
         exit 1
     fi
+}
+
+fzf_choice() {
+    prompt=$1
+    default=$2
+    shift 2
+    if [ -z "${FZF_BIN:-}" ] || [ ! -t 0 ] || [ ! -t 1 ]; then
+        return 1
+    fi
+    rows="0\t↩️ Default — $default\n"
+    for pair in "$@"; do
+        value=${pair%%|*}
+        label=${pair#*|}
+        rows="${rows}${value}\t${label}\n"
+    done
+    selected=$(printf '%b' "$rows" | "$FZF_BIN" \
+        --height=85% --layout=reverse --border=rounded --info=inline \
+        --delimiter='\t' --with-nth=2.. --prompt="$prompt › " \
+        --header='Type to search • Enter select • Esc use default') || selected=
+    if [ -z "$selected" ]; then
+        REPLY=$default
+    else
+        REPLY=${selected%%	*}
+        [ "$REPLY" = 0 ] && REPLY=$default
+    fi
+    return 0
+}
+
+using_fzf() {
+    [ -n "${FZF_BIN:-}" ] && [ -t 0 ] && [ -t 1 ]
 }
 
 is_integer() {
@@ -120,7 +211,7 @@ ask_optional_prompt_seed() {
 
 ask_optional_inference_seed() {
     while :; do
-        read_value 'Inference seed [fixed seed = strongest identity consistency; blank = random per image]: '
+        read_value 'Inference seed [fixed for every image; blank = random per image]: '
         INFERENCE_SEED=$REPLY
         if [ -z "$INFERENCE_SEED" ]; then
             return
@@ -173,6 +264,12 @@ ask_plateau_percent() {
 }
 
 confirm_launch() {
+    if fzf_choice 'Confirmation' y 'y|🚀 Launch now' 'n|❌ Cancel'; then
+        case "$REPLY" in
+            n) printf 'Cancelled.\n'; exit 0 ;;
+            *) return ;;
+        esac
+    fi
     read_value 'Launch now? [Y/n]: '
     case "$REPLY" in
         n|N|no|NO|No) printf 'Cancelled.\n'; exit 0 ;;
@@ -184,6 +281,7 @@ command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python executable not found: $P
 [ -f "$APP" ] || die "Application not found: $APP"
 [ -f "$DATABASE" ] || die "Database not found: $DATABASE"
 ensure_requests
+ensure_fzf
 
 SETTINGS_SUMMARY=$(
     "$PYTHON_BIN" -c '
@@ -215,28 +313,37 @@ print(d["settings"].get("photoshoot_progression", {}).get("explicit_plateau_perc
 
 screen_header 'Main menu'
 printf '%s\n\n' "$SETTINGS_SUMMARY"
-printf '%s\n' 'Choose an action:'
-printf '%s\n' '  1) Generate images'
-printf '%s\n' '  2) Dry run (prompts only)'
-printf '%s\n' '  3) Capture latest ComfyUI workflow'
-printf '%s\n' '  4) Show app help'
-printf '%s\n' '  5) Exit'
+if ! using_fzf; then
+    printf '%s\n' 'Choose an action:'
+    printf '%s\n' '  1) Generate images'
+    printf '%s\n' '  2) Dry run (prompts only)'
+    printf '%s\n' '  3) Capture latest ComfyUI workflow'
+    printf '%s\n' '  4) Show app help'
+    printf '%s\n' '  5) Exit'
+fi
 
-while :; do
-    read_value 'Selection [1]: '
-    case "${REPLY:-1}" in
-        1) COMMAND=generate; break ;;
-        2) COMMAND=dry-run; break ;;
-        3) COMMAND=capture; break ;;
-        4) exec "$PYTHON_BIN" "$APP" --help ;;
-        5) exit 0 ;;
-        *) printf 'Choose 1, 2, 3, 4, or 5.\n' ;;
-    esac
-done
+if fzf_choice 'Main menu' 1 '1|🚀 Generate images' '2|🧪 Dry run (prompts only)' '3|📥 Capture latest ComfyUI workflow' '4|❓ Show app help' '5|🚪 Exit'; then
+    selection=$REPLY
+else
+    while :; do
+        read_value 'Selection [1]: '
+        selection=${REPLY:-1}
+        case "$selection" in 1|2|3|4|5) break ;; *) printf 'Choose 1, 2, 3, 4, or 5.\n' ;; esac
+    done
+fi
+case "$selection" in
+    1) COMMAND=generate ;;
+    2) COMMAND=dry-run ;;
+    3) COMMAND=capture ;;
+    4) exec "$PYTHON_BIN" "$APP" --help ;;
+    5) exit 0 ;;
+esac
 
 if [ "$COMMAND" = capture ]; then
     screen_header 'Capture ComfyUI workflow'
-    read_value 'Replace workflow.json if it already exists? [y/N]: '
+    if fzf_choice 'Capture workflow' n 'y|♻️ Replace existing workflow.json' 'n|↩️ Keep existing workflow.json'; then :; else
+        read_value 'Replace workflow.json if it already exists? [y/N]: '
+    fi
     FORCE_CAPTURE=false
     case "$REPLY" in
         y|Y|yes|YES|Yes) FORCE_CAPTURE=true ;;
@@ -255,29 +362,36 @@ if [ "$COMMAND" = capture ]; then
 fi
 
 screen_header 'Generation mode'
-printf 'Choose generation mode:\n'
-printf '%s\n' '  1) Photoshoot (fixed model/outfit/location with progressive stages)'
-printf '%s\n' '  2) Random (independent scene for every image)'
-while :; do
-    read_value 'Mode [1]: '
-    case "${REPLY:-1}" in
-        1) MODE=photoshoot; break ;;
-        2) MODE=random; break ;;
-        *) printf 'Choose 1 or 2.\n' ;;
-    esac
-done
+if ! using_fzf; then
+    printf 'Choose generation mode:\n'
+    printf '%s\n' '  1) Photoshoot (fixed model/outfit/location with progressive stages)'
+    printf '%s\n' '  2) Random (independent scene for every image)'
+fi
+if fzf_choice 'Generation mode' 1 '1|📸 Photoshoot — connected SET and progression' '2|🎲 Random — independent scene per image'; then :; else
+    while :; do read_value 'Mode [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
+fi
+case "${REPLY:-1}" in 1) MODE=photoshoot ;; 2) MODE=random ;; esac
 
 screen_header 'Content mode'
-printf '%s\n' '  1) Normal / progressive content'
-printf '%s\n' '  2) Full XXX from the first image'
-while :; do
-    read_value 'Content [1]: '
-    case "${REPLY:-1}" in
-        1) XXX_ONLY=false; break ;;
-        2) XXX_ONLY=true; break ;;
-        *) printf 'Choose 1 or 2.\n' ;;
-    esac
-done
+if ! using_fzf; then
+    printf '%s\n' '  1) Normal / progressive content'
+    printf '%s\n' '  2) Full XXX from the first image'
+fi
+if fzf_choice 'Content mode' 1 '1|🎞️ Normal / progressive content' '2|🔞 Full XXX from the first image'; then :; else
+    while :; do read_value 'Content [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
+fi
+case "${REPLY:-1}" in 1) XXX_ONLY=false ;; 2) XXX_ONLY=true ;; esac
+
+screen_header "Director's Desk"
+if ! using_fzf; then
+    printf '%s\n' 'Would you like to review and direct the complete storyboard before launch?'
+    printf '%s\n' '  1) Auto — trust the director and continue'
+    printf '%s\n' '  2) Interactive — review, reroll, and edit individual shots'
+fi
+if fzf_choice "Director's Desk" 1 '1|🤖 Auto — trust the director and continue' '2|🎬 Interactive — review and edit storyboard'; then :; else
+    while :; do read_value 'Storyboard [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
+fi
+case "${REPLY:-1}" in 1) REVIEW_STORYBOARD=false ;; 2) REVIEW_STORYBOARD=true ;; esac
 
 PHOTOSHOOTS=1
 screen_header 'Batch size'
@@ -308,6 +422,11 @@ if [ "$XXX_ONLY" = true ]; then
     printf 'Content: full XXX from the first image\n'
 else
     printf 'Content: normal / progressive\n'
+fi
+if [ "$REVIEW_STORYBOARD" = true ]; then
+    printf "Storyboard: interactive Director's Desk\n"
+else
+    printf 'Storyboard: automatic\n'
 fi
 if [ "$MODE" = photoshoot ]; then
     printf 'Photoshoots: %s\n' "$PHOTOSHOOTS"
@@ -359,6 +478,9 @@ if [ -n "$PLATEAU_PERCENT" ]; then
 fi
 if [ "$XXX_ONLY" = true ]; then
     set -- "$@" --xxx-only
+fi
+if [ "$REVIEW_STORYBOARD" = true ]; then
+    set -- "$@" --review-storyboard
 fi
 
 clear_screen

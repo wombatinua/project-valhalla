@@ -15,13 +15,25 @@
 
 ## P0 — Storyboard Director
 
-- [ ] Планувати всю фотосесію до початку генерації, а не резолвити кадри як майже незалежні сцени.
-- [ ] Зберігати continuity для моделі, outfit, кольорів, інтер’єру, mood і lighting family.
+Implemented MVP foundation:
+
+- [x] Resolve the complete batch before rendering.
+- [x] Keep a fixed photoshoot context in every planned shot.
+- [x] Provide an interactive Director's Desk before any GPU job.
+- [x] Support full-storyboard reroll, single-shot reroll, stage selection, and compatible pose/action/expression selection.
+- [x] Add Casting & Set Design for subject, wardrobe, location, surface, mood, and photography style.
+- [x] Add constrained subject, wardrobe, interior, and surface remixing with category locks.
+- [x] Use searchable `fzf` selectors on every fixed-choice launcher and Director screen, with a numbered-menu fallback.
+- [x] Prevent manually edited photoshoot stages from reversing progression.
+- [x] Keep automatic behavior available without interactive review.
+
+- [x] Планувати всю фотосесію до початку генерації, а не резолвити кадри як майже незалежні сцени.
+- [x] Зберігати continuity для моделі, outfit, кольорів, інтер’єру, mood і lighting family.
 - [ ] Планувати послідовність stage, framing, camera angle, pose family, action family та expression intensity.
 - [ ] Формувати редакційну арку: establishing → medium → reveal → nude → explicit plateau.
 - [ ] Для `xxx-only` планувати всю серію відразу як explicit storyboard.
 - [ ] Передавати готовий storyboard у resolver без випадкового руйнування запланованої структури.
-- [ ] Зупиняти batch до GPU-запуску, якщо storyboard неможливо повністю розв’язати.
+- [x] Зупиняти batch до GPU-запуску, якщо storyboard неможливо повністю розв’язати.
 
 Критерії готовності:
 
@@ -105,7 +117,7 @@
 - [ ] Вибирати 1–2 distinctive traits для кожної моделі.
 - [ ] Додати каталог distinctive beauty marks та інших стабільних facial anchors.
 - [ ] Не використовувати batch-temporal phrases, які diffusion model може інтерпретувати як кілька subjects.
-- [ ] Завжди зберігати `solo`, `single subject` і `exactly one adult woman` на початку prompt.
+- [x] Завжди зберігати компактний `solo adult woman` і `single subject` anchor на початку prompt.
 - [ ] Зберегти strengthened duplicate-person negatives.
 
 Критерії готовності:

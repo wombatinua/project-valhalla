@@ -75,6 +75,7 @@ The wizard clears the terminal between each logical screen, shows the active Com
 
 - generate, dry-run, capture, or help;
 - photoshoot or random mode;
+- automatic or interactive storyboard direction;
 - number of photoshoots and images per photoshoot;
 - optional prompt and inference seeds;
 - the photoshoot NSFW and explicit-plateau percentages;
@@ -86,7 +87,42 @@ It prints a complete summary and asks for confirmation before launching `app.py`
 PYTHON_BIN=.venv/bin/python ./launcher.sh
 ```
 
-At startup, the launcher checks whether the selected Python can import `requests`. If necessary, it initializes `pip` through `ensurepip` and installs `requests` automatically before showing the main menu.
+At startup, the launcher checks whether the selected Python can import `requests`. If necessary, it initializes `pip` through `ensurepip` and installs `requests` automatically before showing the main menu. It also detects `fzf`; when Homebrew is available, a missing `fzf` is installed automatically. If neither is available, the Director keeps working with numbered menus.
+
+## Interactive Director's Desk
+
+Choose `Interactive` on the launcher's **Director's Desk** screen, or add the CLI flag directly:
+
+```bash
+python3 app.py dry-run \
+  --mode photoshoot \
+  --count 10 \
+  --review-storyboard
+```
+
+Before any GPU job is queued, the application resolves the complete batch and displays a compact table containing each shot's photoshoot number, stage, pose, action, and expression. The director can then:
+
+- accept the storyboard and begin generation;
+- reroll the complete storyboard;
+- open **Casting & Set Design**, choose a photoshoot SET, and use the explicit **Cast / remix subject** action or replace its wardrobe, location, surface, mood, photography style, or complete set;
+- reroll one shot while preserving its model, outfit, location, and stage;
+- direct one shot by changing its stage/XXX category, pose, action, or expression;
+- reroll the complete composition of one shot;
+- inspect the full positive and negative prompt;
+- cancel without contacting ComfyUI.
+
+Every fixed-choice screen uses an `fzf` picker, including the launcher, confirmation screens, storyboard actions, shot selection, SET design, stages, and all content catalogs. Selectable rows start with a semantic icon for quick visual scanning: casting, wardrobe, location, surface, pose, action, expression, stage, reroll, confirmation, and navigation each use a recognizable marker. Director command pickers use a compact lower-screen window so the SET card and storyboard remain visible above them; larger searchable catalogs expand only when opened. When a picker is active, the redundant numbered list is hidden. Type to search, press Enter to select, or Escape to use the displayed default/keep the current automatic choice. Numeric values such as counts, seeds, and percentages remain ordinary input fields. Pose and action lists contain only variants that the resolver can successfully combine with that shot. Expression choices are filtered against the selected action's required expression tags. When a stage is edited in photoshoot mode, the application rejects changes that would make undressing progression move backward. Set changes are resolved for the complete selected photoshoot, while random mode changes only the selected independent shot. Redirected/non-TTY runs retain the visible numbered-menu fallback for automation.
+
+The SET designer supports constrained remixing instead of forcing a completely new random selection:
+
+- subject: randomize everything, preserve ethnic appearance, or remix only face, hair, body/anatomy, or styling;
+- wardrobe: choose another template or generate new compatible pieces and colors inside the current template;
+- location: choose any interior, stay within the current location family, or keep the exact interior and remix its surface;
+- surface: choose any compatible furniture or stay within the current surface type.
+
+Each remix presents several resolved candidates. Compatibility rules are applied before the candidate is shown, and the accepted context remains fixed across the selected photoshoot.
+
+The same desk works with `dry-run`, `generate`, normal progression, `--xxx-only`, photoshoot batches, and independent random images. Interactive editing happens in memory and does not create another database or modify `database.json`. Without `--review-storyboard`, behavior remains fully automatic.
 
 ## Quick start
 
@@ -185,6 +221,7 @@ python3 app.py dry-run \
   [--prompt-seed N] \
   [--inference-seed N] \
   [--xxx-only] \
+  [--review-storyboard] \
   [--nsfw-percent 0..100] \
   [--plateau-percent 0..100]
 ```
@@ -225,15 +262,7 @@ With `--photoshoots N`, each photoshoot independently assembles a new human mode
 
 The model signature contains every selected human trait, including traits that are not visible in a clothed frame.
 
-To reduce identity drift, photoshoot prompts also contain a weighted identity-reference block. It repeats the fixed facial structure, eyes, nose, lips, jawline, complexion, hairstyle, hair length, hair color, stature, and body proportions identically in every frame. A dedicated negative fragment discourages a different face, hairstyle, hair color, and proportions. These controls are manually adjustable in `prompt_defaults`:
-
-```json
-"identity_consistency_prompt": "same adult woman throughout the photoshoot, ...",
-"identity_consistency_strength": 1.3,
-"identity_consistency_negative": "different woman, identity drift, ..."
-```
-
-The default strength of `1.3` is deliberately firm without overwhelming pose and action instructions. A fixed `--inference-seed` provides the strongest available visual continuity. Leaving it blank still randomizes inference per image as designed and may produce more facial variation even though the model signature and identity block remain fixed. Guaranteed pixel-level identity ultimately depends on the captured workflow; an identity/reference-image node can improve it further when supported by that workflow.
+Photoshoot mode reuses the same resolved human traits and `model_signature` in every prompt. This keeps the requested appearance stable at the prompt-composition level, but it is not an identity-control mechanism and does not give the backend information about previous frames.
 
 ### Random
 
@@ -287,7 +316,11 @@ Explicit actions also constrain facial-expression selection. Masturbation is exc
 
 Mirrors and reflections are excluded from the scene catalog because they frequently create duplicate subjects and anatomical glitches. Mirror furniture and mirror-dependent poses are unavailable, while the global negative prompt also discourages mirrors, reflections, mirrored walls, and reflected people.
 
-The global anatomy-integrity suffix explicitly requests a complete connected body with exactly two arms, two legs, two hands, two feet, and natural finger/toe counts. Its negative counterpart rejects missing, amputated, detached, duplicated, fused, malformed, or disappearing limbs as well as common hand, finger, foot, and toe defects. Extreme overhead contortion poses and actions that pull both legs by the ankles or knees are intentionally excluded because they disproportionately produce missing-leg failures.
+The global anatomy-integrity suffix requests a complete body with two arms, two legs, two hands, two feet, and correct hands and feet. Its negative counterpart rejects missing, amputated, detached, duplicated, fused, or malformed limbs as well as common hand, finger, foot, and toe defects. Extreme overhead contortion poses and actions that pull both legs by the ankles or knees are intentionally excluded because they disproportionately produce missing-leg failures.
+
+Every mode is strictly solo-woman content. The positive prefix anchors a single adult woman, while the global negative prompt rejects men, male bodies or hands, penises, testicles, additional people, and duplicate subjects.
+
+`prompt_defaults` are intentionally compact. Subject count, anatomical integrity, identity, XXX framing, and negative safeguards use short non-repetitive fragments so pose and action instructions retain more conditioning influence.
 
 Override the percentage for one command:
 
@@ -328,7 +361,7 @@ For a multi-photoshoot batch, one prompt seed reproduces the ordered set of ever
 - When omitted, every image receives a new random inference seed.
 - Accepted values are `0` through `18446744073709551615`.
 
-Reusing an inference seed and model signature helps visual continuity, but strict identity consistency still depends on the captured model and workflow. Reference-image, IPAdapter, or character-LoRA nodes can be configured in Stability Matrix and preserved through capture.
+Reusing an inference seed can also repeat composition, crop, or pose tendencies. It is passed literally to the captured sampler nodes; the application does not claim that it preserves identity between independent generations.
 
 ## Settings
 

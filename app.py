@@ -7,8 +7,11 @@ import argparse
 import copy
 import json
 import math
+import os
 import random
 import secrets
+import shutil
+import subprocess
 import sys
 import time
 import uuid
@@ -393,7 +396,13 @@ class Composer:
                 last_error = str(exc)
         raise AppError(f"Could not resolve a compatible fixed context after {attempts} attempts: {last_error}")
 
-    def variable_context(self, stage: dict[str, Any], fixed: dict[str, Any]) -> dict[str, Any]:
+    def variable_context(
+        self,
+        stage: dict[str, Any],
+        fixed: dict[str, Any],
+        overrides: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        overrides = overrides or {}
         available_tags = set(stage.get("body_visibility", [])) | {stage["level"]}
         available_tags |= set(stage.get("visible_slots", []))
         available_tags |= tags(fixed["furniture"]) | tags(fixed["interior"])
@@ -414,6 +423,8 @@ class Composer:
             poses = [item for item in poses if "intimate_closeup" in tags(item)]
         elif plateau_kind == "masturbation":
             poses = [item for item in poses if "masturbation_pose" in tags(item)]
+        if overrides.get("pose"):
+            poses = [item for item in poses if item["id"] == overrides["pose"]]
         pose = weighted_choice(self.rng, poses)
         action_tags = available_tags | tags(pose)
         actions = [
@@ -434,6 +445,8 @@ class Composer:
             actions = [item for item in actions if "closeup_action" in tags(item)]
         elif plateau_kind == "masturbation":
             actions = [item for item in actions if "masturbation_action" in tags(item)]
+        if overrides.get("action"):
+            actions = [item for item in actions if item["id"] == overrides["action"]]
         action = weighted_choice(self.rng, actions)
         prop = None
         required_prop_tags = set(action.get("requires_prop_tags", []))
@@ -454,6 +467,11 @@ class Composer:
                 item for item in expression_candidates
                 if required_expression_tags.issubset(tags(item))
             ]
+        if overrides.get("expression"):
+            expression_candidates = [
+                item for item in expression_candidates
+                if item["id"] == overrides["expression"]
+            ]
         return {
             "pose": pose,
             "action": action,
@@ -461,13 +479,18 @@ class Composer:
             "expression": weighted_choice(self.rng, expression_candidates),
         }
 
-    def resolve_scene(self, fixed: dict[str, Any], stage: dict[str, Any]) -> dict[str, Any]:
+    def resolve_scene(
+        self,
+        fixed: dict[str, Any],
+        stage: dict[str, Any],
+        overrides: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         attempts = int(self.db["settings"].get("max_scene_attempts", 100))
         last_error = "no candidates"
         for _ in range(attempts):
             try:
                 scene = dict(fixed)
-                scene.update(self.variable_context(stage, fixed))
+                scene.update(self.variable_context(stage, fixed, overrides))
                 scene["stage"] = stage
                 scene["dependencies"] = self.resolve_dependencies(scene)
                 self.validate_scene_rules(scene)
@@ -545,20 +568,8 @@ ALWAYS_HUMAN_PARTS = (
     "manicure",
 )
 
-IDENTITY_HUMAN_PARTS = (
-    "ethnic_appearance", "skin_tone", "face_shape", "eye_shape", "eye_color",
-    "eyebrows", "nose", "lips", "cheekbones", "jawline", "hair_texture",
-    "hair_length", "hair_style", "hair_color", "height", "body_frame", "waist", "hips",
-)
-
-
-def human_fragments(
-    human: dict[str, Any], visibility: set[str], include_identity: bool = True
-) -> list[str]:
-    keys = ALWAYS_HUMAN_PARTS if include_identity else tuple(
-        key for key in ALWAYS_HUMAN_PARTS if key not in IDENTITY_HUMAN_PARTS
-    )
-    items: list[dict[str, Any]] = [human[key] for key in keys]
+def human_fragments(human: dict[str, Any], visibility: set[str]) -> list[str]:
+    items: list[dict[str, Any]] = [human[key] for key in ALWAYS_HUMAN_PARTS]
     items.extend(human.get("facial_accents", []))
     if "breasts" in visibility or "nipples" in visibility:
         items.extend([human["breast_size"], human["breast_shape"]])
@@ -571,30 +582,14 @@ def human_fragments(
     return [item["prompt"] for item in items if item.get("prompt")]
 
 
-def identity_consistency_fragment(defaults: dict[str, Any], human: dict[str, Any]) -> str:
-    traits = [human[key]["prompt"] for key in IDENTITY_HUMAN_PARTS if human[key].get("prompt")]
-    prefix = defaults.get(
-        "identity_consistency_prompt",
-        "single subject, solo, exactly one adult woman, consistent facial identity and hairstyle",
-    )
-    strength = float(defaults.get("identity_consistency_strength", 1.25))
-    return f"({prefix}, {', '.join(traits)}:{strength:g})"
-
-
-def compile_scene(
-    db: dict[str, Any], scene: dict[str, Any], identity_consistency: bool = False
-) -> tuple[str, str, list[str]]:
+def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, list[str]]:
     defaults = db["prompt_defaults"]
     stage = scene["stage"]
     visibility = set(stage.get("body_visibility", []))
     plateau_kind = stage.get("plateau_kind")
     xxx_prompt = defaults.get("xxx_plateau_prompts", {}).get(plateau_kind, "")
     fragments = [xxx_prompt, defaults.get("positive_prefix", "")]
-    if identity_consistency:
-        fragments.append(identity_consistency_fragment(defaults, scene["human"]))
-    fragments.extend(
-        human_fragments(scene["human"], visibility, include_identity=not identity_consistency)
-    )
+    fragments.extend(human_fragments(scene["human"], visibility))
     visible_slots = set(stage.get("visible_slots", []))
     outfit = scene["outfit"]
     for slot in outfit["template"]["slots"]:
@@ -608,8 +603,6 @@ def compile_scene(
     fragments.append(defaults.get("positive_suffix", ""))
     positive = ", ".join(fragment.strip(" ,") for fragment in fragments if fragment.strip(" ,"))
     negative = defaults.get("negative_prompt", "")
-    if identity_consistency and defaults.get("identity_consistency_negative"):
-        negative = f"{negative}, {defaults['identity_consistency_negative']}"
     if plateau_kind and defaults.get("xxx_negative_additions"):
         negative = f"{negative}, {defaults['xxx_negative_additions']}"
     ids = []
@@ -877,37 +870,17 @@ def generate_one(
     return prompt_id, saved
 
 
-def run_batch(args: argparse.Namespace, render: bool) -> None:
-    db, db_path = load_database()
-    prompt_seed = args.prompt_seed if args.prompt_seed is not None else secrets.randbits(63)
-    rng = random.Random(prompt_seed)
-    composer = Composer(db, rng)
-    configured_percent = float(db["settings"].get("photoshoot_progression", {}).get("nsfw_final_percent", 50))
-    nsfw_percent = configured_percent if args.nsfw_percent is None else args.nsfw_percent
-    configured_plateau = float(db["settings"].get("photoshoot_progression", {}).get("explicit_plateau_percent", 30))
-    plateau_percent = configured_plateau if args.plateau_percent is None else args.plateau_percent
-    if args.mode == "random" and (args.nsfw_percent is not None or args.plateau_percent is not None):
-        raise AppError("--nsfw-percent and --plateau-percent are only valid with --mode photoshoot")
-    if args.xxx_only and (args.nsfw_percent is not None or args.plateau_percent is not None):
-        raise AppError("--xxx-only cannot be combined with --nsfw-percent or --plateau-percent")
-    if args.mode == "random" and args.photoshoots != 1:
-        raise AppError("--photoshoots is only valid with --mode photoshoot")
-    if plateau_percent > nsfw_percent:
-        raise AppError("The explicit plateau percentage cannot exceed the NSFW final percentage")
-    fixed_inference_seed = args.inference_seed
+def build_storyboard(
+    args: argparse.Namespace,
+    db: dict[str, Any],
+    composer: Composer,
+    rng: random.Random,
+    nsfw_percent: float,
+    plateau_percent: float,
+) -> list[dict[str, Any]]:
     photoshoot_count = args.photoshoots if args.mode == "photoshoot" else 1
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    print(
-        f"mode={args.mode} count={args.count} photoshoots={photoshoot_count} "
-        f"total_images={args.count * photoshoot_count} prompt_seed={prompt_seed} "
-        f"content_mode={'xxx-only' if args.xxx_only else 'progressive'}"
-    )
-    if args.mode == "photoshoot" and not args.xxx_only:
-        print(f"nsfw_final_percent={nsfw_percent:g}")
-        print(f"explicit_plateau_percent={plateau_percent:g}")
-    if fixed_inference_seed is not None:
-        print(f"fixed_inference_seed={fixed_inference_seed}")
     seen_photoshoots: set[tuple[Any, ...]] = set()
+    storyboard: list[dict[str, Any]] = []
     for photoshoot_index in range(photoshoot_count):
         fixed = None
         if args.mode == "photoshoot":
@@ -921,58 +894,895 @@ def run_batch(args: argparse.Namespace, render: bool) -> None:
                     break
             if fixed is None:
                 raise AppError(
-                    f"Could not assemble {photoshoot_count} distinct photoshoots after "
-                    f"{attempts} attempts for photoshoot {photoshoot_index + 1}"
+                    f"Could not assemble distinct photoshoot {photoshoot_index + 1} "
+                    f"after {attempts} attempts"
                 )
-        if args.mode == "photoshoot":
-            assert fixed is not None
-            print(
-                f"\n=== Photoshoot {photoshoot_index + 1}/{photoshoot_count}: "
-                f"template={fixed['outfit']['template']['id']} "
-                f"model_signature={model_signature(fixed['human'])} ==="
-            )
         for shot_index in range(args.count):
             context = fixed if fixed is not None else composer.fixed_context()
             assert context is not None
             template = context["outfit"]["template"]
-            if args.xxx_only:
-                stage = xxx_only_stage(template, shot_index, args.count, args.mode, rng)
-            else:
-                stage = stage_for_index(
-                    template, shot_index, args.count, args.mode, rng, nsfw_percent, plateau_percent
+            stage = (
+                xxx_only_stage(template, shot_index, args.count, args.mode, rng)
+                if args.xxx_only
+                else stage_for_index(
+                    template, shot_index, args.count, args.mode, rng,
+                    nsfw_percent, plateau_percent,
                 )
-            scene = composer.resolve_scene(context, stage)
-            positive, negative, selected_ids = compile_scene(
-                db, scene, identity_consistency=args.mode == "photoshoot"
             )
-            inference_seed = fixed_inference_seed if fixed_inference_seed is not None else secrets.randbelow(2**63)
-            if args.mode == "photoshoot":
-                progress = (
-                    f"photoshoot {photoshoot_index + 1}/{photoshoot_count} "
-                    f"shot {shot_index + 1}/{args.count}"
+            storyboard.append({
+                "number": len(storyboard) + 1,
+                "photoshoot_index": photoshoot_index,
+                "shot_index": shot_index,
+                "context": context,
+                "stage": stage,
+                "scene": composer.resolve_scene(context, stage),
+                "inference_seed": (
+                    args.inference_seed
+                    if args.inference_seed is not None
+                    else secrets.randbelow(2**63)
+                ),
+            })
+    return storyboard
+
+
+def director_clear() -> None:
+    if sys.stdout.isatty():
+        print("\033[2J\033[H", end="")
+
+
+def short_id(value: str, width: int) -> str:
+    prefixes = ("pose_", "action_", "expression_", "template_")
+    for prefix in prefixes:
+        if value.startswith(prefix):
+            value = value[len(prefix):]
+            break
+    return value if len(value) <= width else value[: width - 1] + "…"
+
+
+def show_storyboard(storyboard: list[dict[str, Any]], title: str = "DIRECTOR'S DESK") -> None:
+    director_clear()
+    print(f"🎬 {title}")
+    print("═" * 104)
+    unique_contexts = {id(shot["context"]) for shot in storyboard}
+    random_contexts = len(unique_contexts) > len({shot["photoshoot_index"] for shot in storyboard})
+    if random_contexts:
+        print("RANDOM SET: every shot has an independently assembled model, wardrobe, and location.")
+        print("═" * 104)
+    seen_sets: set[int] = set()
+    for shot in storyboard:
+        if random_contexts:
+            break
+        photo = shot["photoshoot_index"]
+        if photo in seen_sets:
+            continue
+        seen_sets.add(photo)
+        context = shot["context"]
+        human = context["human"]
+        identity = ", ".join((
+            human["age"]["prompt"],
+            human["ethnic_appearance"]["prompt"],
+            human["hair_color"]["prompt"],
+            human["hair_style"]["prompt"],
+            human["body_frame"]["prompt"],
+        ))
+        print(
+            f"SET {photo + 1}: {identity}\n"
+            f"       wardrobe={context['outfit']['template']['id']} | "
+            f"location={context['interior']['id']} | surface={context['furniture']['id']}"
+        )
+    print("═" * 104)
+    print(f"{'#':>3} {'Set':>3} {'Stage':<18} {'Pose':<23} {'Action':<24} {'Expression':<18}")
+    print("─" * 104)
+    for shot in storyboard:
+        scene = shot["scene"]
+        print(
+            f"{shot['number']:>3} {shot['photoshoot_index'] + 1:>3} "
+            f"{short_id(shot['stage']['id'], 18):<18} "
+            f"{short_id(scene['pose']['id'], 23):<23} "
+            f"{short_id(scene['action']['id'], 24):<24} "
+            f"{short_id(scene['expression']['id'], 18):<18}"
+        )
+    print("═" * 104)
+
+
+def director_input(prompt: str) -> str:
+    try:
+        return input(prompt).strip()
+    except EOFError as exc:
+        raise AppError("Interactive storyboard input ended before confirmation") from exc
+
+
+def choose_number(prompt: str, maximum: int, allow_zero: bool = True) -> int | None:
+    value = director_input(prompt)
+    if value == "" and allow_zero:
+        return 0
+    try:
+        parsed = int(value)
+    except ValueError:
+        return None
+    if (allow_zero and parsed == 0) or 1 <= parsed <= maximum:
+        return parsed
+    return None
+
+
+def fzf_binary() -> str | None:
+    configured_env = os.environ.get("FZF_BIN")
+    if configured_env and Path(configured_env).is_file():
+        return configured_env
+    configured = shutil.which("fzf")
+    if configured:
+        return configured
+    for path in (
+        "/home/linuxbrew/.linuxbrew/bin/fzf",
+        "/opt/homebrew/bin/fzf",
+        "/usr/local/bin/fzf",
+    ):
+        if Path(path).is_file():
+            return path
+    return None
+
+
+def director_uses_fzf() -> bool:
+    return bool(fzf_binary() and sys.stdin.isatty() and sys.stdout.isatty())
+
+
+def semantic_fzf_label(label: str, prompt: str) -> str:
+    if label and ord(label[0]) > 0x2000:
+        return label
+    text = f"{prompt} {label}".lower()
+    rules = (
+        (("cancel",), "❌"),
+        (("back", "keep current", "auto", "default"), "↩️"),
+        (("inspect", "view full prompt"), "🔎"),
+        (("cast", "subject", "model"), "🎭"),
+        (("wardrobe", "outfit", "garment", "clothes"), "👗"),
+        (("location", "interior"), "🏠"),
+        (("surface", "furniture", "bed", "sofa", "chair"), "🛋️"),
+        (("photography", "camera", "photo style"), "📸"),
+        (("expression",), "😏"),
+        (("pose",), "🧍"),
+        (("action",), "🎬"),
+        (("stage", "xxx category"), "🎞️"),
+        (("mood",), "✨"),
+        (("reroll", "remix", "random"), "🔀"),
+        (("generate", "lights, camera", "accept"), "🚀"),
+        (("dry run",), "🧪"),
+        (("capture", "workflow"), "📥"),
+        (("help",), "❓"),
+        (("exit",), "🚪"),
+        (("set", "shot", "storyboard"), "🎬"),
+    )
+    for keywords, icon in rules:
+        if any(keyword in text for keyword in keywords):
+            return f"{icon} {label}"
+    return f"• {label}"
+
+
+def fzf_select(
+    prompt: str,
+    choices: list[tuple[str, Any]],
+    default: Any | None = None,
+    default_label: str = "Auto / keep current",
+    height: str = "72%",
+) -> Any | None:
+    executable = fzf_binary()
+    if not executable or not sys.stdin.isatty() or not sys.stdout.isatty():
+        return None
+    rows = [f"0\t{semantic_fzf_label(default_label, prompt)}"]
+    rows.extend(
+        f"{index}\t{semantic_fzf_label(label.replace(chr(9), ' '), prompt)}"
+        for index, (label, _) in enumerate(choices, 1)
+    )
+    try:
+        result = subprocess.run(
+            [
+                executable,
+                f"--height={height}",
+                "--layout=reverse",
+                "--border=rounded",
+                "--info=inline",
+                "--delimiter=\t",
+                "--with-nth=2..",
+                f"--prompt={prompt} › ",
+                "--header=Type to search • Enter select • Esc keep Auto",
+            ],
+            input="\n".join(rows) + "\n",
+            text=True,
+            stdout=subprocess.PIPE,
+            check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    try:
+        selected = int(result.stdout.split("\t", 1)[0])
+    except ValueError:
+        return None
+    return choices[selected - 1][1] if selected else default
+
+
+def director_menu_choice(
+    prompt: str,
+    choices: list[tuple[str, str]],
+    default: str,
+) -> str:
+    if director_uses_fzf():
+        selected = fzf_select(
+            prompt,
+            choices,
+            default,
+            f"Default — {default}",
+            height="42%",
+        )
+        return str(selected)
+    return director_input(f"\n{prompt} [{default}]: ") or default
+
+
+def director_stage_options(shot: dict[str, Any], xxx_only: bool) -> list[dict[str, Any]]:
+    template = shot["context"]["outfit"]["template"]
+    explicit = [xxx_only_stage(template, i, 3, "photoshoot", random.Random(0)) for i in range(3)]
+    if xxx_only:
+        return explicit
+    non_explicit = [
+        stage for stage in effective_photoshoot_stages(template) if stage["level"] != "explicit"
+    ]
+    return non_explicit + explicit
+
+
+def effective_progression(args: argparse.Namespace, db: dict[str, Any]) -> tuple[float, float]:
+    progression = db["settings"].get("photoshoot_progression", {})
+    nsfw = float(
+        progression.get("nsfw_final_percent", 50)
+        if args.nsfw_percent is None else args.nsfw_percent
+    )
+    plateau = float(
+        progression.get("explicit_plateau_percent", 30)
+        if args.plateau_percent is None else args.plateau_percent
+    )
+    return nsfw, plateau
+
+
+def replace_set_context(
+    args: argparse.Namespace,
+    db: dict[str, Any],
+    composer: Composer,
+    storyboard: list[dict[str, Any]],
+    indices: list[int],
+    context: dict[str, Any],
+    recalculate_stages: bool,
+) -> None:
+    nsfw, plateau = effective_progression(args, db)
+    replacements: list[tuple[int, dict[str, Any], dict[str, Any]]] = []
+    for index in indices:
+        shot = storyboard[index]
+        if recalculate_stages:
+            template = context["outfit"]["template"]
+            stage = (
+                xxx_only_stage(template, shot["shot_index"], args.count, args.mode, composer.rng)
+                if args.xxx_only
+                else stage_for_index(
+                    template, shot["shot_index"], args.count, args.mode,
+                    composer.rng, nsfw, plateau,
                 )
+            )
+        else:
+            stage = shot["stage"]
+        scene = composer.resolve_scene(context, stage)
+        replacements.append((index, stage, scene))
+    for index, stage, scene in replacements:
+        storyboard[index]["context"] = context
+        storyboard[index]["stage"] = stage
+        storyboard[index]["scene"] = scene
+
+
+def set_indices(storyboard: list[dict[str, Any]], index: int, mode: str) -> list[int]:
+    if mode == "random":
+        return [index]
+    photo = storyboard[index]["photoshoot_index"]
+    return [i for i, shot in enumerate(storyboard) if shot["photoshoot_index"] == photo]
+
+
+def human_cast_label(human: dict[str, Any]) -> str:
+    return ", ".join((
+        human["age"]["prompt"], human["ethnic_appearance"]["prompt"],
+        human["skin_tone"]["prompt"], human["face_shape"]["prompt"],
+        human["eye_shape"]["prompt"], human["eye_color"]["prompt"],
+        human["nose"]["prompt"], human["lips"]["prompt"],
+        human["hair_color"]["prompt"], human["hair_style"]["prompt"],
+        human["body_frame"]["prompt"], human["breast_size"]["prompt"],
+    ))
+
+
+HUMAN_FACE_PARTS = {
+    "face_shape", "eye_shape", "eye_color", "eyebrows", "nose", "lips",
+    "cheekbones", "jawline", "facial_accents",
+}
+HUMAN_HAIR_PARTS = {"hair_texture", "hair_length", "hair_style", "hair_color"}
+HUMAN_BODY_PARTS = {
+    "height", "body_frame", "waist", "hips", "breast_size", "breast_shape",
+    "areola_size", "areola_color", "nipple_size", "nipple_shape", "pubic_hair",
+    "genital_appearance",
+}
+HUMAN_STYLING_PARTS = {"makeup", "manicure"}
+
+
+def remixed_human(
+    composer: Composer,
+    current: dict[str, Any],
+    replace_parts: set[str] | None = None,
+    keep_parts: set[str] | None = None,
+) -> dict[str, Any]:
+    fresh = composer.choose_human()
+    if replace_parts is not None:
+        return {
+            key: fresh[key] if key in replace_parts else value
+            for key, value in current.items()
+        }
+    keep_parts = keep_parts or set()
+    return {
+        key: value if key in keep_parts else fresh[key]
+        for key, value in current.items()
+    }
+
+
+def choose_subject_remix(composer: Composer, current: dict[str, Any]) -> dict[str, Any] | None:
+    mode = select_labeled(
+        "🎭 SUBJECT REMIX — choose what stays locked",
+        [
+            ("New completely random subject", "all"),
+            (f"Keep ethnic appearance: {current['ethnic_appearance']['prompt']}", "ethnic"),
+            ("Remix face only", "face"),
+            ("Remix hair only", "hair"),
+            ("Remix body and anatomy only", "body"),
+            ("Remix makeup and manicure only", "styling"),
+        ],
+    )
+    if mode is None:
+        return None
+    candidates: list[dict[str, Any]] = []
+    for _ in range(8):
+        if mode == "all":
+            candidate = composer.choose_human()
+        elif mode == "ethnic":
+            candidate = remixed_human(composer, current, keep_parts={"ethnic_appearance"})
+        else:
+            groups = {
+                "face": HUMAN_FACE_PARTS,
+                "hair": HUMAN_HAIR_PARTS,
+                "body": HUMAN_BODY_PARTS,
+                "styling": HUMAN_STYLING_PARTS,
+            }
+            candidate = remixed_human(composer, current, replace_parts=groups[mode])
+            if mode == "body":
+                compatible_colors = [
+                    item for item in composer.db["human_model_parts"]["areola_color"]
+                    if not item.get("disabled", False)
+                    and compatible_with_requirements(item, tags(current["skin_tone"]))
+                ]
+                candidate["areola_color"] = weighted_choice(composer.rng, compatible_colors)
+        candidates.append(candidate)
+    return select_labeled(
+        "🎭 CASTING CALL — choose the remixed subject",
+        [(human_cast_label(candidate), candidate) for candidate in candidates],
+    )
+
+
+def outfit_label(outfit: dict[str, Any]) -> str:
+    garments = ", ".join(
+        f"{slot}={item['id']} ({outfit['colors'][slot]['id']})"
+        for slot, item in outfit["garments"].items()
+    )
+    return f"{outfit['template']['id']} — {garments}"
+
+
+def choose_wardrobe_remix(
+    db: dict[str, Any], composer: Composer, current: dict[str, Any]
+) -> dict[str, Any] | None:
+    mode = select_labeled(
+        "👗 WARDROBE REMIX",
+        [
+            ("Choose another outfit category / template", "template"),
+            (f"Remix pieces and colors inside {current['template']['id']}", "same_template"),
+        ],
+    )
+    if mode is None:
+        return None
+    if mode == "same_template":
+        candidates = [composer.choose_outfit(current["template"]) for _ in range(8)]
+    else:
+        candidates = []
+        for template in db["outfit_templates"]:
+            if template.get("disabled", False):
+                continue
+            try:
+                candidates.append(composer.choose_outfit(template))
+            except AppError:
+                continue
+    return select_labeled(
+        "👗 WARDROBE DEPARTMENT — choose a resolved outfit",
+        [(outfit_label(outfit), outfit) for outfit in candidates],
+    )
+
+
+def location_family(interior: dict[str, Any]) -> set[str]:
+    generic = {"indoor", "private", "luxury", "cozy", "intimate"}
+    return tags(interior) - generic
+
+
+def resolved_location_candidates(
+    db: dict[str, Any], composer: Composer, interiors: list[dict[str, Any]]
+) -> list[tuple[str, tuple[dict[str, Any], dict[str, Any]]]]:
+    result = []
+    for interior in interiors:
+        surfaces = [
+            item for item in db["furniture"]
+            if not item.get("disabled", False)
+            and compatible_with_requirements(item, tags(interior))
+        ]
+        if surfaces:
+            surface = weighted_choice(composer.rng, surfaces)
+            result.append((f"{interior['prompt']} — {surface['prompt']}", (interior, surface)))
+    return result
+
+
+def choose_location_remix(
+    db: dict[str, Any], composer: Composer, current: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    family = location_family(current)
+    mode = select_labeled(
+        "🏠 LOCATION REMIX",
+        [
+            ("Choose any new interior", "all"),
+            (f"Remix within the same location family: {', '.join(sorted(family)) or 'general'}", "family"),
+            (f"Keep {current['id']} and remix its surface", "surface"),
+        ],
+    )
+    if mode is None:
+        return None
+    if mode == "surface":
+        interiors = [current]
+        count = 8
+    else:
+        interiors = [item for item in db["interiors"] if not item.get("disabled", False)]
+        if mode == "family" and family:
+            interiors = [item for item in interiors if location_family(item) & family]
+        count = 1
+    candidates = []
+    for _ in range(count):
+        candidates.extend(resolved_location_candidates(db, composer, interiors))
+    return select_labeled("🏠 LOCATION SCOUTING — choose a resolved set", candidates)
+
+
+def choose_surface_remix(
+    db: dict[str, Any], current_interior: dict[str, Any], current: dict[str, Any]
+) -> dict[str, Any] | None:
+    surface_types = {
+        "bed", "sofa", "chair", "bathtub", "floor", "wall", "windowsill",
+        "table", "shower", "bench", "stool",
+    }
+    current_types = tags(current) & surface_types
+    mode = select_labeled(
+        "🛋️ SURFACE REMIX",
+        [
+            ("Choose any compatible surface", "all"),
+            (f"Remix the same surface type: {', '.join(sorted(current_types)) or current['id']}", "type"),
+        ],
+    )
+    if mode is None:
+        return None
+    candidates = [
+        item for item in db["furniture"]
+        if not item.get("disabled", False)
+        and compatible_with_requirements(item, tags(current_interior))
+    ]
+    if mode == "type" and current_types:
+        candidates = [item for item in candidates if tags(item) & current_types]
+    return select_labeled(
+        "🛋️ SURFACE & BLOCKING — choose a variant",
+        [(item["prompt"], item) for item in candidates],
+    )
+
+
+def select_labeled(prompt: str, choices: list[tuple[str, Any]]) -> Any | None:
+    if director_uses_fzf():
+        return fzf_select(prompt, choices)
+    director_clear()
+    print(prompt + "\n")
+    for number, (label, _) in enumerate(choices, 1):
+        print(f"{number:>2}) {label}")
+    print(" 0) Keep current / Auto")
+    selected = choose_number("\nChoose: ", len(choices))
+    return choices[selected - 1][1] if selected else None
+
+
+def direct_set(
+    args: argparse.Namespace,
+    db: dict[str, Any],
+    composer: Composer,
+    storyboard: list[dict[str, Any]],
+    index: int,
+) -> None:
+    indices = set_indices(storyboard, index, args.mode)
+    while True:
+        shot = storyboard[index]
+        context = shot["context"]
+        show_storyboard([storyboard[i] for i in indices], f"CASTING & SET DESIGN — SET {shot['photoshoot_index'] + 1}")
+        if not director_uses_fzf():
+            print("1) Cast / remix subject")
+            print("2) Change wardrobe")
+            print("3) Change location")
+            print("4) Change surface / furniture")
+            print("5) Change mood")
+            print("6) Change photography style")
+            print("7) Reroll the complete set")
+            print("0) Back to storyboard")
+        choice = director_menu_choice(
+            "Set designer's choice",
+            [
+                ("Cast / remix subject", "1"),
+                ("Change wardrobe", "2"),
+                ("Change location", "3"),
+                ("Change surface / furniture", "4"),
+                ("Change mood", "5"),
+                ("Change photography style", "6"),
+                ("Reroll the complete set", "7"),
+                ("Back to storyboard", "0"),
+            ],
+            "0",
+        )
+        if choice == "0":
+            return
+        new_context = dict(context)
+        recalculate_stages = False
+        if choice == "1":
+            human = choose_subject_remix(composer, context["human"])
+            if human is None:
+                continue
+            new_context["human"] = human
+        elif choice == "2":
+            outfit = choose_wardrobe_remix(db, composer, context["outfit"])
+            if outfit is None:
+                continue
+            new_context["outfit"] = outfit
+            recalculate_stages = True
+        elif choice == "3":
+            selected = choose_location_remix(db, composer, context["interior"])
+            if selected is None:
+                continue
+            new_context["interior"], new_context["furniture"] = selected
+        elif choice == "4":
+            surface = choose_surface_remix(db, context["interior"], context["furniture"])
+            if surface is None:
+                continue
+            new_context["furniture"] = surface
+        elif choice == "5":
+            mood = select_labeled(
+                "✨ MOOD",
+                [(item["prompt"], item) for item in db["moods"] if not item.get("disabled", False)],
+            )
+            if mood is None:
+                continue
+            new_context["mood"] = mood
+        elif choice == "6":
+            style = select_labeled(
+                "📸 PHOTOGRAPHY STYLE",
+                [(item["prompt"], item) for item in db["photography_styles"] if not item.get("disabled", False)],
+            )
+            if style is None:
+                continue
+            new_context["photography_style"] = style
+        elif choice == "7":
+            new_context = composer.fixed_context()
+            recalculate_stages = True
+        else:
+            continue
+        try:
+            replace_set_context(
+                args, db, composer, storyboard, indices, new_context, recalculate_stages
+            )
+        except AppError as exc:
+            director_input(f"Could not apply this direction: {exc}\nPress Enter...")
+
+
+def stage_change_preserves_progression(
+    storyboard: list[dict[str, Any]], index: int, stage: dict[str, Any], mode: str
+) -> bool:
+    if mode != "photoshoot":
+        return True
+    ranks = {"covered": 0, "lingerie": 1, "topless": 2, "nude": 3, "explicit": 4}
+    photo = storyboard[index]["photoshoot_index"]
+    previous = next(
+        (storyboard[i] for i in range(index - 1, -1, -1)
+         if storyboard[i]["photoshoot_index"] == photo), None
+    )
+    following = next(
+        (storyboard[i] for i in range(index + 1, len(storyboard))
+         if storyboard[i]["photoshoot_index"] == photo), None
+    )
+    rank = ranks[stage["level"]]
+    return (
+        (previous is None or ranks[previous["stage"]["level"]] <= rank)
+        and (following is None or rank <= ranks[following["stage"]["level"]])
+    )
+
+
+def choose_compatible_override(
+    db: dict[str, Any], composer: Composer, shot: dict[str, Any], key: str
+) -> dict[str, Any] | None:
+    section = {"pose": "poses", "action": "actions"}[key]
+    candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for item in db[section]:
+        if item.get("disabled", False):
+            continue
+        try:
+            scene = composer.resolve_scene(
+                shot["context"], shot["stage"], {key: item["id"]}
+            )
+        except AppError:
+            continue
+        candidates.append((item, scene))
+    return select_labeled(
+        f"🎥 Compatible {key}s for shot {shot['number']}",
+        [(f"{item['id']} — {item['prompt']}", scene) for item, scene in candidates],
+    )
+
+
+def choose_expression(
+    db: dict[str, Any], composer: Composer, shot: dict[str, Any]
+) -> dict[str, Any] | None:
+    candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for item in db["expressions"]:
+        if item.get("disabled", False):
+            continue
+        scene = dict(shot["scene"])
+        scene["expression"] = item
+        try:
+            composer.validate_scene_rules(scene)
+        except AppError:
+            continue
+        candidates.append((item, scene))
+    return select_labeled(
+        f"🎭 Compatible expressions for shot {shot['number']}",
+        [(f"{item['id']} — {item['prompt']}", scene) for item, scene in candidates],
+    )
+
+
+def direct_one_shot(
+    args: argparse.Namespace,
+    db: dict[str, Any],
+    composer: Composer,
+    storyboard: list[dict[str, Any]],
+    index: int,
+) -> None:
+    shot = storyboard[index]
+    while True:
+        show_storyboard([shot], f"DIRECT SHOT {shot['number']}")
+        if not director_uses_fzf():
+            print("1) Stage / XXX category")
+            print("2) Pose")
+            print("3) Action")
+            print("4) Expression")
+            print("5) Reroll complete shot composition")
+            print("6) View full prompt")
+            print("0) Back to storyboard")
+        choice = director_menu_choice(
+            "Director's choice",
+            [
+                ("Stage / XXX category", "1"),
+                ("Pose", "2"),
+                ("Action", "3"),
+                ("Expression", "4"),
+                ("Reroll complete shot composition", "5"),
+                ("View full prompt", "6"),
+                ("Back to storyboard", "0"),
+            ],
+            "0",
+        )
+        if choice == "0":
+            return
+        if choice == "1":
+            options = director_stage_options(shot, args.xxx_only)
+            stage = select_labeled(
+                f"🎞️ Stage for shot {shot['number']}",
+                [(f"{stage['id']} ({stage['level']})", stage) for stage in options],
+            )
+            if stage:
+                if not stage_change_preserves_progression(storyboard, index, stage, args.mode):
+                    director_input("That would reverse the photoshoot progression. Press Enter...")
+                    continue
+                shot["stage"] = stage
+                shot["scene"] = composer.resolve_scene(shot["context"], stage)
+        elif choice in {"2", "3"}:
+            scene = choose_compatible_override(
+                db, composer, shot, "pose" if choice == "2" else "action"
+            )
+            if scene:
+                shot["scene"] = scene
+        elif choice == "4":
+            scene = choose_expression(db, composer, shot)
+            if scene:
+                shot["scene"] = scene
+        elif choice == "5":
+            shot["scene"] = composer.resolve_scene(shot["context"], shot["stage"])
+            if args.inference_seed is None:
+                shot["inference_seed"] = secrets.randbelow(2**63)
+        elif choice == "6":
+            positive, negative, _ = compile_scene(db, shot["scene"])
+            director_clear()
+            print(f"POSITIVE\n{positive}\n\nNEGATIVE\n{negative}\n")
+            director_input("Press Enter to return...")
+
+
+def review_storyboard(
+    args: argparse.Namespace,
+    db: dict[str, Any],
+    composer: Composer,
+    storyboard: list[dict[str, Any]],
+    render: bool,
+) -> str:
+    while True:
+        show_storyboard(storyboard)
+        if not director_uses_fzf():
+            print(f"1) {'Lights, camera, generate!' if render else 'Accept and print dry-run'}")
+            print("2) Reroll the entire storyboard")
+            print("3) Cast & design a SET")
+            print("4) Reroll one shot")
+            print("5) Direct one shot")
+            print("6) Inspect one full prompt")
+            print("0) Cancel")
+        choice = director_menu_choice(
+            "Director's choice",
+            [
+                (("Lights, camera, generate!" if render else "Accept and print dry-run"), "1"),
+                ("Reroll the entire storyboard", "2"),
+                ("Cast & design a SET", "3"),
+                ("Reroll one shot", "4"),
+                ("Direct one shot", "5"),
+                ("Inspect one full prompt", "6"),
+                ("Cancel", "0"),
+            ],
+            "1",
+        )
+        if choice == "1":
+            return "accept"
+        if choice == "2":
+            return "reroll"
+        if choice == "0":
+            return "cancel"
+        if choice in {"3", "4", "5", "6"}:
+            if choice == "3" and args.mode == "photoshoot":
+                set_representatives = []
+                seen_sets: set[int] = set()
+                for offset, shot in enumerate(storyboard):
+                    photo = shot["photoshoot_index"]
+                    if photo not in seen_sets:
+                        seen_sets.add(photo)
+                        set_representatives.append((offset, shot))
+                selection_choices = [
+                    (
+                        f"SET {shot['photoshoot_index'] + 1} · "
+                        f"{human_cast_label(shot['context']['human'])} · "
+                        f"{shot['context']['outfit']['template']['id']} · "
+                        f"{shot['context']['interior']['id']}",
+                        offset,
+                    )
+                    for offset, shot in set_representatives
+                ]
+                noun = "Choose a SET for casting and design"
             else:
-                progress = f"{shot_index + 1}/{args.count}"
-            print(f"\n[{progress}] stage={stage['id']} inference_seed={inference_seed}")
-            print(f"model_signature={model_signature(scene['human'])}")
-            print(f"selected_ids={','.join(selected_ids)}")
-            print(f"positive={positive}")
-            print(f"negative={negative}")
-            if render:
-                prompt_id, paths = generate_one(
-                    db,
-                    db_path,
-                    positive,
-                    negative,
-                    inference_seed,
-                    args.mode,
-                    shot_index,
-                    photoshoot_index,
-                    run_id,
-                )
-                print(f"prompt_id={prompt_id}")
-                for path in paths:
-                    print(f"saved={path}")
+                selection_choices = [
+                    (
+                        f"Shot {shot['number']} · SET {shot['photoshoot_index'] + 1} · "
+                        f"{shot['stage']['id']} · {shot['scene']['pose']['id']}",
+                        offset,
+                    )
+                    for offset, shot in enumerate(storyboard)
+                ]
+                noun = "Choose an independent shot as its SET" if choice == "3" else "Choose a shot"
+            index = select_labeled(
+                noun,
+                selection_choices,
+            )
+            if index is None:
+                continue
+            number = index + 1
+            if choice == "3":
+                direct_set(args, db, composer, storyboard, index)
+            elif choice == "4":
+                shot = storyboard[index]
+                shot["scene"] = composer.resolve_scene(shot["context"], shot["stage"])
+                if args.inference_seed is None:
+                    shot["inference_seed"] = secrets.randbelow(2**63)
+            elif choice == "5":
+                direct_one_shot(args, db, composer, storyboard, index)
+            else:
+                shot = storyboard[index]
+                positive, negative, _ = compile_scene(db, shot["scene"])
+                director_clear()
+                print(f"SHOT {number}\n\nPOSITIVE\n{positive}\n\nNEGATIVE\n{negative}\n")
+                director_input("Press Enter to return...")
+
+
+def run_batch(args: argparse.Namespace, render: bool) -> None:
+    db, db_path = load_database()
+    prompt_seed = args.prompt_seed if args.prompt_seed is not None else secrets.randbits(63)
+    rng = random.Random(prompt_seed)
+    composer = Composer(db, rng)
+    progression = db["settings"].get("photoshoot_progression", {})
+    nsfw_percent = float(
+        progression.get("nsfw_final_percent", 50)
+        if args.nsfw_percent is None else args.nsfw_percent
+    )
+    plateau_percent = float(
+        progression.get("explicit_plateau_percent", 30)
+        if args.plateau_percent is None else args.plateau_percent
+    )
+    if args.mode == "random" and (args.nsfw_percent is not None or args.plateau_percent is not None):
+        raise AppError("--nsfw-percent and --plateau-percent are only valid with --mode photoshoot")
+    if args.xxx_only and (args.nsfw_percent is not None or args.plateau_percent is not None):
+        raise AppError("--xxx-only cannot be combined with --nsfw-percent or --plateau-percent")
+    if args.mode == "random" and args.photoshoots != 1:
+        raise AppError("--photoshoots is only valid with --mode photoshoot")
+    if plateau_percent > nsfw_percent:
+        raise AppError("The explicit plateau percentage cannot exceed the NSFW final percentage")
+
+    photoshoot_count = args.photoshoots if args.mode == "photoshoot" else 1
+    storyboard = build_storyboard(args, db, composer, rng, nsfw_percent, plateau_percent)
+    if args.review_storyboard:
+        while True:
+            decision = review_storyboard(args, db, composer, storyboard, render)
+            if decision == "accept":
+                break
+            if decision == "cancel":
+                print("Cancelled by director.")
+                return
+            storyboard = build_storyboard(args, db, composer, rng, nsfw_percent, plateau_percent)
+
+    director_clear() if args.review_storyboard else None
+    print(
+        f"mode={args.mode} count={args.count} photoshoots={photoshoot_count} "
+        f"total_images={len(storyboard)} prompt_seed={prompt_seed} "
+        f"content_mode={'xxx-only' if args.xxx_only else 'progressive'}"
+    )
+    if args.mode == "photoshoot" and not args.xxx_only:
+        print(f"nsfw_final_percent={nsfw_percent:g}")
+        print(f"explicit_plateau_percent={plateau_percent:g}")
+    if args.inference_seed is not None:
+        print(f"fixed_inference_seed={args.inference_seed}")
+
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    announced_photoshoot = -1
+    for shot in storyboard:
+        photo = shot["photoshoot_index"]
+        scene = shot["scene"]
+        if args.mode == "photoshoot" and photo != announced_photoshoot:
+            context = shot["context"]
+            print(
+                f"\n=== Photoshoot {photo + 1}/{photoshoot_count}: "
+                f"template={context['outfit']['template']['id']} "
+                f"model_signature={model_signature(context['human'])} ==="
+            )
+            announced_photoshoot = photo
+        positive, negative, selected_ids = compile_scene(db, scene)
+        progress = (
+            f"photoshoot {photo + 1}/{photoshoot_count} "
+            f"shot {shot['shot_index'] + 1}/{args.count}"
+            if args.mode == "photoshoot" else f"{shot['shot_index'] + 1}/{args.count}"
+        )
+        print(f"\n[{progress}] stage={shot['stage']['id']} inference_seed={shot['inference_seed']}")
+        print(f"model_signature={model_signature(scene['human'])}")
+        print(f"selected_ids={','.join(selected_ids)}")
+        print(f"positive={positive}")
+        print(f"negative={negative}")
+        if render:
+            prompt_id, paths = generate_one(
+                db, db_path, positive, negative, shot["inference_seed"], args.mode,
+                shot["shot_index"], photo, run_id,
+            )
+            print(f"prompt_id={prompt_id}")
+            for path in paths:
+                print(f"saved={path}")
 
 
 def positive_int(value: str) -> int:
@@ -1012,6 +1822,11 @@ def build_parser() -> argparse.ArgumentParser:
             "--xxx-only",
             action="store_true",
             help="Make every image immediately explicit XXX (works with photoshoot and random modes)",
+        )
+        command.add_argument(
+            "--review-storyboard",
+            action="store_true",
+            help="Open the interactive Director's Desk before printing or generating the batch",
         )
         command.add_argument(
             "--nsfw-percent",

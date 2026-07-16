@@ -78,18 +78,15 @@
     ]
   },
   "prompt_defaults": {
-    "positive_prefix": "(solo:1.4), (single subject:1.4), (exactly one beautiful adult woman:1.4)",
-    "positive_suffix": "complete intact adult body, exactly two complete arms and two complete legs, both arms naturally connected at the shoulders, both legs naturally connected to the pelvis, exactly two complete hands and two complete feet, five natural fingers on each hand, five natural toes on each foot, all limbs fully formed and clearly connected, professional model photoshoot, anatomically coherent, detailed skin, realistic photography, high detail",
-    "negative_prompt": "child, minor, underage, teen, teenager, young-looking, schoolgirl, multiple people, duplicate person, mirror, mirrors, mirrored wall, mirror reflection, reflection, reflected person, reflective glass, sex toy, adult toy, vibrator, dildo, artificial object in hand, amputee, amputation, incomplete body, missing limb, missing arm, missing leg, one arm, one leg, missing hand, missing foot, disappearing limb, disappearing arm, disappearing leg, cropped-off limb, severed limb, severed arm, severed leg, detached limb, detached arm, detached leg, detached hand, detached foot, limb stump, arm stump, leg stump, prosthetic limb, prosthetic arm, prosthetic leg, extra limb, extra limbs, extra arm, extra arms, extra leg, extra legs, extra hand, extra hands, extra foot, extra feet, duplicated limb, duplicated arms, duplicated legs, fused arms, fused legs, merged limbs, merged arms, merged legs, malformed limbs, malformed arms, malformed legs, deformed arms, deformed legs, twisted limbs, dislocated shoulder, dislocated hip, bad hands, malformed hands, deformed hands, fused hands, missing finger, missing fingers, extra finger, extra fingers, too many fingers, six fingers, duplicated fingers, fused fingers, webbed fingers, malformed fingers, deformed fingers, broken fingers, bad feet, malformed feet, deformed feet, missing toe, missing toes, extra toe, extra toes, fused toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
-    "identity_consistency_prompt": "single subject identity anchor, one person only, consistent facial structure, consistent eyes, nose, lips and jawline, consistent hairstyle, hair length, hair color and body proportions",
-    "identity_consistency_strength": 1.3,
-    "identity_consistency_negative": "two women, second woman, multiple women, twins, twin sisters, clone, cloned woman, duplicated person, duplicate face, duplicate body, side-by-side women, split portrait, mirror duplicate, mirror reflection showing another person, different woman, different person, identity drift, inconsistent face, changing facial features, different eye color, different nose, different lips, changing hairstyle, different hairstyle, changing hair length, changing hair color, wig, inconsistent body proportions",
+    "positive_prefix": "(solo adult woman:1.4), (single subject:1.4)",
+    "positive_suffix": "complete intact body, two arms, two legs, two hands, two feet, correct hands and feet, coherent anatomy, realistic professional photography, detailed skin, high detail",
+    "negative_prompt": "child, minor, underage, teen, young-looking, man, male, men, male body, male hands, penis, testicles, multiple people, duplicate person, twins, mirror, reflection, sex toy, vibrator, dildo, amputee, missing limb, missing arm, missing leg, detached limb, limb stump, prosthetic limb, extra limbs, extra arms, extra legs, duplicated limbs, fused limbs, malformed arms, malformed legs, bad hands, missing fingers, extra fingers, fused fingers, malformed fingers, bad feet, missing toes, extra toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
     "xxx_plateau_prompts": {
-      "provocative_rear": "(XXX explicit adult pornography:1.5), (fully nude uncensored adult woman:1.4), (bare buttocks and exposed intimate anatomy from behind:1.4), pornographic rear-view composition",
-      "intimate_closeup": "(XXX explicit adult pornography:1.5), (fully nude uncensored adult woman:1.4), (intimate anatomy clearly visible in extreme close-up:1.5), explicit pornographic close-up composition",
-      "masturbation": "(XXX explicit adult pornography:1.5), (fully nude uncensored adult woman masturbating:1.5), (explicit sexual action and exposed intimate anatomy:1.5), pornographic action composition"
+      "provocative_rear": "(explicit nude rear view:1.5), exposed buttocks and genitals from behind, uncensored",
+      "intimate_closeup": "(explicit intimate anatomical close-up:1.5), fully nude, clearly visible, uncensored",
+      "masturbation": "(hands-only masturbation:1.5), exposed genitals, fully nude, uncensored"
     },
-    "xxx_negative_additions": "clothed, wearing underwear, bra, panties, covered breasts, covered genitals, censored, censorship, mosaic, black bars, strategically covered anatomy, implied nudity, non-explicit boudoir"
+    "xxx_negative_additions": "clothes, underwear, covered breasts, covered genitals, censorship, mosaic, black bars, implied nudity"
   },
   "colors": [
     {
