@@ -142,6 +142,18 @@ def validate_database(db: dict[str, Any], require_mapping: bool) -> None:
             ids.add(item["id"]); index[item["id"]] = item
 
     enabled_ids = {item_id for item_id, item in index.items() if not item.get("disabled", False)}
+    default_ethnic_appearance = settings.get("default_ethnic_appearance")
+    if (
+        not isinstance(default_ethnic_appearance, str)
+        or default_ethnic_appearance not in enabled_ids
+        or default_ethnic_appearance not in {
+            item["id"] for item in db["human_model_parts"]["ethnic_appearance"]
+        }
+    ):
+        raise AppError(
+            "settings.default_ethnic_appearance must reference an enabled "
+            "human_model_parts.ethnic_appearance item"
+        )
     color_ids = {item["id"] for item in db["colors"]}
     enabled_color_ids = {
         item["id"] for item in db["colors"] if not item.get("disabled", False)
@@ -279,24 +291,46 @@ class Composer:
             if not item.get("disabled", False)
         }
 
-    def choose_human(self) -> dict[str, Any]:
+    def choose_human(
+        self,
+        overrides: dict[str, dict[str, Any]] | None = None,
+        use_default_ethnicity: bool = True,
+    ) -> dict[str, Any]:
+        overrides = dict(overrides or {})
+        if use_default_ethnicity and "ethnic_appearance" not in overrides:
+            default_id = self.db["settings"]["default_ethnic_appearance"]
+            overrides["ethnic_appearance"] = self.item_index[default_id]
         human: dict[str, Any] = {}
         parts = self.db["human_model_parts"]
         order = list(parts)
+        selected_tags: set[str] = set()
         for category in order:
             if category == "facial_accents":
                 count = self.rng.choices([0, 1, 2], weights=[3, 5, 2], k=1)[0]
-                candidates = [item for item in parts[category] if not item.get("disabled", False)]
+                candidates = [
+                    item for item in parts[category]
+                    if not item.get("disabled", False)
+                    and compatible_with_requirements(item, selected_tags)
+                ]
                 human[category] = self.rng.sample(candidates, k=min(count, len(candidates)))
+                for item in human[category]:
+                    selected_tags |= tags(item)
                 continue
-            candidates = list(parts[category])
-            if category == "hair_style":
-                selected_tags = tags(human["hair_length"]) | tags(human["hair_texture"])
-                candidates = [item for item in candidates if compatible_with_requirements(item, selected_tags)]
-            elif category == "areola_color":
-                selected_tags = tags(human["skin_tone"])
-                candidates = [item for item in candidates if compatible_with_requirements(item, selected_tags)]
-            human[category] = weighted_choice(self.rng, candidates)
+            candidates = [
+                item for item in parts[category]
+                if not item.get("disabled", False)
+                and compatible_with_requirements(item, selected_tags)
+            ]
+            if category in overrides:
+                choice = overrides[category]
+                if choice not in candidates:
+                    raise AppError(
+                        f"Human trait override {choice['id']} is incompatible in category {category}"
+                    )
+            else:
+                choice = weighted_choice(self.rng, candidates)
+            human[category] = choice
+            selected_tags |= tags(choice)
         return human
 
     def choose_template(self) -> dict[str, Any]:
@@ -1191,7 +1225,10 @@ def remixed_human(
     replace_parts: set[str] | None = None,
     keep_parts: set[str] | None = None,
 ) -> dict[str, Any]:
-    fresh = composer.choose_human()
+    overrides = {}
+    if replace_parts is not None or (keep_parts and "ethnic_appearance" in keep_parts):
+        overrides["ethnic_appearance"] = current["ethnic_appearance"]
+    fresh = composer.choose_human(overrides)
     if replace_parts is not None:
         return {
             key: fresh[key] if key in replace_parts else value
@@ -1210,6 +1247,8 @@ def choose_subject_remix(composer: Composer, current: dict[str, Any]) -> dict[st
         [
             ("New completely random subject", "all"),
             (f"Keep ethnic appearance: {current['ethnic_appearance']['prompt']}", "ethnic"),
+            ("Choose a specific ethnic appearance", "choose_ethnic"),
+            ("Choose age", "choose_age"),
             ("Remix face only", "face"),
             ("Remix hair only", "hair"),
             ("Remix body and anatomy only", "body"),
@@ -1218,12 +1257,40 @@ def choose_subject_remix(composer: Composer, current: dict[str, Any]) -> dict[st
     )
     if mode is None:
         return None
+    if mode == "choose_age":
+        age_options = [
+            item for item in composer.db["human_model_parts"]["age"]
+            if not item.get("disabled", False)
+        ]
+        selected_age = select_labeled(
+            "CASTING CALL — choose age",
+            [(f"{item['id']} — {item['prompt']}", item) for item in age_options],
+        )
+        if selected_age is None:
+            return None
+        updated = dict(current)
+        updated["age"] = selected_age
+        return updated
+    selected_ethnic = None
+    if mode == "choose_ethnic":
+        ethnic_options = [
+            item for item in composer.db["human_model_parts"]["ethnic_appearance"]
+            if not item.get("disabled", False)
+        ]
+        selected_ethnic = select_labeled(
+            "CASTING CALL — choose ethnic appearance",
+            [(f"{item['id']} — {item['prompt']}", item) for item in ethnic_options],
+        )
+        if selected_ethnic is None:
+            return None
     candidates: list[dict[str, Any]] = []
     for _ in range(8):
         if mode == "all":
-            candidate = composer.choose_human()
+            candidate = composer.choose_human(use_default_ethnicity=False)
         elif mode == "ethnic":
             candidate = remixed_human(composer, current, keep_parts={"ethnic_appearance"})
+        elif mode == "choose_ethnic":
+            candidate = composer.choose_human({"ethnic_appearance": selected_ethnic})
         else:
             groups = {
                 "face": HUMAN_FACE_PARTS,

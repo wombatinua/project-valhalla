@@ -121,7 +121,7 @@ Every fixed-choice screen uses an `fzf` picker, including the launcher, confirma
 
 The SET designer supports constrained remixing instead of forcing a completely new random selection:
 
-- subject: randomize everything, preserve ethnic appearance, or remix only face, hair, body/anatomy, or styling;
+- subject: randomize everything, preserve the current ethnic appearance, explicitly choose any enabled ethnic-appearance ID (including Slavic appearance), select exact adult age 21 or 22, or remix only face, hair, body/anatomy, or styling;
 - wardrobe: choose another template or generate new compatible pieces and colors inside the current template;
 - location: choose any interior, stay within the current location family, or keep the exact interior and remix its surface;
 - surface: choose any compatible furniture or stay within the current surface type.
@@ -378,18 +378,21 @@ Runtime settings live near the top of `database.json`:
   "comfy_url": "http://127.0.0.1:8188",
   "workflow_file": "./workflow.json",
   "output_dir": "./outputs",
+  "default_ethnic_appearance": "appearance_slavic",
   "http_timeout_seconds": 15,
   "poll_interval_seconds": 1,
   "generation_timeout_seconds": 600,
-    "max_scene_attempts": 100,
-    "photoshoot_progression": {
-      "nsfw_final_percent": 50,
-      "explicit_plateau_percent": 30
-    }
+  "max_scene_attempts": 100,
+  "photoshoot_progression": {
+    "nsfw_final_percent": 50,
+    "explicit_plateau_percent": 30
+  }
 }
 ```
 
 Relative paths are resolved from the directory containing `database.json`. Absolute paths are also accepted.
+
+`default_ethnic_appearance` controls automatic casting. Director can still choose another ethnicity or request a completely random subject.
 
 ComfyUI may return images from a `PreviewImage` node as temporary files. The application downloads both `temp` and permanent `output` images into `settings.output_dir`.
 
@@ -452,7 +455,11 @@ The main content sections are:
 
 ### Human model parts
 
-Human models are assembled from independent age, appearance, skin, face, eyes, hair, body, anatomy, makeup, and detail categories.
+Human models are assembled from age, appearance, skin, face, eyes, hair, body, anatomy, makeup, and detail categories. Selection is compositional but not blindly independent: accumulated tags are checked before every later trait is chosen.
+
+Ethnic-appearance records declare a unique `heritage_*` tag and their allowed skin-tone tags. Skin tone, ancestry-linked face shapes, natural eye pigmentation, nose/lip variants, hair texture, and natural hair colors use `requires_tags` or `requires_any_tags` to declare compatible heritage groups. This prevents combinations such as European/Slavic appearance with deep or ebony skin, Slavic appearance with coily/curly texture, or East Asian appearance with unsupported natural pigmentation. Mixed heritage intentionally permits the complete trait catalog.
+
+Universal variants remain available across groups, while fashion-dyed silver and rose-gold hair remain unrestricted styling choices. Hair style is additionally checked against selected hair length and texture, and areola color against skin tone. Partial face/hair remix operations preserve the current ethnicity while resolving new compatible traits.
 
 In a photoshoot, every selected trait stays fixed. Anatomy fragments are visibility-aware: covered anatomy remains in the model signature but is not emitted into the image prompt until the relevant body area is visible.
 
