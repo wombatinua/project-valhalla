@@ -290,6 +290,7 @@ reset_configuration() {
     MODE=photoshoot
     XXX_ONLY=false
     REVIEW_STORYBOARD=true
+    FAST_MODE=false
     PHOTOSHOOTS=1
     COUNT=10
     PROMPT_SEED=
@@ -308,6 +309,7 @@ configuration_summary() {
     fi
     [ "$XXX_ONLY" = true ] && content_text='Full XXX' || content_text='Normal / progressive'
     [ "$REVIEW_STORYBOARD" = true ] && director_text='Interactive' || director_text='Automatic'
+    [ "$FAST_MODE" = true ] && quality_text='Fast test' || quality_text='Production'
     prompt_text=${PROMPT_SEED:-Random}
     inference_text=${INFERENCE_SEED:-Random per image}
     nsfw_text=${NSFW_PERCENT:-$DEFAULT_NSFW_PERCENT}
@@ -316,6 +318,9 @@ configuration_summary() {
     printf 'Content           %s\n' "$content_text"
     printf 'Batch             %s\n' "$batch_text"
     printf 'Director          %s\n' "$director_text"
+    if [ "$COMMAND" = generate ]; then
+        printf 'Quality           %s\n' "$quality_text"
+    fi
     printf 'Prompt seed       %s\n' "$prompt_text"
     printf 'Inference seed    %s\n' "$inference_text"
     if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
@@ -332,16 +337,16 @@ advanced_dashboard() {
         configuration_summary
         set -- \
             '_group_randomness|── RANDOMNESS ─────────────────' \
-            "prompt_seed|Prompt seed — $prompt_text" \
-            "inference_seed|Inference seed — $inference_text"
+            'prompt_seed|Prompt seed' \
+            'inference_seed|Inference seed'
         if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
             set -- "$@" \
                 '_group_progression|── PROGRESSION ─────────────────' \
-                "progression|NSFW ending $nsfw_text% / XXX plateau $plateau_text%"
+            'progression|Progression'
         fi
         set -- "$@" \
             '_group_back|── NAVIGATION ──────────────────' \
-            'back|Back to configuration'
+            'back|Back'
         fzf_choice 'Advanced' back "$@"
         case "$REPLY" in
             prompt_seed)
@@ -370,30 +375,35 @@ configuration_dashboard() {
         configuration_summary
         if [ "$REVIEW_STORYBOARD" = true ]; then
             if [ "$COMMAND" = generate ]; then
-                continue_label="Continue to Director — review $total image(s) before rendering"
+                continue_label="Open Director"
             else
-                continue_label="Continue to Director — review $total dry-run prompt(s)"
+                continue_label="Open Director"
             fi
         else
             if [ "$COMMAND" = generate ]; then
-                continue_label="Generate $total image(s)"
+                continue_label="Generate images"
             else
-                continue_label="Print $total dry-run prompt(s)"
+                continue_label="Print prompts"
             fi
         fi
         printf '\nChoose what to change, then continue.\n'
-        fzf_choice 'Configure' launch \
+        set -- \
             '_group_run|── RUN ────────────────────────' \
             "launch|$continue_label" \
             '_group_shoot|── PHOTOSHOOT ─────────────────' \
-            "mode|Mode — $MODE" \
-            "content|Content — $content_text" \
-            "batch|Batch — $batch_text" \
-            "director|Director — $director_text" \
-            "advanced|Advanced — seeds and progression" \
+            'mode|Mode' \
+            'content|Content' \
+            'batch|Batch' \
+            'director|Director'
+        if [ "$COMMAND" = generate ]; then
+            set -- "$@" 'quality|Quality'
+        fi
+        set -- "$@" \
+            'advanced|Advanced' \
             '_group_navigation|── NAVIGATION ─────────────────' \
             'reset|Reset settings' \
-            'main|Back to main menu'
+            'main|Main menu'
+        fzf_choice 'Configure' launch "$@"
         action=$REPLY
         case "$action" in
             launch)
@@ -411,13 +421,13 @@ configuration_dashboard() {
                 return
                 ;;
             mode)
-                fzf_choice 'Mode' "$MODE" 'photoshoot|Photoshoot — connected SET' 'random|Random — independent images'
+                fzf_choice 'Mode' "$MODE" 'photoshoot|Photoshoot' 'random|Random'
                 MODE=$REPLY
                 [ "$MODE" = random ] && PHOTOSHOOTS=1
                 ;;
             content)
                 [ "$XXX_ONLY" = true ] && current_content=xxx || current_content=normal
-                fzf_choice 'Content' "$current_content" 'normal|Normal / progressive' 'xxx|Full XXX from the first image'
+                fzf_choice 'Content' "$current_content" 'normal|Progressive' 'xxx|Full XXX'
                 [ "$REPLY" = xxx ] && XXX_ONLY=true || XXX_ONLY=false
                 ;;
             batch)
@@ -427,8 +437,13 @@ configuration_dashboard() {
                 ;;
             director)
                 [ "$REVIEW_STORYBOARD" = true ] && current_director=interactive || current_director=auto
-                fzf_choice 'Director' "$current_director" 'auto|Automatic — launch without review' 'interactive|Interactive — review before rendering'
+                fzf_choice 'Director' "$current_director" 'auto|Automatic' 'interactive|Interactive'
                 [ "$REPLY" = interactive ] && REVIEW_STORYBOARD=true || REVIEW_STORYBOARD=false
+                ;;
+            quality)
+                [ "$FAST_MODE" = true ] && current_quality=fast || current_quality=production
+                fzf_choice 'Quality' "$current_quality" 'production|Production' 'fast|Fast test'
+                [ "$REPLY" = fast ] && FAST_MODE=true || FAST_MODE=false
                 ;;
             advanced) advanced_dashboard ;;
             reset) reset_configuration ;;
@@ -476,13 +491,13 @@ printf '%s\n\n' "$SETTINGS_SUMMARY"
 if ! using_fzf; then
     printf '%s\n' 'Choose an action:'
     printf '%s\n' '  1) Generate images'
-    printf '%s\n' '  2) Dry run (prompts only)'
-    printf '%s\n' '  3) Capture latest ComfyUI workflow'
-    printf '%s\n' '  4) Show app help'
+    printf '%s\n' '  2) Dry run'
+    printf '%s\n' '  3) Capture workflow'
+    printf '%s\n' '  4) App help'
     printf '%s\n' '  5) Exit'
 fi
 
-if fzf_choice 'Main menu' 1 '_group_create|── CREATE ─────────────────────' '1|Generate images' '2|Dry run (prompts only)' '_group_tools|── TOOLS ──────────────────────' '3|Capture latest ComfyUI workflow' '4|Show app help' '_group_exit|── EXIT ───────────────────────' '5|Exit'; then
+if fzf_choice 'Main menu' 1 '_group_create|── CREATE ─────────────────────' '1|Generate images' '2|Dry run' '_group_tools|── TOOLS ──────────────────────' '3|Capture workflow' '4|App help' '_group_exit|── EXIT ───────────────────────' '5|Exit'; then
     selection=$REPLY
 else
     while :; do
@@ -501,7 +516,7 @@ esac
 
 if [ "$COMMAND" = capture ]; then
     screen_header 'Capture ComfyUI workflow'
-    if fzf_choice 'Capture workflow' n 'y|Replace existing workflow.json' 'n|Keep existing workflow.json'; then :; else
+    if fzf_choice 'Capture workflow' n 'y|Replace workflow' 'n|Keep workflow'; then :; else
         read_value 'Replace workflow.json if it already exists? [y/N]: '
     fi
     FORCE_CAPTURE=false
@@ -521,6 +536,7 @@ if [ "$COMMAND" = capture ]; then
     exec "$@"
 fi
 
+FAST_MODE=false
 if using_fzf; then
     reset_configuration
     DASHBOARD_ACTIVE=true
@@ -529,20 +545,20 @@ else
 screen_header 'Generation mode'
 if ! using_fzf; then
     printf 'Choose generation mode:\n'
-    printf '%s\n' '  1) Photoshoot (fixed model/outfit/location with progressive stages)'
-    printf '%s\n' '  2) Random (independent scene for every image)'
+    printf '%s\n' '  1) Photoshoot'
+    printf '%s\n' '  2) Random'
 fi
-if fzf_choice 'Generation mode' 1 '1|Photoshoot — connected SET and progression' '2|Random — independent scene per image'; then :; else
+if fzf_choice 'Generation mode' 1 '1|Photoshoot' '2|Random'; then :; else
     while :; do read_value 'Mode [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
 fi
 case "${REPLY:-1}" in 1) MODE=photoshoot ;; 2) MODE=random ;; esac
 
 screen_header 'Content mode'
 if ! using_fzf; then
-    printf '%s\n' '  1) Normal / progressive content'
-    printf '%s\n' '  2) Full XXX from the first image'
+    printf '%s\n' '  1) Progressive'
+    printf '%s\n' '  2) Full XXX'
 fi
-if fzf_choice 'Content mode' 1 '1|Normal / progressive content' '2|Full XXX from the first image'; then :; else
+if fzf_choice 'Content mode' 1 '1|Progressive' '2|Full XXX'; then :; else
     while :; do read_value 'Content [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
 fi
 case "${REPLY:-1}" in 1) XXX_ONLY=false ;; 2) XXX_ONLY=true ;; esac
@@ -550,13 +566,23 @@ case "${REPLY:-1}" in 1) XXX_ONLY=false ;; 2) XXX_ONLY=true ;; esac
 screen_header "Director's Desk"
 if ! using_fzf; then
     printf '%s\n' 'Would you like to review and direct the complete storyboard before launch?'
-    printf '%s\n' '  1) Auto — trust the director and continue'
-    printf '%s\n' '  2) Interactive — review, reroll, and edit individual shots'
+    printf '%s\n' '  1) Automatic'
+    printf '%s\n' '  2) Interactive'
 fi
-if fzf_choice "Director's Desk" 1 '1|Auto — trust the director and continue' '2|Interactive — review and edit storyboard'; then :; else
+if fzf_choice "Director's Desk" 1 '1|Automatic' '2|Interactive'; then :; else
     while :; do read_value 'Storyboard [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
 fi
 case "${REPLY:-1}" in 1) REVIEW_STORYBOARD=false ;; 2) REVIEW_STORYBOARD=true ;; esac
+
+if [ "$COMMAND" = generate ]; then
+    screen_header 'Quality'
+    printf '%s\n' '  1) Production'
+    printf '%s\n' '  2) Fast test'
+    if fzf_choice 'Quality' 1 '1|Production' '2|Fast test'; then :; else
+        while :; do read_value 'Quality [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
+    fi
+    case "${REPLY:-1}" in 1) FAST_MODE=false ;; 2) FAST_MODE=true ;; esac
+fi
 
 PHOTOSHOOTS=1
 screen_header 'Batch size'
@@ -594,6 +620,9 @@ if [ "$REVIEW_STORYBOARD" = true ]; then
     printf "Storyboard: interactive Director's Desk\n"
 else
     printf 'Storyboard: automatic\n'
+fi
+if [ "$COMMAND" = generate ]; then
+    [ "$FAST_MODE" = true ] && printf 'Quality: fast test\n' || printf 'Quality: production\n'
 fi
 if [ "$MODE" = photoshoot ]; then
     printf 'Photoshoots: %s\n' "$PHOTOSHOOTS"
@@ -649,6 +678,9 @@ if [ "$XXX_ONLY" = true ]; then
 fi
 if [ "$REVIEW_STORYBOARD" = true ]; then
     set -- "$@" --review-storyboard
+fi
+if [ "$COMMAND" = generate ] && [ "$FAST_MODE" = true ]; then
+    set -- "$@" --fast
 fi
 
 clear_screen

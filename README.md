@@ -79,6 +79,7 @@ The dashboard shows:
 - normal/progressive versus full-XXX content;
 - photoshoots, shots per SET, and calculated total image count;
 - automatic versus interactive Director;
+- production versus fast-test render quality for generation;
 - prompt and inference seed behavior;
 - NSFW ending and explicit plateau percentages with estimated frame counts;
 - advanced seed/progression settings, reset, and return to the main menu.
@@ -125,6 +126,8 @@ The SET designer supports constrained remixing instead of forcing a completely n
 - wardrobe: choose another template or generate new compatible pieces and colors inside the current template;
 - location: choose any interior, stay within the current location family, or keep the exact interior and remix its surface;
 - surface: choose any compatible furniture or stay within the current surface type.
+
+The Subject menu is organized into Whole subject, Identity & face, Hair & beauty, and Body groups. It remains open after each change so several traits can be directed in one visit; the explicit final `Back` item returns to SET design. Navigation actions throughout the launcher and Director use compact one-to-three-word labels; configuration details stay in the summary, while candidate rows retain only the information needed to distinguish actual models, outfits, or scenes. Remix candidate rows show only the section currently being changed. Hair, face, body, and styling therefore have separate focused summaries instead of repeating the complete subject. Hair color, makeup, manicure, breast size, and body type can also be selected directly without rerolling unrelated traits. The Body group contains a persistent `Intimate details` submenu with explicit pubic-hair choices (including completely shaved) and external vulva variants such as Tiny, Compact, Full, Puffy, and Prominent. Compatible natural hair colors are clearly distinguished from fashion colors; `No makeup` produces a bare natural face, and `No manicure` produces natural unpolished nails. Breast size offers Tiny, Small, Medium, and Large; body type offers simple choices such as Thin, Normal, Petite, Athletic, Curvy, and Hourglass. Every fixed-choice screen ends with `Back`; Wardrobe selection first chooses a short outfit category and then shows compact, human-readable variations of that category.
 
 Each remix presents several resolved candidates. Compatibility rules are applied before the candidate is shown, and the accepted context remains fixed across the selected photoshoot.
 
@@ -207,7 +210,8 @@ python3 app.py capture [--force]
 1. saves the submitted API workflow to `settings.workflow_file`;
 2. detects the positive and negative text nodes;
 3. detects scalar seed inputs on samplers and detailers;
-4. updates only `node_mapping` in `database.json`.
+4. detects the base sampler, its direct VAE Decode, and image-output targets for fast-test mode;
+5. updates only `node_mapping` in `database.json`.
 
 An existing workflow is not overwritten unless `--force` is supplied:
 
@@ -240,7 +244,7 @@ Use this before a large batch to validate database changes without spending GPU 
 
 ### `generate`
 
-`generate` accepts the same arguments as `dry-run`. For each image it:
+`generate` accepts the same arguments as `dry-run`, including the optional `--fast` render profile. For each image it:
 
 1. resolves and compiles a scene;
 2. deep-copies `workflow.json`;
@@ -250,6 +254,21 @@ Use this before a large batch to validate database changes without spending GPU 
 6. downloads returned images through `/view`.
 
 Jobs run sequentially. The batch stops on its first resolver, HTTP, ComfyUI, or timeout error.
+
+### Fast test
+
+```bash
+python3 app.py generate \
+  --mode photoshoot \
+  --count 10 \
+  --fast
+```
+
+`--fast` reconnects every mapped image output directly to the VAE Decode immediately following the base sampler. The workflow is then pruned to ancestors of those outputs, so Face/Hand Detailers, Hires Fix, secondary samplers, refiners, upscalers, and their detector/model nodes are not submitted to ComfyUI. LoRA model and CLIP links are reconnected to their inputs before pruning; unsupported custom LoRA nodes stop with a clear error instead of silently running.
+
+Capture stores this path in `node_mapping.fast_mode`. If the captured graph has no unique base sampler fed by an empty latent, no direct VAE Decode, or no image-output node, capture fails safely because an automatic bypass would be ambiguous. Production mode never changes or prunes the captured workflow.
+
+Fast-test filenames contain `fast_`, and console output reports `render_profile=fast`. This profile is intended for checking composition, prompts, stages, and general model behavior. Final detail, faces, resolution, and sometimes composition can differ from production output.
 
 ## Modes
 
@@ -379,6 +398,19 @@ Runtime settings live near the top of `database.json`:
   "workflow_file": "./workflow.json",
   "output_dir": "./outputs",
   "default_ethnic_appearance": "appearance_slavic",
+  "human_defaults": {
+    "fixed": {
+      "makeup": "makeup_no_makeup",
+      "manicure": "manicure_none",
+      "body_frame": "body_slender",
+      "breast_size": "breasts_very_small",
+      "pubic_hair": "pubic_shaved",
+      "genital_appearance": "genitals_small_delicate"
+    },
+    "required_tags": {
+      "hair_color": ["natural_hair_color"]
+    }
+  },
   "http_timeout_seconds": 15,
   "poll_interval_seconds": 1,
   "generation_timeout_seconds": 600,
@@ -393,6 +425,7 @@ Runtime settings live near the top of `database.json`:
 Relative paths are resolved from the directory containing `database.json`. Absolute paths are also accepted.
 
 `default_ethnic_appearance` controls automatic casting. Director can still choose another ethnicity or request a completely random subject.
+`human_defaults.fixed` locks automatic casting to specific database items, while `human_defaults.required_tags` keeps a category random within a tagged pool. The supplied defaults use no makeup, no manicure, a thin figure, tiny breasts, a completely shaved pubic area, a tiny external vulva, and a random ethnicity-compatible natural hair color. Explicit Director choices and section remixes can still override them.
 
 ComfyUI may return images from a `PreviewImage` node as temporary files. The application downloads both `temp` and permanent `output` images into `settings.output_dir`.
 

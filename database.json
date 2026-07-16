@@ -1,10 +1,10 @@
 {
   "_guide": {
     "purpose": "Edit this file directly. Prompt text is English for diffusion-model compatibility.",
-    "simple_item": "Every selectable item needs only id and prompt. Set disabled to true to keep an item in the database while excluding it from all composer selections. Optional fields are disabled, weight, tags, requires, excludes, requires_tags, requires_any_tags, excludes_tags, requires_expression_tags, occupies_slots, allowed_colors and mix_tags. requires_any_tags means at least one listed tag must be present.",
+    "simple_item": "Every selectable item needs only id and prompt. menu_label optionally supplies a short Director label. Set disabled to true to keep an item in the database while excluding it from all composer selections. Optional fields are menu_label, disabled, weight, tags, requires, excludes, requires_tags, requires_any_tags, excludes_tags, requires_expression_tags, occupies_slots, allowed_colors and mix_tags. requires_any_tags means at least one listed tag must be present.",
     "photoshoot": "A photoshoot fixes the assembled adult model, outfit, colors and location. It progresses through undressing into a predictable explicit plateau of rear views, close-ups and masturbation shots.",
     "random": "Random mode independently assembles every image and chooses any stage from the selected outfit template.",
-    "human_compatibility": "settings.default_ethnic_appearance controls automatic casting and currently selects appearance_slavic. Ethnic appearance records expose allows_*_skin and heritage_* tags. Later human categories use requires_tags or requires_any_tags because the composer accumulates tags in database order.",
+    "human_compatibility": "settings.default_ethnic_appearance controls automatic ethnicity. settings.human_defaults.fixed selects exact default traits, while required_tags selects a random compatible item from a tagged pool. Ethnic appearance records expose allows_*_skin and heritage_* tags. Later human categories use requires_tags or requires_any_tags because the composer accumulates tags in database order.",
     "outfit_templates": "Slots select garments by catalog and required_tags. color_group reuses a color. match_group asks pieces to share a mix tag.",
     "body_visibility": "Use breasts, nipples, pubic_area and genitals. Anatomy prompt fragments are emitted only when listed by a stage.",
     "safety": "This database contains only explicitly adult women aged 21 or 22 and contains no teen-coded descriptions."
@@ -14,6 +14,21 @@
     "workflow_file": "./workflow.json",
     "output_dir": "./outputs",
     "default_ethnic_appearance": "appearance_slavic",
+    "human_defaults": {
+      "fixed": {
+        "makeup": "makeup_no_makeup",
+        "manicure": "manicure_none",
+        "body_frame": "body_slender",
+        "breast_size": "breasts_very_small",
+        "pubic_hair": "pubic_shaved",
+        "genital_appearance": "genitals_small_delicate"
+      },
+      "required_tags": {
+        "hair_color": [
+          "natural_hair_color"
+        ]
+      }
+    },
     "http_timeout_seconds": 15,
     "poll_interval_seconds": 1,
     "generation_timeout_seconds": 600,
@@ -70,14 +85,20 @@
         "input": "seed"
       },
       {
-        "node": "FaceDetailer_9",
-        "input": "seed"
-      },
-      {
         "node": "HiresFix_Sampler",
         "input": "seed"
       }
-    ]
+    ],
+    "fast_mode": {
+      "base_sampler": "Sampler",
+      "output_targets": [
+        {
+          "node": "SaveImage",
+          "input": "images",
+          "source": ["VAEDecode_1", 0]
+        }
+      ]
+    }
   },
   "prompt_defaults": {
     "positive_prefix": "(solo adult woman:1.4), (single subject:1.4)",
@@ -201,52 +222,126 @@
       {
         "id": "appearance_european",
         "prompt": "European facial appearance",
-        "tags": ["heritage_european", "allows_fair_skin", "allows_porcelain_skin", "allows_light_warm_skin", "allows_olive_skin", "allows_honey_skin"]
+        "tags": [
+          "heritage_european",
+          "allows_fair_skin",
+          "allows_porcelain_skin",
+          "allows_light_warm_skin",
+          "allows_olive_skin",
+          "allows_honey_skin"
+        ]
       },
       {
         "id": "appearance_slavic",
         "prompt": "Slavic facial appearance",
-        "tags": ["heritage_slavic", "allows_fair_skin", "allows_porcelain_skin", "allows_light_warm_skin"]
+        "tags": [
+          "heritage_slavic",
+          "allows_fair_skin",
+          "allows_porcelain_skin",
+          "allows_light_warm_skin"
+        ]
       },
       {
         "id": "appearance_east_asian",
         "prompt": "East Asian facial appearance",
-        "tags": ["heritage_east_asian", "allows_fair_skin", "allows_porcelain_skin", "allows_light_warm_skin", "allows_honey_skin"]
+        "tags": [
+          "heritage_east_asian",
+          "allows_fair_skin",
+          "allows_porcelain_skin",
+          "allows_light_warm_skin",
+          "allows_honey_skin"
+        ]
       },
       {
         "id": "appearance_south_asian",
         "prompt": "South Asian facial appearance",
-        "tags": ["heritage_south_asian", "allows_light_warm_skin", "allows_olive_skin", "allows_honey_skin", "allows_caramel_skin", "allows_brown_skin", "allows_deep_skin"]
+        "tags": [
+          "heritage_south_asian",
+          "allows_light_warm_skin",
+          "allows_olive_skin",
+          "allows_honey_skin",
+          "allows_caramel_skin",
+          "allows_brown_skin",
+          "allows_deep_skin"
+        ]
       },
       {
         "id": "appearance_african",
         "prompt": "African facial appearance",
-        "tags": ["heritage_african", "allows_honey_skin", "allows_caramel_skin", "allows_brown_skin", "allows_deep_skin", "allows_ebony_skin"]
+        "tags": [
+          "heritage_african",
+          "allows_honey_skin",
+          "allows_caramel_skin",
+          "allows_brown_skin",
+          "allows_deep_skin",
+          "allows_ebony_skin"
+        ]
       },
       {
         "id": "appearance_mediterranean",
         "prompt": "Mediterranean facial appearance",
-        "tags": ["heritage_mediterranean", "allows_fair_skin", "allows_light_warm_skin", "allows_olive_skin", "allows_honey_skin", "allows_caramel_skin"]
+        "tags": [
+          "heritage_mediterranean",
+          "allows_fair_skin",
+          "allows_light_warm_skin",
+          "allows_olive_skin",
+          "allows_honey_skin",
+          "allows_caramel_skin"
+        ]
       },
       {
         "id": "appearance_latina",
         "prompt": "Latina facial appearance",
-        "tags": ["heritage_latina", "allows_fair_skin", "allows_light_warm_skin", "allows_olive_skin", "allows_honey_skin", "allows_caramel_skin", "allows_brown_skin"]
+        "tags": [
+          "heritage_latina",
+          "allows_fair_skin",
+          "allows_light_warm_skin",
+          "allows_olive_skin",
+          "allows_honey_skin",
+          "allows_caramel_skin",
+          "allows_brown_skin"
+        ]
       },
       {
         "id": "appearance_middle_eastern",
         "prompt": "Middle Eastern facial appearance",
-        "tags": ["heritage_middle_eastern", "allows_fair_skin", "allows_light_warm_skin", "allows_olive_skin", "allows_honey_skin", "allows_caramel_skin", "allows_brown_skin"]
+        "tags": [
+          "heritage_middle_eastern",
+          "allows_fair_skin",
+          "allows_light_warm_skin",
+          "allows_olive_skin",
+          "allows_honey_skin",
+          "allows_caramel_skin",
+          "allows_brown_skin"
+        ]
       },
       {
         "id": "appearance_southeast_asian",
         "prompt": "Southeast Asian facial appearance",
-        "tags": ["heritage_southeast_asian", "allows_light_warm_skin", "allows_olive_skin", "allows_honey_skin", "allows_caramel_skin", "allows_brown_skin"]
+        "tags": [
+          "heritage_southeast_asian",
+          "allows_light_warm_skin",
+          "allows_olive_skin",
+          "allows_honey_skin",
+          "allows_caramel_skin",
+          "allows_brown_skin"
+        ]
       },
       {
         "id": "appearance_mixed_heritage",
         "prompt": "distinctive mixed-heritage facial appearance",
-        "tags": ["heritage_mixed", "allows_fair_skin", "allows_porcelain_skin", "allows_light_warm_skin", "allows_olive_skin", "allows_honey_skin", "allows_caramel_skin", "allows_brown_skin", "allows_deep_skin", "allows_ebony_skin"]
+        "tags": [
+          "heritage_mixed",
+          "allows_fair_skin",
+          "allows_porcelain_skin",
+          "allows_light_warm_skin",
+          "allows_olive_skin",
+          "allows_honey_skin",
+          "allows_caramel_skin",
+          "allows_brown_skin",
+          "allows_deep_skin",
+          "allows_ebony_skin"
+        ]
       }
     ],
     "skin_tone": [
@@ -256,7 +351,9 @@
         "tags": [
           "light_skin"
         ],
-        "requires_tags": ["allows_fair_skin"]
+        "requires_tags": [
+          "allows_fair_skin"
+        ]
       },
       {
         "id": "skin_olive",
@@ -264,7 +361,9 @@
         "tags": [
           "medium_skin"
         ],
-        "requires_tags": ["allows_olive_skin"]
+        "requires_tags": [
+          "allows_olive_skin"
+        ]
       },
       {
         "id": "skin_brown",
@@ -272,7 +371,9 @@
         "tags": [
           "dark_skin"
         ],
-        "requires_tags": ["allows_brown_skin"]
+        "requires_tags": [
+          "allows_brown_skin"
+        ]
       },
       {
         "id": "skin_deep",
@@ -280,7 +381,9 @@
         "tags": [
           "dark_skin"
         ],
-        "requires_tags": ["allows_deep_skin"]
+        "requires_tags": [
+          "allows_deep_skin"
+        ]
       },
       {
         "id": "skin_porcelain",
@@ -288,7 +391,9 @@
         "tags": [
           "light_skin"
         ],
-        "requires_tags": ["allows_porcelain_skin"]
+        "requires_tags": [
+          "allows_porcelain_skin"
+        ]
       },
       {
         "id": "skin_light_warm",
@@ -296,7 +401,9 @@
         "tags": [
           "light_skin"
         ],
-        "requires_tags": ["allows_light_warm_skin"]
+        "requires_tags": [
+          "allows_light_warm_skin"
+        ]
       },
       {
         "id": "skin_honey",
@@ -304,7 +411,9 @@
         "tags": [
           "medium_skin"
         ],
-        "requires_tags": ["allows_honey_skin"]
+        "requires_tags": [
+          "allows_honey_skin"
+        ]
       },
       {
         "id": "skin_caramel",
@@ -312,7 +421,9 @@
         "tags": [
           "medium_skin"
         ],
-        "requires_tags": ["allows_caramel_skin"]
+        "requires_tags": [
+          "allows_caramel_skin"
+        ]
       },
       {
         "id": "skin_ebony",
@@ -320,7 +431,9 @@
         "tags": [
           "dark_skin"
         ],
-        "requires_tags": ["allows_ebony_skin"]
+        "requires_tags": [
+          "allows_ebony_skin"
+        ]
       }
     ],
     "face_shape": [
@@ -331,32 +444,72 @@
       {
         "id": "face_heart",
         "prompt": "delicate heart-shaped face",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_latina", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_latina",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "face_sculpted",
         "prompt": "elegantly sculpted face",
-        "requires_any_tags": ["heritage_european", "heritage_african", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "face_round",
         "prompt": "soft youthful round adult face",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "face_diamond",
         "prompt": "refined diamond-shaped face",
-        "requires_any_tags": ["heritage_african", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_african",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "face_oblong",
         "prompt": "graceful oblong face",
-        "requires_any_tags": ["heritage_european", "heritage_south_asian", "heritage_african", "heritage_mediterranean", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "face_square_soft",
         "prompt": "softly squared elegant face",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_african", "heritage_mediterranean", "heritage_latina", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_mixed"
+        ]
       }
     ],
     "eye_shape": [
@@ -371,27 +524,61 @@
       {
         "id": "eyes_hooded",
         "prompt": "graceful hooded eyes",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_upturned",
         "prompt": "elegant upturned eyes",
-        "requires_any_tags": ["heritage_east_asian", "heritage_latina", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_east_asian",
+          "heritage_latina",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_deep_set",
         "prompt": "expressive deep-set eyes",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_south_asian", "heritage_african", "heritage_mediterranean", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_catlike",
         "prompt": "striking catlike eyes",
-        "requires_any_tags": ["heritage_european", "heritage_east_asian", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_east_asian",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_wide_set",
         "prompt": "beautiful wide-set eyes",
-        "requires_any_tags": ["heritage_european", "heritage_south_asian", "heritage_african", "heritage_latina", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_latina",
+          "heritage_mixed"
+        ]
       }
     ],
     "eye_color": [
@@ -402,27 +589,62 @@
       {
         "id": "eyes_blue",
         "prompt": "clear blue eyes",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_green",
         "prompt": "vivid green eyes",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_hazel",
         "prompt": "hazel eyes",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_gray",
         "prompt": "smoky gray eyes",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_amber",
         "prompt": "luminous amber eyes",
-        "requires_any_tags": ["heritage_african", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_african",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_dark_brown",
@@ -431,12 +653,20 @@
       {
         "id": "eyes_aqua",
         "prompt": "bright aqua-blue eyes",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "eyes_violet",
         "prompt": "unusual violet-gray eyes",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mixed"
+        ]
       }
     ],
     "eyebrows": [
@@ -451,17 +681,36 @@
       {
         "id": "brows_straight",
         "prompt": "elegant straight eyebrows",
-        "requires_any_tags": ["heritage_slavic", "heritage_east_asian", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "brows_full",
         "prompt": "full natural eyebrows",
-        "requires_any_tags": ["heritage_south_asian", "heritage_african", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "brows_high_arch",
         "prompt": "dramatically arched eyebrows",
-        "requires_any_tags": ["heritage_european", "heritage_african", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       }
     ],
     "nose": [
@@ -480,24 +729,54 @@
       {
         "id": "nose_aquiline",
         "prompt": "elegant aquiline nose",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "nose_broad_refined",
         "prompt": "beautifully proportioned broad nose",
-        "requires_any_tags": ["heritage_african", "heritage_south_asian", "heritage_latina", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_african",
+          "heritage_south_asian",
+          "heritage_latina",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       }
     ],
     "lips": [
       {
         "id": "lips_full",
         "prompt": "full shapely lips",
-        "requires_any_tags": ["heritage_african", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_african",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "lips_bow",
         "prompt": "defined cupid's-bow lips",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "lips_soft",
@@ -506,17 +785,37 @@
       {
         "id": "lips_plush",
         "prompt": "plush sensual lips",
-        "requires_any_tags": ["heritage_african", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_african",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "lips_wide",
         "prompt": "wide expressive mouth with shapely lips",
-        "requires_any_tags": ["heritage_african", "heritage_south_asian", "heritage_latina", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_african",
+          "heritage_south_asian",
+          "heritage_latina",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "lips_delicate",
         "prompt": "delicate finely shaped lips",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       }
     ],
     "cheekbones": [
@@ -562,7 +861,17 @@
         "tags": [
           "straight_hair"
         ],
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_texture_wavy",
@@ -570,7 +879,17 @@
         "tags": [
           "wavy_hair"
         ],
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_south_asian", "heritage_african", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_texture_curly",
@@ -578,7 +897,15 @@
         "tags": [
           "curly_hair"
         ],
-        "requires_any_tags": ["heritage_european", "heritage_south_asian", "heritage_african", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_texture_coily",
@@ -586,7 +913,11 @@
         "tags": [
           "coily_hair"
         ],
-        "requires_any_tags": ["heritage_african", "heritage_latina", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_african",
+          "heritage_latina",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_texture_silky",
@@ -594,7 +925,14 @@
         "tags": [
           "straight_hair"
         ],
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_south_asian", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_south_asian",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_texture_beach_waves",
@@ -602,7 +940,16 @@
         "tags": [
           "wavy_hair"
         ],
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       }
     ],
     "hair_length": [
@@ -747,65 +1094,182 @@
       {
         "id": "hair_black",
         "prompt": "glossy black hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_south_asian", "heritage_african", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_brown",
         "prompt": "rich brunette hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_blonde",
         "prompt": "golden blonde hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mediterranean", "heritage_latina", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_auburn",
         "prompt": "warm auburn hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_platinum",
         "prompt": "platinum blonde hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_dark_brown",
         "prompt": "dark chocolate-brown hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_east_asian", "heritage_south_asian", "heritage_african", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_east_asian",
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_chestnut",
         "prompt": "glossy chestnut hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_south_asian", "heritage_mediterranean", "heritage_latina", "heritage_middle_eastern", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_south_asian",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_copper",
         "prompt": "vivid copper-red hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mediterranean", "heritage_latina", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mediterranean",
+          "heritage_latina",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_strawberry_blonde",
         "prompt": "strawberry-blonde hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_ash_blonde",
         "prompt": "cool ash-blonde hair",
-        "requires_any_tags": ["heritage_european", "heritage_slavic", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_european",
+          "heritage_slavic",
+          "heritage_mixed"
+        ]
       },
       {
         "id": "hair_silver",
-        "prompt": "fashionable silver hair"
+        "prompt": "fashionable silver hair",
+        "tags": [
+          "fashion_hair_color"
+        ]
       },
       {
         "id": "hair_rose_gold",
-        "prompt": "soft rose-gold hair"
+        "prompt": "soft rose-gold hair",
+        "tags": [
+          "fashion_hair_color"
+        ]
       },
       {
         "id": "hair_blue_black",
         "prompt": "blue-black hair",
-        "requires_any_tags": ["heritage_east_asian", "heritage_south_asian", "heritage_african", "heritage_latina", "heritage_middle_eastern", "heritage_southeast_asian", "heritage_mixed"]
+        "tags": [
+          "natural_hair_color"
+        ],
+        "requires_any_tags": [
+          "heritage_east_asian",
+          "heritage_south_asian",
+          "heritage_african",
+          "heritage_latina",
+          "heritage_middle_eastern",
+          "heritage_southeast_asian",
+          "heritage_mixed"
+        ]
       }
     ],
     "height": [
@@ -830,6 +1294,10 @@
       {
         "id": "body_slender",
         "prompt": "slender feminine figure"
+      },
+      {
+        "id": "body_average",
+        "prompt": "natural average feminine figure"
       },
       {
         "id": "body_athletic",
@@ -1137,77 +1605,95 @@
     "pubic_hair": [
       {
         "id": "pubic_natural",
-        "prompt": "natural neatly groomed pubic hair"
+        "prompt": "natural neatly groomed pubic hair",
+        "menu_label": "Natural groomed"
       },
       {
         "id": "pubic_trimmed",
-        "prompt": "closely trimmed pubic hair"
+        "prompt": "closely trimmed pubic hair",
+        "menu_label": "Closely trimmed"
       },
       {
         "id": "pubic_shaved",
-        "prompt": "smoothly shaved pubic area"
+        "prompt": "smoothly shaved pubic area",
+        "menu_label": "Completely shaved"
       },
       {
         "id": "pubic_brazilian",
-        "prompt": "neatly groomed Brazilian pubic style"
+        "prompt": "neatly groomed Brazilian pubic style",
+        "menu_label": "Brazilian"
       },
       {
         "id": "pubic_landing_strip",
-        "prompt": "precise narrow landing-strip pubic hair"
+        "prompt": "precise narrow landing-strip pubic hair",
+        "menu_label": "Landing strip"
       },
       {
         "id": "pubic_triangle",
-        "prompt": "neatly shaped triangular pubic hair"
+        "prompt": "neatly shaped triangular pubic hair",
+        "menu_label": "Triangle"
       },
       {
         "id": "pubic_light_natural",
-        "prompt": "light natural pubic hair"
+        "prompt": "light natural pubic hair",
+        "menu_label": "Light natural"
       },
       {
         "id": "pubic_full_natural",
-        "prompt": "full natural pubic hair"
+        "prompt": "full natural pubic hair",
+        "menu_label": "Full natural"
       },
       {
         "id": "pubic_very_short",
-        "prompt": "very short closely groomed pubic hair"
+        "prompt": "very short closely groomed pubic hair",
+        "menu_label": "Very short"
       }
     ],
     "genital_appearance": [
       {
         "id": "genitals_delicate",
-        "prompt": "delicate natural external female anatomy"
+        "prompt": "delicate natural external vulva",
+        "menu_label": "Delicate"
       },
       {
         "id": "genitals_full",
-        "prompt": "full natural external female anatomy"
+        "prompt": "full natural external vulva",
+        "menu_label": "Full"
       },
       {
         "id": "genitals_compact",
-        "prompt": "compact natural external female anatomy"
+        "prompt": "compact natural external vulva",
+        "menu_label": "Compact"
       },
       {
         "id": "genitals_small_delicate",
-        "prompt": "small delicate natural external female anatomy"
+        "prompt": "tiny delicate natural external vulva",
+        "menu_label": "Tiny"
       },
       {
         "id": "genitals_soft_full",
-        "prompt": "soft full natural external female anatomy"
+        "prompt": "soft full natural external vulva",
+        "menu_label": "Soft full"
       },
       {
         "id": "genitals_prominent",
-        "prompt": "prominent natural external female anatomy"
+        "prompt": "prominent natural external vulva",
+        "menu_label": "Prominent"
       },
       {
         "id": "genitals_neat",
-        "prompt": "neatly defined natural external female anatomy"
+        "prompt": "neatly defined natural external vulva",
+        "menu_label": "Neatly defined"
       },
       {
         "id": "genitals_plump",
-        "prompt": "plump rounded natural external female anatomy"
+        "prompt": "puffy full natural external vulva",
+        "menu_label": "Puffy"
       },
       {
         "id": "genitals_subtle",
-        "prompt": "subtle compact natural external female anatomy"
+        "prompt": "subtle compact natural external vulva",
+        "menu_label": "Subtle"
       }
     ],
     "facial_accents": [
@@ -1267,7 +1753,10 @@
       },
       {
         "id": "makeup_no_makeup",
-        "prompt": "fresh almost makeup-free face"
+        "prompt": "bare natural face without makeup",
+        "tags": [
+          "no_makeup"
+        ]
       },
       {
         "id": "makeup_glamour",
@@ -1291,6 +1780,13 @@
       }
     ],
     "manicure": [
+      {
+        "id": "manicure_none",
+        "prompt": "natural unpolished nails",
+        "tags": [
+          "natural_nails"
+        ]
+      },
       {
         "id": "manicure_nude",
         "prompt": "neat nude manicure"
