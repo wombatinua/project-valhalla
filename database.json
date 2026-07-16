@@ -1,7 +1,7 @@
 {
   "_guide": {
     "purpose": "Edit this file directly. Prompt text is English for diffusion-model compatibility.",
-    "simple_item": "Every selectable item needs only id and prompt. Optional fields are weight, tags, requires, excludes, requires_tags, requires_any_tags, excludes_tags, requires_expression_tags, occupies_slots, allowed_colors and mix_tags. requires_any_tags means at least one listed tag must be present.",
+    "simple_item": "Every selectable item needs only id and prompt. Set disabled to true to keep an item in the database while excluding it from all composer selections. Optional fields are disabled, weight, tags, requires, excludes, requires_tags, requires_any_tags, excludes_tags, requires_expression_tags, occupies_slots, allowed_colors and mix_tags. requires_any_tags means at least one listed tag must be present.",
     "photoshoot": "A photoshoot fixes the assembled adult model, outfit, colors and location. It progresses through undressing into a predictable explicit plateau of rear views, close-ups and masturbation shots.",
     "random": "Random mode independently assembles every image and chooses any stage from the selected outfit template.",
     "outfit_templates": "Slots select garments by catalog and required_tags. color_group reuses a color. match_group asks pieces to share a mix tag.",
@@ -36,6 +36,42 @@
         "input": "seed"
       },
       {
+        "node": "FaceDetailer",
+        "input": "seed"
+      },
+      {
+        "node": "FaceDetailer_2",
+        "input": "seed"
+      },
+      {
+        "node": "FaceDetailer_3",
+        "input": "seed"
+      },
+      {
+        "node": "FaceDetailer_4",
+        "input": "seed"
+      },
+      {
+        "node": "FaceDetailer_5",
+        "input": "seed"
+      },
+      {
+        "node": "FaceDetailer_6",
+        "input": "seed"
+      },
+      {
+        "node": "FaceDetailer_7",
+        "input": "seed"
+      },
+      {
+        "node": "FaceDetailer_8",
+        "input": "seed"
+      },
+      {
+        "node": "FaceDetailer_9",
+        "input": "seed"
+      },
+      {
         "node": "HiresFix_Sampler",
         "input": "seed"
       }
@@ -43,8 +79,8 @@
   },
   "prompt_defaults": {
     "positive_prefix": "(solo:1.4), (single subject:1.4), (exactly one beautiful adult woman:1.4)",
-    "positive_suffix": "professional model photoshoot, anatomically coherent, detailed skin, realistic photography, high detail",
-    "negative_prompt": "child, minor, underage, teen, teenager, young-looking, schoolgirl, multiple people, duplicate person, malformed anatomy, extra limbs, extra fingers, fused fingers, bad hands, distorted face, low quality, blurry, watermark, text",
+    "positive_suffix": "complete intact adult body, exactly two complete arms and two complete legs, both arms naturally connected at the shoulders, both legs naturally connected to the pelvis, exactly two complete hands and two complete feet, five natural fingers on each hand, five natural toes on each foot, all limbs fully formed and clearly connected, professional model photoshoot, anatomically coherent, detailed skin, realistic photography, high detail",
+    "negative_prompt": "child, minor, underage, teen, teenager, young-looking, schoolgirl, multiple people, duplicate person, mirror, mirrors, mirrored wall, mirror reflection, reflection, reflected person, reflective glass, sex toy, adult toy, vibrator, dildo, artificial object in hand, amputee, amputation, incomplete body, missing limb, missing arm, missing leg, one arm, one leg, missing hand, missing foot, disappearing limb, disappearing arm, disappearing leg, cropped-off limb, severed limb, severed arm, severed leg, detached limb, detached arm, detached leg, detached hand, detached foot, limb stump, arm stump, leg stump, prosthetic limb, prosthetic arm, prosthetic leg, extra limb, extra limbs, extra arm, extra arms, extra leg, extra legs, extra hand, extra hands, extra foot, extra feet, duplicated limb, duplicated arms, duplicated legs, fused arms, fused legs, merged limbs, merged arms, merged legs, malformed limbs, malformed arms, malformed legs, deformed arms, deformed legs, twisted limbs, dislocated shoulder, dislocated hip, bad hands, malformed hands, deformed hands, fused hands, missing finger, missing fingers, extra finger, extra fingers, too many fingers, six fingers, duplicated fingers, fused fingers, webbed fingers, malformed fingers, deformed fingers, broken fingers, bad feet, malformed feet, deformed feet, missing toe, missing toes, extra toe, extra toes, fused toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
     "identity_consistency_prompt": "single subject identity anchor, one person only, consistent facial structure, consistent eyes, nose, lips and jawline, consistent hairstyle, hair length, hair color and body proportions",
     "identity_consistency_strength": 1.3,
     "identity_consistency_negative": "two women, second woman, multiple women, twins, twin sisters, clone, cloned woman, duplicated person, duplicate face, duplicate body, side-by-side women, split portrait, mirror duplicate, mirror reflection showing another person, different woman, different person, identity drift, inconsistent face, changing facial features, different eye color, different nose, different lips, changing hairstyle, different hairstyle, changing hair length, changing hair color, wig, inconsistent body proportions",
@@ -6160,15 +6196,6 @@
       ]
     },
     {
-      "id": "interior_dressing_room",
-      "prompt": "inside an elegant private dressing room",
-      "tags": [
-        "indoor",
-        "dressing_room",
-        "intimate"
-      ]
-    },
-    {
       "id": "interior_loft",
       "prompt": "inside a spacious sunlit loft",
       "tags": [
@@ -6288,16 +6315,6 @@
       ]
     },
     {
-      "id": "interior_walkin_closet",
-      "prompt": "inside a lavish private walk-in wardrobe",
-      "tags": [
-        "indoor",
-        "dressing_room",
-        "luxury",
-        "private"
-      ]
-    },
-    {
       "id": "interior_private_kitchen",
       "prompt": "inside a stylish private designer kitchen",
       "tags": [
@@ -6413,7 +6430,6 @@
         "bedroom",
         "living_room",
         "studio",
-        "dressing_room",
         "kitchen"
       ]
     },
@@ -6430,19 +6446,7 @@
       "requires_any_tags": [
         "bedroom",
         "living_room",
-        "studio",
-        "dressing_room"
-      ]
-    },
-    {
-      "id": "furniture_mirror",
-      "prompt": "in front of a full-length mirror",
-      "tags": [
-        "mirror",
-        "standing_area"
-      ],
-      "requires_tags": [
-        "indoor"
+        "studio"
       ]
     },
     {
@@ -6509,8 +6513,7 @@
       "requires_any_tags": [
         "bedroom",
         "living_room",
-        "studio",
-        "dressing_room"
+        "studio"
       ]
     },
     {
@@ -6539,24 +6542,7 @@
       "requires_any_tags": [
         "bedroom",
         "living_room",
-        "studio",
-        "dressing_room"
-      ]
-    },
-    {
-      "id": "furniture_vanity",
-      "prompt": "seated at an illuminated dressing-table vanity",
-      "tags": [
-        "chair",
-        "mirror",
-        "sitting_surface"
-      ],
-      "requires_tags": [
-        "indoor"
-      ],
-      "requires_any_tags": [
-        "bedroom",
-        "dressing_room"
+        "studio"
       ]
     },
     {
@@ -6758,23 +6744,6 @@
       ],
       "requires_tags": [
         "wall"
-      ],
-      "allowed_levels": [
-        "covered",
-        "lingerie",
-        "topless",
-        "nude"
-      ]
-    },
-    {
-      "id": "pose_mirror",
-      "prompt": "posing elegantly in front of the mirror",
-      "tags": [
-        "standing",
-        "mirror"
-      ],
-      "requires_tags": [
-        "mirror"
       ],
       "allowed_levels": [
         "covered",
@@ -7377,24 +7346,6 @@
       ]
     },
     {
-      "id": "pose_explicit_legs_overhead",
-      "prompt": "reclining with both legs drawn high over her head, intimate anatomy fully exposed",
-      "tags": [
-        "explicit_pose",
-        "intimate_closeup",
-        "masturbation_pose",
-        "open_legs",
-        "lying",
-        "legs_up"
-      ],
-      "requires_tags": [
-        "lying_surface"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
       "id": "pose_explicit_knees_chest",
       "prompt": "lying back with both knees pulled tightly toward her chest and spread apart",
       "tags": [
@@ -7496,23 +7447,6 @@
       ]
     },
     {
-      "id": "pose_explicit_ankles_held",
-      "prompt": "lying back while holding both ankles high and pulling her legs wide apart",
-      "tags": [
-        "explicit_pose",
-        "masturbation_pose",
-        "open_legs",
-        "lying",
-        "legs_up"
-      ],
-      "requires_tags": [
-        "lying_surface"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
       "id": "pose_explicit_squat_open",
       "prompt": "balanced in a deep wide squat with knees fully apart and body facing camera",
       "tags": [
@@ -7561,22 +7495,6 @@
       ],
       "requires_tags": [
         "lying_surface"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
-      "id": "pose_explicit_mirror_rear",
-      "prompt": "bent forward in front of a mirror, showing both her rear view and reflection",
-      "tags": [
-        "explicit_pose",
-        "provocative_rear",
-        "open_legs",
-        "mirror"
-      ],
-      "requires_tags": [
-        "mirror"
       ],
       "allowed_levels": [
         "explicit"
@@ -7816,50 +7734,6 @@
       ]
     },
     {
-      "id": "action_toy_external",
-      "prompt": "(adult vibrator held in her hand and visibly pressed directly against her exposed intimate anatomy:1.5)",
-      "tags": [
-        "explicit",
-        "explicit_action",
-        "masturbation_action"
-      ],
-      "requires_tags": [
-        "genitals",
-        "open_legs"
-      ],
-      "requires_prop_tags": [
-        "vibrator"
-      ],
-      "requires_expression_tags": [
-        "pleasure_expression"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
-      "id": "action_toy_penetration",
-      "prompt": "explicit solo penetration with an adult toy",
-      "tags": [
-        "explicit",
-        "explicit_action",
-        "masturbation_action"
-      ],
-      "requires_tags": [
-        "genitals",
-        "open_legs"
-      ],
-      "requires_prop_tags": [
-        "penetrative_toy"
-      ],
-      "requires_expression_tags": [
-        "intense_pleasure_expression"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
       "id": "action_open_robe",
       "prompt": "slowly opening her robe to reveal the lingerie beneath",
       "tags": [
@@ -8007,28 +7881,6 @@
       ]
     },
     {
-      "id": "action_dual_stimulation",
-      "prompt": "using an adult vibrator while visibly caressing her breast",
-      "tags": [
-        "explicit_action",
-        "masturbation_action",
-        "explicit"
-      ],
-      "requires_tags": [
-        "genitals",
-        "open_legs"
-      ],
-      "requires_prop_tags": [
-        "vibrator"
-      ],
-      "requires_expression_tags": [
-        "intense_pleasure_expression"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
       "id": "action_squeeze_breasts_together",
       "prompt": "firmly squeezing both breasts together with her hands",
       "tags": [
@@ -8099,45 +7951,6 @@
       "requires_tags": [
         "genitals",
         "open_legs"
-      ],
-      "requires_expression_tags": [
-        "aroused_expression"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
-      "id": "action_hold_legs_wide",
-      "prompt": "gripping behind both knees and pulling her legs as wide apart as possible",
-      "tags": [
-        "explicit_action",
-        "closeup_action",
-        "explicit"
-      ],
-      "requires_tags": [
-        "genitals",
-        "open_legs"
-      ],
-      "requires_expression_tags": [
-        "aroused_expression"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
-      "id": "action_hold_ankles_up",
-      "prompt": "holding both ankles overhead to keep her body completely open to camera",
-      "tags": [
-        "explicit_action",
-        "closeup_action",
-        "explicit"
-      ],
-      "requires_tags": [
-        "genitals",
-        "open_legs",
-        "legs_up"
       ],
       "requires_expression_tags": [
         "aroused_expression"
@@ -8276,51 +8089,6 @@
       ]
     },
     {
-      "id": "action_vibrator_legs_up",
-      "prompt": "pressing an adult vibrator firmly against herself while holding both legs raised wide",
-      "tags": [
-        "explicit_action",
-        "masturbation_action",
-        "explicit"
-      ],
-      "requires_tags": [
-        "genitals",
-        "open_legs",
-        "legs_up"
-      ],
-      "requires_prop_tags": [
-        "vibrator"
-      ],
-      "requires_expression_tags": [
-        "intense_pleasure_expression"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
-      "id": "action_toy_deep_use",
-      "prompt": "actively using a penetrative adult toy while keeping her body fully open to camera",
-      "tags": [
-        "explicit_action",
-        "masturbation_action",
-        "explicit"
-      ],
-      "requires_tags": [
-        "genitals",
-        "open_legs"
-      ],
-      "requires_prop_tags": [
-        "penetrative_toy"
-      ],
-      "requires_expression_tags": [
-        "intense_pleasure_expression"
-      ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    },
-    {
       "id": "action_orgasmic_tension",
       "prompt": "tensing her thighs around her hand at the visible peak of stimulation",
       "tags": [
@@ -8378,33 +8146,6 @@
         "fashion_prop"
       ],
       "excludes_tags": [
-        "explicit"
-      ]
-    },
-    {
-      "id": "prop_vibrator",
-      "prompt": "adult vibrator clearly visible in her hand at the point of contact",
-      "tags": [
-        "adult_toy",
-        "vibrator",
-        "explicit"
-      ]
-    },
-    {
-      "id": "prop_glass_toy",
-      "prompt": "smooth glass adult toy clearly visible and actively positioned for use",
-      "tags": [
-        "adult_toy",
-        "penetrative_toy",
-        "explicit"
-      ]
-    },
-    {
-      "id": "prop_silicone_toy",
-      "prompt": "realistic silicone adult toy clearly visible and actively positioned for use",
-      "tags": [
-        "adult_toy",
-        "penetrative_toy",
         "explicit"
       ]
     },
@@ -8502,42 +8243,6 @@
         "erotic_prop"
       ],
       "excludes_tags": [
-        "explicit"
-      ]
-    },
-    {
-      "id": "prop_wand_vibrator",
-      "prompt": "cordless wand vibrator visibly positioned for active use",
-      "tags": [
-        "adult_toy",
-        "vibrator",
-        "explicit"
-      ]
-    },
-    {
-      "id": "prop_bullet_vibrator",
-      "prompt": "compact bullet vibrator visibly held at the point of contact",
-      "tags": [
-        "adult_toy",
-        "vibrator",
-        "explicit"
-      ]
-    },
-    {
-      "id": "prop_luxury_toy",
-      "prompt": "premium sculpted silicone adult toy visibly positioned for active use",
-      "tags": [
-        "adult_toy",
-        "penetrative_toy",
-        "explicit"
-      ]
-    },
-    {
-      "id": "prop_crystal_toy",
-      "prompt": "polished crystal adult toy visibly positioned for active use",
-      "tags": [
-        "adult_toy",
-        "penetrative_toy",
         "explicit"
       ]
     }

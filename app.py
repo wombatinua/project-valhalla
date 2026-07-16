@@ -27,6 +27,7 @@ class AppError(RuntimeError):
 
 
 def weighted_choice(rng: random.Random, items: list[dict[str, Any]]) -> dict[str, Any]:
+    items = [item for item in items if not item.get("disabled", False)]
     if not items:
         raise AppError("No compatible choices remain for a required selection")
     weights = [float(item.get("weight", 1)) for item in items]
@@ -78,6 +79,8 @@ def validate_item(item: Any, context: str) -> None:
     weight = item.get("weight", 1)
     if not isinstance(weight, (int, float)) or weight <= 0:
         raise AppError(f"{context}.{item['id']}: weight must be greater than zero")
+    if "disabled" in item and not isinstance(item["disabled"], bool):
+        raise AppError(f"{context}.{item['id']}: disabled must be true or false")
 
 
 def validate_database(db: dict[str, Any], require_mapping: bool) -> None:
@@ -135,7 +138,25 @@ def validate_database(db: dict[str, Any], require_mapping: bool) -> None:
                 raise AppError(f"Duplicate id: {item['id']}")
             ids.add(item["id"]); index[item["id"]] = item
 
+    enabled_ids = {item_id for item_id, item in index.items() if not item.get("disabled", False)}
     color_ids = {item["id"] for item in db["colors"]}
+    enabled_color_ids = {
+        item["id"] for item in db["colors"] if not item.get("disabled", False)
+    }
+    if not enabled_color_ids:
+        raise AppError("colors must contain at least one enabled item")
+    for section, values in db["human_model_parts"].items():
+        if not any(not item.get("disabled", False) for item in values):
+            raise AppError(f"human_model_parts.{section} must contain at least one enabled item")
+    for section, values in db["garments"].items():
+        if not any(not item.get("disabled", False) for item in values):
+            raise AppError(f"garments.{section} must contain at least one enabled item")
+    for section in (
+        "outfit_templates", "interiors", "furniture", "poses", "actions",
+        "expressions", "moods", "photography_styles",
+    ):
+        if not any(not item.get("disabled", False) for item in db[section]):
+            raise AppError(f"{section} must contain at least one enabled item")
     garment_catalogs = set(db["garments"])
     for item in index.values():
         for key in ("requires", "excludes"):
@@ -145,6 +166,16 @@ def validate_database(db: dict[str, Any], require_mapping: bool) -> None:
         unknown_colors = set(item.get("allowed_colors", [])) - color_ids
         if unknown_colors:
             raise AppError(f"{item['id']} references unknown colors: {sorted(unknown_colors)}")
+        if not item.get("disabled", False):
+            disabled_requirements = set(item.get("requires", [])) - enabled_ids
+            if disabled_requirements:
+                raise AppError(
+                    f"Enabled item {item['id']} requires disabled IDs: "
+                    f"{sorted(disabled_requirements)}"
+                )
+            configured_colors = set(item.get("allowed_colors", []))
+            if configured_colors and not configured_colors & enabled_color_ids:
+                raise AppError(f"Enabled item {item['id']} has no enabled allowed colors")
 
     for template in db["outfit_templates"]:
         slots = template.get("slots")
@@ -236,8 +267,14 @@ class Composer:
     def __init__(self, db: dict[str, Any], rng: random.Random):
         self.db = db
         self.rng = rng
-        self.colors = {item["id"]: item for item in db["colors"]}
-        self.item_index = {item["id"]: item for item in iter_content_items(db)}
+        self.colors = {
+            item["id"]: item for item in db["colors"] if not item.get("disabled", False)
+        }
+        self.item_index = {
+            item["id"]: item
+            for item in iter_content_items(db)
+            if not item.get("disabled", False)
+        }
 
     def choose_human(self) -> dict[str, Any]:
         human: dict[str, Any] = {}
@@ -246,7 +283,8 @@ class Composer:
         for category in order:
             if category == "facial_accents":
                 count = self.rng.choices([0, 1, 2], weights=[3, 5, 2], k=1)[0]
-                human[category] = self.rng.sample(parts[category], k=min(count, len(parts[category])))
+                candidates = [item for item in parts[category] if not item.get("disabled", False)]
+                human[category] = self.rng.sample(candidates, k=min(count, len(candidates)))
                 continue
             candidates = list(parts[category])
             if category == "hair_style":
@@ -306,7 +344,11 @@ class Composer:
                 raise AppError(f"Outfit color group '{group}' has no color shared by slots {slots}")
             color_groups[group] = self.rng.choice(sorted(shared))
         for slot, item in selected.items():
-            allowed = item.get("allowed_colors") or list(self.colors)
+            allowed = [
+                color_id
+                for color_id in (item.get("allowed_colors") or list(self.colors))
+                if color_id in self.colors
+            ]
             rule = template["slots"][slot]
             group = rule.get("color_group")
             if group:
@@ -402,7 +444,6 @@ class Composer:
             candidates = [
                 item for item in self.db["props"]
                 if compatible_with_requirements(item, available_tags | tags(action))
-                and "adult_toy" not in tags(item)
             ]
             if candidates:
                 prop = weighted_choice(self.rng, candidates)

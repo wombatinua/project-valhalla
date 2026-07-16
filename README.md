@@ -14,15 +14,15 @@ Stability Matrix remains the visual workflow editor. This application handles co
 
 ## Production content database
 
-`database.json` is a production-scale, manually editable catalog with more than 680 selectable records. Its current balance includes roughly:
+`database.json` is a production-scale, manually editable catalog with 663 selectable records. Its current balance includes roughly:
 
 - 220 compositional adult-model traits;
 - 215 garments and fashion accessories;
 - 18 algorithmic outfit templates;
-- 25 private interiors and secluded nature locations;
-- 25 compatible pieces of furniture and posing surfaces;
-- 60 fashion, lifestyle, boudoir, nude, close-up, and explicit poses;
-- 41 actions, 20 props, and dedicated action-compatible expressions;
+- 23 private interiors and secluded nature locations;
+- 23 compatible pieces of furniture and posing surfaces;
+- 56 fashion, lifestyle, boudoir, nude, close-up, and explicit poses;
+- 34 actions, 13 non-sexual props, and dedicated action-compatible expressions;
 - 24 mood and photography treatments.
 
 The wardrobe covers everyday casual wear, office and evening fashion, homewear, pajamas, bathrobes, dresses, private-garden outfits, swimwear, bras, many cuts of panties and thongs, corsetry, lace, sheer garments, leather, fishnets, pantyhose, stockings, socks, high heels, boots, slippers, jewelry, garters, and editorial accessories. Templates are recipes rather than fixed outfits, so compatible pieces, matching tags, slots, and colors can be recombined into many coherent sets.
@@ -32,6 +32,18 @@ All locations are private. Outdoor content is limited to secluded gardens, priva
 Human models are always explicitly adult women aged 21 or 22 and are assembled from independently editable face, eyes, hair, complexion, stature, figure, breast, areola, nipple, pubic-hair, external-anatomy, makeup, manicure, and accent catalogs. Anatomical prompt fragments are emitted only at stages where the relevant body area is visible.
 
 Every record has a globally unique descriptive ID. New records can usually be added by copying the nearest related item and changing `id`, `prompt`, tags, and colors. Run a large `dry-run` after edits; the validator rejects duplicate IDs, unknown colors and references, invalid stages, and incompatible resolved scenes before any GPU work starts.
+
+Any selectable database record can be temporarily excluded without deleting it:
+
+```json
+{
+  "id": "example_item",
+  "prompt": "example prompt fragment",
+  "disabled": true
+}
+```
+
+When `disabled` is absent, the item is enabled by default. `"disabled": false` also keeps it enabled. The flag works uniformly for human traits, colors, garments, outfit templates, interiors, furniture, poses, actions, props, expressions, moods, and photography styles. Disabled records retain their IDs for convenient manual editing but are never selected, used as dependencies, or included in color choices. The validator rejects non-boolean flag values, active records that require disabled IDs, and required categories with no enabled records remaining.
 
 ## Requirements
 
@@ -237,7 +249,7 @@ With `--mode photoshoot`, the adult model, identity lock, private location, ligh
 
 1. provocative explicit rear views;
 2. extreme intimate and breast close-ups;
-3. masturbation and adult-toy actions with compatible expressions.
+3. hands-only masturbation actions with compatible expressions.
 
 With `--mode random`, every image independently assembles a different adult model, outfit context, private location, furniture, lighting, pose, action, prop, and expression. Every frame remains explicit, while the three XXX categories are selected randomly.
 
@@ -263,7 +275,7 @@ The plateau percentage is part of the NSFW percentage and cannot be larger than 
 5. image 9: explicit intimate close-up;
 6. image 10: masturbation with action-compatible expression and adult prop when required.
 
-For a longer plateau, rear views, close-ups, and masturbation each occupy a contiguous part of the plateau. This makes the final sequence predictable while poses, framing, actions, toys, and expressions remain randomized within the appropriate category.
+For a longer plateau, rear views, close-ups, and masturbation each occupy a contiguous part of the plateau. This makes the final sequence predictable while poses, framing, hands-only actions, and expressions remain randomized within the appropriate category.
 
 Plateau shots receive dedicated high-priority XXX prompt prefixes before the model description. All garment slots are removed, full anatomy fragments are enabled, and a plateau-specific negative suffix discourages censorship, covered anatomy, underwear, implied nudity, and non-explicit boudoir framing. These strings are manually editable in `prompt_defaults.xxx_plateau_prompts` and `prompt_defaults.xxx_negative_additions`.
 
@@ -271,7 +283,11 @@ The application guarantees an unambiguous XXX workflow prompt and stage. The dif
 
 NSFW pose selection also includes visibility-compatible intimate close-ups of breasts, nipples, hips/buttocks, the pubic area, and explicit anatomy. Close-ups are randomized with other eligible NSFW poses and cannot be selected for covered or lingerie-only stages.
 
-Explicit actions also constrain facial-expression selection. Manual stimulation uses an aroused expression, vibrator scenes use a clear pleasure expression, and penetrative-toy scenes use an intense pleasure expression. The resolver validates the action/expression relationship before compiling the prompt.
+Explicit actions also constrain facial-expression selection. Masturbation is exclusively hands-only: manual stimulation uses pleasure or intense-pleasure expressions according to the action. Sexual toys are absent from the selectable database and explicitly discouraged by the global negative prompt. The resolver validates the action/expression relationship before compiling the prompt.
+
+Mirrors and reflections are excluded from the scene catalog because they frequently create duplicate subjects and anatomical glitches. Mirror furniture and mirror-dependent poses are unavailable, while the global negative prompt also discourages mirrors, reflections, mirrored walls, and reflected people.
+
+The global anatomy-integrity suffix explicitly requests a complete connected body with exactly two arms, two legs, two hands, two feet, and natural finger/toe counts. Its negative counterpart rejects missing, amputated, detached, duplicated, fused, malformed, or disappearing limbs as well as common hand, finger, foot, and toe defects. Extreme overhead contortion poses and actions that pull both legs by the ankles or knees are intentionally excluded because they disproportionately produce missing-leg failures.
 
 Override the percentage for one command:
 
