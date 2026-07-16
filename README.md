@@ -5,6 +5,7 @@ A small Linux-first Python CLI that builds structured, rule-compatible image pro
 The project intentionally stays compact:
 
 - `app.py` contains the CLI, resolver, prompt compiler, workflow capture, and ComfyUI client.
+- `launcher.sh` provides an interactive wizard for all launch options.
 - `database.json` contains settings and all manually editable content.
 - `workflow.json` is the captured ComfyUI API workflow used as the render template.
 - The configured output directory contains downloaded generated images.
@@ -27,6 +28,29 @@ The default ComfyUI URL is:
 
 ```text
 http://127.0.0.1:8188
+```
+
+## Interactive launcher
+
+For a guided launch, run:
+
+```bash
+./launcher.sh
+```
+
+The wizard shows the active ComfyUI, workflow, and output settings, then guides you through:
+
+- generate, dry-run, capture, or help;
+- photoshoot or random mode;
+- number of photoshoots and images per photoshoot;
+- optional prompt and inference seeds;
+- the photoshoot NSFW and explicit-plateau percentages;
+- capture overwrite protection.
+
+It prints a complete summary and asks for confirmation before launching `app.py`. Set `PYTHON_BIN` when a different Python executable or virtual environment is needed:
+
+```bash
+PYTHON_BIN=.venv/bin/python ./launcher.sh
 ```
 
 ## Quick start
@@ -52,6 +76,15 @@ Generate a ten-image photoshoot:
 ```bash
 python3 app.py generate \
   --mode photoshoot \
+  --count 10
+```
+
+Generate five different ten-image photoshoots:
+
+```bash
+python3 app.py generate \
+  --mode photoshoot \
+  --photoshoots 5 \
   --count 10
 ```
 
@@ -94,12 +127,16 @@ Capture can fail safely when multiple prompt nodes are ambiguous. In that case i
 python3 app.py dry-run \
   --mode photoshoot|random \
   --count N \
+  [--photoshoots N] \
   [--prompt-seed N] \
   [--inference-seed N] \
-  [--nsfw-percent 0..100]
+  [--nsfw-percent 0..100] \
+  [--plateau-percent 0..100]
 ```
 
 Resolves scenes and prints model signatures, selected IDs, prompts, stages, and seeds without contacting ComfyUI for generation.
+
+In photoshoot mode, `--count` is the number of images in each photoshoot and `--photoshoots` is the number of distinct photoshoots. The default is one photoshoot. In random mode, `--count` is the total image count and `--photoshoots` must remain `1`.
 
 Use this before a large batch to validate database changes without spending GPU time.
 
@@ -126,7 +163,10 @@ Jobs run sequentially. The batch stops on its first resolver, HTTP, ComfyUI, or 
 - outfit pieces, colors, location, furniture, mood, and photography style stay fixed;
 - poses, actions, props, and expressions vary;
 - outfit stages advance without dressing backwards;
-- the configured final percentage becomes progressively NSFW.
+- the configured final percentage becomes progressively NSFW;
+- its final explicit plateau follows a predictable peak-shot sequence.
+
+With `--photoshoots N`, each photoshoot independently assembles a new human model, outfit, color palette, location, mood, and complete progression. Continuity is preserved only within each individual photoshoot.
 
 The model signature contains every selected human trait, including traits that are not visible in a clothed frame.
 
@@ -134,7 +174,7 @@ The model signature contains every selected human trait, including traits that a
 
 `--mode random` independently assembles every frame. Human traits, outfit, stage, location, pose, and action can all change.
 
-`--nsfw-percent` is intentionally unavailable in random mode because random mode selects independent stages.
+`--nsfw-percent` and `--plateau-percent` are intentionally unavailable in random mode because random mode selects independent stages.
 
 ## NSFW photoshoot progression
 
@@ -142,15 +182,29 @@ The default is stored in `database.json`:
 
 ```json
 "photoshoot_progression": {
-  "nsfw_final_percent": 30
+  "nsfw_final_percent": 50,
+  "explicit_plateau_percent": 30
 }
 ```
 
-For a ten-image photoshoot at `30`, the final three images are:
+The plateau percentage is part of the NSFW percentage and cannot be larger than it. With the defaults, a ten-image photoshoot is divided into:
 
-1. topless with an erotic pose/action;
-2. fully nude with an erotic pose/action;
-3. explicit with an explicit pose/action and a compatible adult prop when required.
+1. images 1–5: clothed-to-lingerie progression;
+2. image 6: topless transition;
+3. image 7: fully nude transition;
+4. image 8: provocative explicit rear view;
+5. image 9: explicit intimate close-up;
+6. image 10: masturbation with action-compatible expression and adult prop when required.
+
+For a longer plateau, rear views, close-ups, and masturbation each occupy a contiguous part of the plateau. This makes the final sequence predictable while poses, framing, actions, toys, and expressions remain randomized within the appropriate category.
+
+Plateau shots receive dedicated high-priority XXX prompt prefixes before the model description. All garment slots are removed, full anatomy fragments are enabled, and a plateau-specific negative suffix discourages censorship, covered anatomy, underwear, implied nudity, and non-explicit boudoir framing. These strings are manually editable in `prompt_defaults.xxx_plateau_prompts` and `prompt_defaults.xxx_negative_additions`.
+
+The application guarantees an unambiguous XXX workflow prompt and stage. The diffusion model still has final control over the rendered pixels; a model that strongly resists explicit content may require a different checkpoint or workflow tuning in Stability Matrix.
+
+NSFW pose selection also includes visibility-compatible intimate close-ups of breasts, nipples, hips/buttocks, the pubic area, and explicit anatomy. Close-ups are randomized with other eligible NSFW poses and cannot be selected for covered or lingerie-only stages.
+
+Explicit actions also constrain facial-expression selection. Manual stimulation uses an aroused expression, vibrator scenes use a clear pleasure expression, and penetrative-toy scenes use an intense pleasure expression. The resolver validates the action/expression relationship before compiling the prompt.
 
 Override the percentage for one command:
 
@@ -158,10 +212,11 @@ Override the percentage for one command:
 python3 app.py generate \
   --mode photoshoot \
   --count 10 \
-  --nsfw-percent 50
+  --nsfw-percent 60 \
+  --plateau-percent 40
 ```
 
-Use `--nsfw-percent 0` to disable the forced NSFW ending. Values from `0` through `100` are accepted.
+Use `--nsfw-percent 0 --plateau-percent 0` to disable the forced NSFW ending. Values from `0` through `100` are accepted, and the plateau must not exceed the NSFW percentage.
 
 If an outfit template does not define topless, nude, or explicit terminal stages, the application derives safe terminal stages from the template's available garment slots.
 
@@ -179,6 +234,8 @@ Prompt and inference randomness are independent.
 - location, poses, actions, props, expressions, and style.
 
 When supplied, it reproduces the complete prompt sequence. When omitted, one random prompt seed is generated for the command and printed.
+
+For a multi-photoshoot batch, one prompt seed reproduces the ordered set of every photoshoot and every shot within them.
 
 ### Inference seed
 
@@ -202,16 +259,23 @@ Runtime settings live near the top of `database.json`:
   "http_timeout_seconds": 15,
   "poll_interval_seconds": 1,
   "generation_timeout_seconds": 600,
-  "max_scene_attempts": 100,
-  "photoshoot_progression": {
-    "nsfw_final_percent": 30
-  }
+    "max_scene_attempts": 100,
+    "photoshoot_progression": {
+      "nsfw_final_percent": 50,
+      "explicit_plateau_percent": 30
+    }
 }
 ```
 
 Relative paths are resolved from the directory containing `database.json`. Absolute paths are also accepted.
 
 ComfyUI may return images from a `PreviewImage` node as temporary files. The application downloads both `temp` and permanent `output` images into `settings.output_dir`.
+
+Photoshoot filenames include the run ID, photoshoot number, and shot number, for example:
+
+```text
+20260716_170000_000000_photoshoot_002_shot_007_12345_image_01.png
+```
 
 ## Editing the database
 
@@ -238,6 +302,7 @@ Optional rule fields are added only when needed:
   "excludes": ["incompatible_item_id"],
   "requires_tags": ["required_tag"],
   "excludes_tags": ["forbidden_tag"],
+  "requires_expression_tags": ["expression_tag"],
   "occupies_slots": ["upperwear"],
   "allowed_colors": ["color_black"]
 }
@@ -248,6 +313,7 @@ Important rules:
 - IDs must be globally unique and stable.
 - `requires` and `excludes` refer to exact IDs.
 - `requires_tags` and `excludes_tags` define generic compatibility.
+- `requires_expression_tags` restricts an action to expressions carrying all listed tags.
 - `weight` must be greater than zero.
 - A lower weight makes an item less likely; a higher weight makes it more likely.
 - Do not add empty optional arrays unless they improve readability.

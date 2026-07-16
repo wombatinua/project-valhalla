@@ -94,9 +94,15 @@ def validate_database(db: dict[str, Any], require_mapping: bool) -> None:
         if not isinstance(settings.get(key), str) or not settings[key]:
             raise AppError(f"settings.{key} must be a non-empty string")
     progression = settings.get("photoshoot_progression", {})
-    nsfw_percent = progression.get("nsfw_final_percent", 30)
+    nsfw_percent = progression.get("nsfw_final_percent", 50)
     if not isinstance(nsfw_percent, (int, float)) or not 0 <= nsfw_percent <= 100:
         raise AppError("settings.photoshoot_progression.nsfw_final_percent must be between 0 and 100")
+    plateau_percent = progression.get("explicit_plateau_percent", 30)
+    if not isinstance(plateau_percent, (int, float)) or not 0 <= plateau_percent <= nsfw_percent:
+        raise AppError(
+            "settings.photoshoot_progression.explicit_plateau_percent must be between 0 "
+            "and nsfw_final_percent"
+        )
 
     ids: set[str] = set()
     index: dict[str, dict[str, Any]] = {}
@@ -337,6 +343,13 @@ class Composer:
         elif stage["level"] in {"topless", "nude"}:
             nsfw_pose_tags = {"erotic_pose", "topless_pose", "nude_pose", "open_legs"}
             poses = [item for item in poses if tags(item) & nsfw_pose_tags]
+        plateau_kind = stage.get("plateau_kind")
+        if plateau_kind == "provocative_rear":
+            poses = [item for item in poses if "provocative_rear" in tags(item)]
+        elif plateau_kind == "intimate_closeup":
+            poses = [item for item in poses if "intimate_closeup" in tags(item)]
+        elif plateau_kind == "masturbation":
+            poses = [item for item in poses if "masturbation_pose" in tags(item)]
         pose = weighted_choice(self.rng, poses)
         action_tags = available_tags | tags(pose)
         actions = [
@@ -351,6 +364,12 @@ class Composer:
                 item for item in actions
                 if tags(item) & {"erotic_action", "undressing_action"}
             ]
+        if plateau_kind == "provocative_rear":
+            actions = [item for item in actions if "provocative_action" in tags(item)]
+        elif plateau_kind == "intimate_closeup":
+            actions = [item for item in actions if "closeup_action" in tags(item)]
+        elif plateau_kind == "masturbation":
+            actions = [item for item in actions if "masturbation_action" in tags(item)]
         action = weighted_choice(self.rng, actions)
         prop = None
         required_prop_tags = set(action.get("requires_prop_tags", []))
@@ -365,11 +384,18 @@ class Composer:
             ]
             if candidates:
                 prop = weighted_choice(self.rng, candidates)
+        expression_candidates = list(self.db["expressions"])
+        required_expression_tags = set(action.get("requires_expression_tags", []))
+        if required_expression_tags:
+            expression_candidates = [
+                item for item in expression_candidates
+                if required_expression_tags.issubset(tags(item))
+            ]
         return {
             "pose": pose,
             "action": action,
             "prop": prop,
-            "expression": weighted_choice(self.rng, self.db["expressions"]),
+            "expression": weighted_choice(self.rng, expression_candidates),
         }
 
     def resolve_scene(self, fixed: dict[str, Any], stage: dict[str, Any]) -> dict[str, Any]:
@@ -437,6 +463,12 @@ class Composer:
                     f"excluded={sorted(excluded)}, missing_tags={sorted(missing_tags)}, "
                     f"excluded_tags={sorted(excluded_tags)}"
                 )
+        required_expression_tags = set(scene["action"].get("requires_expression_tags", []))
+        if not required_expression_tags.issubset(tags(scene["expression"])):
+            raise AppError(
+                f"Expression {scene['expression']['id']} is incompatible with action "
+                f"{scene['action']['id']}; required tags: {sorted(required_expression_tags)}"
+            )
 
 
 ALWAYS_HUMAN_PARTS = (
@@ -465,7 +497,9 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     defaults = db["prompt_defaults"]
     stage = scene["stage"]
     visibility = set(stage.get("body_visibility", []))
-    fragments = [defaults.get("positive_prefix", "")]
+    plateau_kind = stage.get("plateau_kind")
+    xxx_prompt = defaults.get("xxx_plateau_prompts", {}).get(plateau_kind, "")
+    fragments = [xxx_prompt, defaults.get("positive_prefix", "")]
     fragments.extend(human_fragments(scene["human"], visibility))
     visible_slots = set(stage.get("visible_slots", []))
     outfit = scene["outfit"]
@@ -480,6 +514,8 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     fragments.append(defaults.get("positive_suffix", ""))
     positive = ", ".join(fragment.strip(" ,") for fragment in fragments if fragment.strip(" ,"))
     negative = defaults.get("negative_prompt", "")
+    if plateau_kind and defaults.get("xxx_negative_additions"):
+        negative = f"{negative}, {defaults['xxx_negative_additions']}"
     ids = []
     for value in scene["human"].values():
         ids.extend(item["id"] for item in value) if isinstance(value, list) else ids.append(value["id"])
@@ -501,6 +537,23 @@ def model_signature(human: dict[str, Any]) -> str:
     return "+".join(parts)
 
 
+def photoshoot_signature(context: dict[str, Any]) -> tuple[Any, ...]:
+    outfit = context["outfit"]
+    garments = tuple(
+        (slot, item["id"], outfit["colors"][slot]["id"])
+        for slot, item in sorted(outfit["garments"].items())
+    )
+    return (
+        model_signature(context["human"]),
+        outfit["template"]["id"],
+        garments,
+        context["interior"]["id"],
+        context["furniture"]["id"],
+        context["mood"]["id"],
+        context["photography_style"]["id"],
+    )
+
+
 def stage_for_index(
     template: dict[str, Any],
     index: int,
@@ -508,6 +561,7 @@ def stage_for_index(
     mode: str,
     rng: random.Random,
     nsfw_percent: float,
+    plateau_percent: float,
 ) -> dict[str, Any]:
     stages = template["stages"]
     if mode == "photoshoot":
@@ -515,10 +569,31 @@ def stage_for_index(
         safe = [stage for stage in effective if stage["level"] not in NSFW_LEVELS]
         nsfw = [stage for stage in effective if stage["level"] in NSFW_LEVELS]
         nsfw_count = min(count, math.ceil(count * nsfw_percent / 100)) if nsfw_percent > 0 else 0
+        plateau_count = min(nsfw_count, math.ceil(count * plateau_percent / 100)) if plateau_percent > 0 else 0
         safe_count = count - nsfw_count
         if index < safe_count:
             return safe[min(len(safe) - 1, index * len(safe) // safe_count)]
-        return progressive_stage(nsfw, index - safe_count, nsfw_count)
+        nsfw_index = index - safe_count
+        transition_count = nsfw_count - plateau_count
+        if nsfw_index < transition_count:
+            transition_stages = nsfw if plateau_count == 0 else [
+                stage for stage in nsfw if stage["level"] != "explicit"
+            ]
+            return progressive_stage(transition_stages, nsfw_index, transition_count)
+        explicit_stage = next(stage for stage in nsfw if stage["level"] == "explicit")
+        plateau_kinds = [
+            {"plateau_kind": "provocative_rear"},
+            {"plateau_kind": "intimate_closeup"},
+            {"plateau_kind": "masturbation"},
+        ]
+        plateau_index = nsfw_index - transition_count
+        kind = progressive_stage(plateau_kinds, plateau_index, plateau_count)["plateau_kind"]
+        result = copy.deepcopy(explicit_stage)
+        result["id"] = f"{explicit_stage['id']}_{kind}"
+        result["plateau_kind"] = kind
+        result["visible_slots"] = []
+        result["body_visibility"] = ["breasts", "nipples", "pubic_area", "genitals"]
+        return result
     return weighted_choice(rng, stages)
 
 
@@ -630,7 +705,17 @@ def wait_for_outputs(session: Any, url: str, prompt_id: str, settings: dict[str,
     raise AppError(f"Timed out waiting for prompt_id {prompt_id}")
 
 
-def generate_one(db: dict[str, Any], db_path: Path, positive: str, negative: str, seed: int, mode: str, index: int) -> tuple[str, list[Path]]:
+def generate_one(
+    db: dict[str, Any],
+    db_path: Path,
+    positive: str,
+    negative: str,
+    seed: int,
+    mode: str,
+    shot_index: int,
+    photoshoot_index: int,
+    run_id: str,
+) -> tuple[str, list[Path]]:
     validate_database(db, require_mapping=True)
     workflow_path = resolve_path(db_path.parent, db["settings"]["workflow_file"])
     try:
@@ -654,13 +739,16 @@ def generate_one(db: dict[str, Any], db_path: Path, positive: str, negative: str
     output_dir = resolve_path(db_path.parent, db["settings"]["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     saved: list[Path] = []
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     image_number = 0
     for node_output in outputs.values():
         for image in node_output.get("images", []):
             image_number += 1
             suffix = Path(image.get("filename", "image.png")).suffix or ".png"
-            destination = output_dir / f"{stamp}_{mode}_{index + 1:03d}_{seed}_{image_number:02d}{suffix}"
+            if mode == "photoshoot":
+                label = f"photoshoot_{photoshoot_index + 1:03d}_shot_{shot_index + 1:03d}"
+            else:
+                label = f"random_shot_{shot_index + 1:03d}"
+            destination = output_dir / f"{run_id}_{label}_{seed}_image_{image_number:02d}{suffix}"
             response = session.get(
                 f"{url}/view",
                 params={"filename": image["filename"], "subfolder": image.get("subfolder", ""), "type": image.get("type", "output")},
@@ -679,35 +767,87 @@ def run_batch(args: argparse.Namespace, render: bool) -> None:
     prompt_seed = args.prompt_seed if args.prompt_seed is not None else secrets.randbits(63)
     rng = random.Random(prompt_seed)
     composer = Composer(db, rng)
-    configured_percent = float(db["settings"].get("photoshoot_progression", {}).get("nsfw_final_percent", 30))
+    configured_percent = float(db["settings"].get("photoshoot_progression", {}).get("nsfw_final_percent", 50))
     nsfw_percent = configured_percent if args.nsfw_percent is None else args.nsfw_percent
-    if args.mode == "random" and args.nsfw_percent is not None:
-        raise AppError("--nsfw-percent is only valid with --mode photoshoot")
-    fixed = composer.fixed_context() if args.mode == "photoshoot" else None
+    configured_plateau = float(db["settings"].get("photoshoot_progression", {}).get("explicit_plateau_percent", 30))
+    plateau_percent = configured_plateau if args.plateau_percent is None else args.plateau_percent
+    if args.mode == "random" and (args.nsfw_percent is not None or args.plateau_percent is not None):
+        raise AppError("--nsfw-percent and --plateau-percent are only valid with --mode photoshoot")
+    if args.mode == "random" and args.photoshoots != 1:
+        raise AppError("--photoshoots is only valid with --mode photoshoot")
+    if plateau_percent > nsfw_percent:
+        raise AppError("The explicit plateau percentage cannot exceed the NSFW final percentage")
     fixed_inference_seed = args.inference_seed
-    print(f"mode={args.mode} count={args.count} prompt_seed={prompt_seed}")
+    photoshoot_count = args.photoshoots if args.mode == "photoshoot" else 1
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    print(
+        f"mode={args.mode} count={args.count} photoshoots={photoshoot_count} "
+        f"total_images={args.count * photoshoot_count} prompt_seed={prompt_seed}"
+    )
     if args.mode == "photoshoot":
         print(f"nsfw_final_percent={nsfw_percent:g}")
+        print(f"explicit_plateau_percent={plateau_percent:g}")
     if fixed_inference_seed is not None:
         print(f"fixed_inference_seed={fixed_inference_seed}")
-    for index in range(args.count):
-        context = fixed if fixed is not None else composer.fixed_context()
-        assert context is not None
-        template = context["outfit"]["template"]
-        stage = stage_for_index(template, index, args.count, args.mode, rng, nsfw_percent)
-        scene = composer.resolve_scene(context, stage)
-        positive, negative, selected_ids = compile_scene(db, scene)
-        inference_seed = fixed_inference_seed if fixed_inference_seed is not None else secrets.randbelow(2**63)
-        print(f"\n[{index + 1}/{args.count}] stage={stage['id']} inference_seed={inference_seed}")
-        print(f"model_signature={model_signature(scene['human'])}")
-        print(f"selected_ids={','.join(selected_ids)}")
-        print(f"positive={positive}")
-        print(f"negative={negative}")
-        if render:
-            prompt_id, paths = generate_one(db, db_path, positive, negative, inference_seed, args.mode, index)
-            print(f"prompt_id={prompt_id}")
-            for path in paths:
-                print(f"saved={path}")
+    seen_photoshoots: set[tuple[Any, ...]] = set()
+    for photoshoot_index in range(photoshoot_count):
+        fixed = None
+        if args.mode == "photoshoot":
+            attempts = int(db["settings"].get("max_scene_attempts", 100))
+            for _ in range(attempts):
+                candidate = composer.fixed_context()
+                signature = photoshoot_signature(candidate)
+                if signature not in seen_photoshoots:
+                    fixed = candidate
+                    seen_photoshoots.add(signature)
+                    break
+            if fixed is None:
+                raise AppError(
+                    f"Could not assemble {photoshoot_count} distinct photoshoots after "
+                    f"{attempts} attempts for photoshoot {photoshoot_index + 1}"
+                )
+        if args.mode == "photoshoot":
+            assert fixed is not None
+            print(
+                f"\n=== Photoshoot {photoshoot_index + 1}/{photoshoot_count}: "
+                f"template={fixed['outfit']['template']['id']} "
+                f"model_signature={model_signature(fixed['human'])} ==="
+            )
+        for shot_index in range(args.count):
+            context = fixed if fixed is not None else composer.fixed_context()
+            assert context is not None
+            template = context["outfit"]["template"]
+            stage = stage_for_index(template, shot_index, args.count, args.mode, rng, nsfw_percent, plateau_percent)
+            scene = composer.resolve_scene(context, stage)
+            positive, negative, selected_ids = compile_scene(db, scene)
+            inference_seed = fixed_inference_seed if fixed_inference_seed is not None else secrets.randbelow(2**63)
+            if args.mode == "photoshoot":
+                progress = (
+                    f"photoshoot {photoshoot_index + 1}/{photoshoot_count} "
+                    f"shot {shot_index + 1}/{args.count}"
+                )
+            else:
+                progress = f"{shot_index + 1}/{args.count}"
+            print(f"\n[{progress}] stage={stage['id']} inference_seed={inference_seed}")
+            print(f"model_signature={model_signature(scene['human'])}")
+            print(f"selected_ids={','.join(selected_ids)}")
+            print(f"positive={positive}")
+            print(f"negative={negative}")
+            if render:
+                prompt_id, paths = generate_one(
+                    db,
+                    db_path,
+                    positive,
+                    negative,
+                    inference_seed,
+                    args.mode,
+                    shot_index,
+                    photoshoot_index,
+                    run_id,
+                )
+                print(f"prompt_id={prompt_id}")
+                for path in paths:
+                    print(f"saved={path}")
 
 
 def positive_int(value: str) -> int:
@@ -739,13 +879,19 @@ def build_parser() -> argparse.ArgumentParser:
     for name, help_text in (("dry-run", "Resolve and print prompts without rendering"), ("generate", "Resolve prompts and render them")):
         command = subparsers.add_parser(name, help=help_text)
         command.add_argument("--mode", choices=("photoshoot", "random"), required=True)
-        command.add_argument("--count", type=positive_int, required=True)
+        command.add_argument("--count", type=positive_int, required=True, help="Images per photoshoot (or total random images)")
+        command.add_argument("--photoshoots", type=positive_int, default=1, help="Number of distinct photoshoots (photoshoot mode only)")
         command.add_argument("--prompt-seed", type=int)
         command.add_argument("--inference-seed", type=inference_seed_value)
         command.add_argument(
             "--nsfw-percent",
             type=percent_value,
             help="Override settings.photoshoot_progression.nsfw_final_percent (photoshoot only)",
+        )
+        command.add_argument(
+            "--plateau-percent",
+            type=percent_value,
+            help="Override settings.photoshoot_progression.explicit_plateau_percent (photoshoot only)",
         )
     return parser
 

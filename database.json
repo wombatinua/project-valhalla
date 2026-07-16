@@ -1,8 +1,8 @@
 {
   "_guide": {
     "purpose": "Edit this file directly. Prompt text is English for diffusion-model compatibility.",
-    "simple_item": "Every selectable item needs only id and prompt. Optional fields are weight, tags, requires, excludes, requires_tags, excludes_tags, occupies_slots, allowed_colors and mix_tags.",
-    "photoshoot": "A photoshoot fixes the assembled adult model, outfit, colors and location. Poses and actions vary while outfit stages move forward.",
+    "simple_item": "Every selectable item needs only id and prompt. Optional fields are weight, tags, requires, excludes, requires_tags, excludes_tags, requires_expression_tags, occupies_slots, allowed_colors and mix_tags.",
+    "photoshoot": "A photoshoot fixes the assembled adult model, outfit, colors and location. It progresses through undressing into a predictable explicit plateau of rear views, close-ups and masturbation shots.",
     "random": "Random mode independently assembles every image and chooses any stage from the selected outfit template.",
     "outfit_templates": "Slots select garments by catalog and required_tags. color_group reuses a color. match_group asks pieces to share a mix tag.",
     "body_visibility": "Use breasts, nipples, pubic_area and genitals. Anatomy prompt fragments are emitted only when listed by a stage.",
@@ -17,7 +17,8 @@
     "generation_timeout_seconds": 600,
     "max_scene_attempts": 100,
     "photoshoot_progression": {
-      "nsfw_final_percent": 30
+      "nsfw_final_percent": 50,
+      "explicit_plateau_percent": 30
     }
   },
   "node_mapping": {
@@ -75,7 +76,13 @@
   "prompt_defaults": {
     "positive_prefix": "solo portrait of one beautiful adult woman",
     "positive_suffix": "professional model photoshoot, anatomically coherent, detailed skin, realistic photography, high detail",
-    "negative_prompt": "child, minor, underage, teen, teenager, young-looking, schoolgirl, multiple people, duplicate person, malformed anatomy, extra limbs, extra fingers, fused fingers, bad hands, distorted face, low quality, blurry, watermark, text"
+    "negative_prompt": "child, minor, underage, teen, teenager, young-looking, schoolgirl, multiple people, duplicate person, malformed anatomy, extra limbs, extra fingers, fused fingers, bad hands, distorted face, low quality, blurry, watermark, text",
+    "xxx_plateau_prompts": {
+      "provocative_rear": "(XXX explicit adult pornography:1.5), (fully nude uncensored adult woman:1.4), (bare buttocks and exposed intimate anatomy from behind:1.4), pornographic rear-view composition",
+      "intimate_closeup": "(XXX explicit adult pornography:1.5), (fully nude uncensored adult woman:1.4), (intimate anatomy clearly visible in extreme close-up:1.5), explicit pornographic close-up composition",
+      "masturbation": "(XXX explicit adult pornography:1.5), (fully nude uncensored adult woman masturbating:1.5), (explicit sexual action and exposed intimate anatomy:1.5), pornographic action composition"
+    },
+    "xxx_negative_additions": "clothed, wearing underwear, bra, panties, covered breasts, covered genitals, censored, censorship, mosaic, black bars, strategically covered anatomy, implied nudity, non-explicit boudoir"
   },
   "colors": [
     {
@@ -2436,7 +2443,9 @@
       "prompt": "sitting with legs sensually parted",
       "tags": [
         "sitting",
-        "open_legs"
+        "open_legs",
+        "explicit_pose",
+        "masturbation_pose"
       ],
       "requires_tags": [
         "sitting_surface"
@@ -2552,12 +2561,154 @@
       ]
     },
     {
+      "id": "closeup_breasts",
+      "prompt": "intimate close-up framing of her exposed breasts and upper torso",
+      "tags": [
+        "closeup",
+        "intimate_closeup",
+        "topless_pose",
+        "explicit_pose"
+      ],
+      "requires_tags": [
+        "breasts"
+      ],
+      "allowed_levels": [
+        "topless",
+        "nude",
+        "explicit"
+      ]
+    },
+    {
+      "id": "closeup_nipples",
+      "prompt": "detailed intimate close-up framing of her breasts and nipples",
+      "tags": [
+        "closeup",
+        "intimate_closeup",
+        "topless_pose",
+        "explicit_pose"
+      ],
+      "requires_tags": [
+        "nipples"
+      ],
+      "allowed_levels": [
+        "topless",
+        "nude",
+        "explicit"
+      ]
+    },
+    {
+      "id": "closeup_hips_buttocks",
+      "prompt": "sensual close-up framing of her hips and bare buttocks",
+      "tags": [
+        "closeup",
+        "intimate_closeup",
+        "erotic_pose",
+        "explicit_pose"
+      ],
+      "allowed_levels": [
+        "topless",
+        "nude",
+        "explicit"
+      ]
+    },
+    {
+      "id": "closeup_pubic_area",
+      "prompt": "intimate close-up framing of her nude lower abdomen and pubic area",
+      "tags": [
+        "closeup",
+        "intimate_closeup",
+        "nude_pose",
+        "explicit_pose"
+      ],
+      "requires_tags": [
+        "pubic_area"
+      ],
+      "allowed_levels": [
+        "nude",
+        "explicit"
+      ]
+    },
+    {
+      "id": "closeup_genitals",
+      "prompt": "explicit close-up framing of her exposed external anatomy",
+      "tags": [
+        "closeup",
+        "intimate_closeup",
+        "explicit_pose",
+        "open_legs",
+        "masturbation_pose"
+      ],
+      "requires_tags": [
+        "genitals"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "closeup_between_legs",
+      "prompt": "explicit between-the-legs close-up with intimate anatomy clearly framed",
+      "tags": [
+        "closeup",
+        "intimate_closeup",
+        "explicit_pose",
+        "open_legs",
+        "masturbation_pose"
+      ],
+      "requires_tags": [
+        "genitals"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_rear_standing",
+      "prompt": "provocative fully nude rear-view pose, standing and looking back over her shoulder",
+      "tags": [
+        "standing",
+        "explicit_pose",
+        "provocative_rear"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_rear_kneeling",
+      "prompt": "provocative fully nude kneeling pose viewed from behind",
+      "tags": [
+        "kneeling",
+        "explicit_pose",
+        "provocative_rear"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_rear_all_fours",
+      "prompt": "provocative fully nude rear view on hands and knees with an arched back",
+      "tags": [
+        "all_fours",
+        "explicit_pose",
+        "provocative_rear"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
       "id": "pose_explicit_reclining",
       "prompt": "explicit reclining pose with legs spread and anatomy visible",
       "tags": [
         "lying",
         "open_legs",
-        "explicit_pose"
+        "explicit_pose",
+        "masturbation_pose"
       ],
       "requires_tags": [
         "lying_surface"
@@ -2699,14 +2850,49 @@
       ]
     },
     {
-      "id": "action_explicit_touch",
-      "prompt": "explicitly touching her exposed intimate anatomy",
+      "id": "action_provocative_pose",
+      "prompt": "holding a deliberately provocative still pose and looking back toward the camera",
       "tags": [
         "explicit",
-        "explicit_action"
+        "explicit_action",
+        "provocative_action"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_intimate_closeup_display",
+      "prompt": "deliberately presenting her intimate body for the close-up framing",
+      "tags": [
+        "explicit",
+        "explicit_action",
+        "closeup_action"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_explicit_touch",
+      "prompt": "(her hand visibly and directly stimulating her exposed intimate anatomy:1.4)",
+      "tags": [
+        "explicit",
+        "explicit_action",
+        "masturbation_action"
       ],
       "requires_tags": [
-        "genitals"
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
       ],
       "allowed_levels": [
         "explicit"
@@ -2714,16 +2900,21 @@
     },
     {
       "id": "action_toy_external",
-      "prompt": "using an adult vibrator against her exposed anatomy",
+      "prompt": "(adult vibrator held in her hand and visibly pressed directly against her exposed intimate anatomy:1.5)",
       "tags": [
         "explicit",
-        "explicit_action"
+        "explicit_action",
+        "masturbation_action"
       ],
       "requires_tags": [
-        "genitals"
+        "genitals",
+        "open_legs"
       ],
       "requires_prop_tags": [
         "vibrator"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
       ],
       "allowed_levels": [
         "explicit"
@@ -2734,7 +2925,8 @@
       "prompt": "explicit solo penetration with an adult toy",
       "tags": [
         "explicit",
-        "explicit_action"
+        "explicit_action",
+        "masturbation_action"
       ],
       "requires_tags": [
         "genitals",
@@ -2742,6 +2934,9 @@
       ],
       "requires_prop_tags": [
         "penetrative_toy"
+      ],
+      "requires_expression_tags": [
+        "intense_pleasure_expression"
       ],
       "allowed_levels": [
         "explicit"
@@ -2791,7 +2986,7 @@
     },
     {
       "id": "prop_vibrator",
-      "prompt": "holding a discreet adult vibrator",
+      "prompt": "adult vibrator clearly visible in her hand at the point of contact",
       "tags": [
         "adult_toy",
         "vibrator",
@@ -2800,7 +2995,7 @@
     },
     {
       "id": "prop_glass_toy",
-      "prompt": "holding a smooth glass adult toy",
+      "prompt": "smooth glass adult toy clearly visible and actively positioned for use",
       "tags": [
         "adult_toy",
         "penetrative_toy",
@@ -2809,7 +3004,7 @@
     },
     {
       "id": "prop_silicone_toy",
-      "prompt": "holding a realistic silicone adult toy",
+      "prompt": "realistic silicone adult toy clearly visible and actively positioned for use",
       "tags": [
         "adult_toy",
         "penetrative_toy",
@@ -2828,7 +3023,10 @@
     },
     {
       "id": "expression_sultry",
-      "prompt": "sultry intimate expression"
+      "prompt": "sultry intimate expression",
+      "tags": [
+        "aroused_expression"
+      ]
     },
     {
       "id": "expression_dreamy",
@@ -2837,6 +3035,27 @@
     {
       "id": "expression_intense",
       "prompt": "intense passionate gaze"
+    },
+    {
+      "id": "expression_visible_arousal",
+      "prompt": "visibly aroused expression with flushed cheeks and parted lips",
+      "tags": [
+        "aroused_expression"
+      ]
+    },
+    {
+      "id": "expression_clear_pleasure",
+      "prompt": "clear expression of pleasure, eyes half-closed and lips parted",
+      "tags": [
+        "pleasure_expression"
+      ]
+    },
+    {
+      "id": "expression_intense_pleasure",
+      "prompt": "intense orgasmic facial expression, eyes closed and mouth softly open",
+      "tags": [
+        "intense_pleasure_expression"
+      ]
     }
   ],
   "moods": [
