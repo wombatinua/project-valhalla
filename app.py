@@ -178,8 +178,11 @@ def tags(item: dict[str, Any]) -> set[str]:
 
 
 def compatible_with_requirements(item: dict[str, Any], available_tags: set[str]) -> bool:
-    return set(item.get("requires_tags", [])).issubset(available_tags) and not (
-        set(item.get("excludes_tags", [])) & available_tags
+    required_any = set(item.get("requires_any_tags", []))
+    return (
+        set(item.get("requires_tags", [])).issubset(available_tags)
+        and (not required_any or bool(required_any & available_tags))
+        and not (set(item.get("excludes_tags", [])) & available_tags)
     )
 
 
@@ -258,7 +261,7 @@ class Composer:
     def choose_template(self) -> dict[str, Any]:
         return weighted_choice(self.rng, self.db["outfit_templates"])
 
-    def choose_outfit(self, template: dict[str, Any]) -> dict[str, Any]:
+    def _choose_outfit_once(self, template: dict[str, Any]) -> dict[str, Any]:
         selected: dict[str, dict[str, Any]] = {}
         group_tags: dict[str, set[str]] = {}
         for slot, rule in template["slots"].items():
@@ -313,21 +316,40 @@ class Composer:
             assigned_colors[slot] = self.colors[color_id]
         return {"template": template, "garments": selected, "colors": assigned_colors}
 
+    def choose_outfit(self, template: dict[str, Any]) -> dict[str, Any]:
+        attempts = int(self.db["settings"].get("max_scene_attempts", 100))
+        last_error = "no compatible outfit"
+        for _ in range(attempts):
+            try:
+                return self._choose_outfit_once(template)
+            except AppError as exc:
+                last_error = str(exc)
+        raise AppError(
+            f"Could not resolve outfit template {template['id']} after {attempts} attempts: {last_error}"
+        )
+
     def fixed_context(self) -> dict[str, Any]:
-        template = self.choose_template()
-        interior = weighted_choice(self.rng, self.db["interiors"])
-        furniture_candidates = [
-            item for item in self.db["furniture"]
-            if compatible_with_requirements(item, tags(interior))
-        ]
-        return {
-            "human": self.choose_human(),
-            "outfit": self.choose_outfit(template),
-            "interior": interior,
-            "furniture": weighted_choice(self.rng, furniture_candidates),
-            "mood": weighted_choice(self.rng, self.db["moods"]),
-            "photography_style": weighted_choice(self.rng, self.db["photography_styles"]),
-        }
+        attempts = int(self.db["settings"].get("max_scene_attempts", 100))
+        last_error = "no compatible fixed context"
+        for _ in range(attempts):
+            try:
+                template = self.choose_template()
+                interior = weighted_choice(self.rng, self.db["interiors"])
+                furniture_candidates = [
+                    item for item in self.db["furniture"]
+                    if compatible_with_requirements(item, tags(interior))
+                ]
+                return {
+                    "human": self.choose_human(),
+                    "outfit": self.choose_outfit(template),
+                    "interior": interior,
+                    "furniture": weighted_choice(self.rng, furniture_candidates),
+                    "mood": weighted_choice(self.rng, self.db["moods"]),
+                    "photography_style": weighted_choice(self.rng, self.db["photography_styles"]),
+                }
+            except AppError as exc:
+                last_error = str(exc)
+        raise AppError(f"Could not resolve a compatible fixed context after {attempts} attempts: {last_error}")
 
     def variable_context(self, stage: dict[str, Any], fixed: dict[str, Any]) -> dict[str, Any]:
         available_tags = set(stage.get("body_visibility", [])) | {stage["level"]}
@@ -456,11 +478,15 @@ class Composer:
             missing = set(item.get("requires", [])) - ids
             excluded = set(item.get("excludes", [])) & ids
             missing_tags = set(item.get("requires_tags", [])) - all_tags
+            missing_any_tags = set(item.get("requires_any_tags", []))
+            if missing_any_tags & all_tags:
+                missing_any_tags.clear()
             excluded_tags = set(item.get("excludes_tags", [])) & all_tags
-            if missing or excluded or missing_tags or excluded_tags:
+            if missing or excluded or missing_tags or missing_any_tags or excluded_tags:
                 raise AppError(
                     f"Rule conflict for {item['id']}: missing={sorted(missing)}, "
                     f"excluded={sorted(excluded)}, missing_tags={sorted(missing_tags)}, "
+                    f"missing_any_tags={sorted(missing_any_tags)}, "
                     f"excluded_tags={sorted(excluded_tags)}"
                 )
         required_expression_tags = set(scene["action"].get("requires_expression_tags", []))
@@ -478,9 +504,20 @@ ALWAYS_HUMAN_PARTS = (
     "manicure",
 )
 
+IDENTITY_HUMAN_PARTS = (
+    "ethnic_appearance", "skin_tone", "face_shape", "eye_shape", "eye_color",
+    "eyebrows", "nose", "lips", "cheekbones", "jawline", "hair_texture",
+    "hair_length", "hair_style", "hair_color", "height", "body_frame", "waist", "hips",
+)
 
-def human_fragments(human: dict[str, Any], visibility: set[str]) -> list[str]:
-    items: list[dict[str, Any]] = [human[key] for key in ALWAYS_HUMAN_PARTS]
+
+def human_fragments(
+    human: dict[str, Any], visibility: set[str], include_identity: bool = True
+) -> list[str]:
+    keys = ALWAYS_HUMAN_PARTS if include_identity else tuple(
+        key for key in ALWAYS_HUMAN_PARTS if key not in IDENTITY_HUMAN_PARTS
+    )
+    items: list[dict[str, Any]] = [human[key] for key in keys]
     items.extend(human.get("facial_accents", []))
     if "breasts" in visibility or "nipples" in visibility:
         items.extend([human["breast_size"], human["breast_shape"]])
@@ -493,14 +530,30 @@ def human_fragments(human: dict[str, Any], visibility: set[str]) -> list[str]:
     return [item["prompt"] for item in items if item.get("prompt")]
 
 
-def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, list[str]]:
+def identity_consistency_fragment(defaults: dict[str, Any], human: dict[str, Any]) -> str:
+    traits = [human[key]["prompt"] for key in IDENTITY_HUMAN_PARTS if human[key].get("prompt")]
+    prefix = defaults.get(
+        "identity_consistency_prompt",
+        "single subject, solo, exactly one adult woman, consistent facial identity and hairstyle",
+    )
+    strength = float(defaults.get("identity_consistency_strength", 1.25))
+    return f"({prefix}, {', '.join(traits)}:{strength:g})"
+
+
+def compile_scene(
+    db: dict[str, Any], scene: dict[str, Any], identity_consistency: bool = False
+) -> tuple[str, str, list[str]]:
     defaults = db["prompt_defaults"]
     stage = scene["stage"]
     visibility = set(stage.get("body_visibility", []))
     plateau_kind = stage.get("plateau_kind")
     xxx_prompt = defaults.get("xxx_plateau_prompts", {}).get(plateau_kind, "")
     fragments = [xxx_prompt, defaults.get("positive_prefix", "")]
-    fragments.extend(human_fragments(scene["human"], visibility))
+    if identity_consistency:
+        fragments.append(identity_consistency_fragment(defaults, scene["human"]))
+    fragments.extend(
+        human_fragments(scene["human"], visibility, include_identity=not identity_consistency)
+    )
     visible_slots = set(stage.get("visible_slots", []))
     outfit = scene["outfit"]
     for slot in outfit["template"]["slots"]:
@@ -514,6 +567,8 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     fragments.append(defaults.get("positive_suffix", ""))
     positive = ", ".join(fragment.strip(" ,") for fragment in fragments if fragment.strip(" ,"))
     negative = defaults.get("negative_prompt", "")
+    if identity_consistency and defaults.get("identity_consistency_negative"):
+        negative = f"{negative}, {defaults['identity_consistency_negative']}"
     if plateau_kind and defaults.get("xxx_negative_additions"):
         negative = f"{negative}, {defaults['xxx_negative_additions']}"
     ids = []
@@ -595,6 +650,25 @@ def stage_for_index(
         result["body_visibility"] = ["breasts", "nipples", "pubic_area", "genitals"]
         return result
     return weighted_choice(rng, stages)
+
+
+def xxx_only_stage(
+    template: dict[str, Any], index: int, count: int, mode: str, rng: random.Random
+) -> dict[str, Any]:
+    """Build an immediately explicit stage for full-XXX photoshoot or random mode."""
+    effective = effective_photoshoot_stages(template)
+    explicit = next(stage for stage in effective if stage["level"] == "explicit")
+    kinds = ("provocative_rear", "intimate_closeup", "masturbation")
+    if mode == "photoshoot":
+        kind = kinds[min(len(kinds) - 1, index * len(kinds) // count)]
+    else:
+        kind = rng.choice(kinds)
+    result = copy.deepcopy(explicit)
+    result["id"] = f"{explicit['id']}_xxx_only_{kind}"
+    result["plateau_kind"] = kind
+    result["visible_slots"] = []
+    result["body_visibility"] = ["breasts", "nipples", "pubic_area", "genitals"]
+    return result
 
 
 def require_requests() -> Any:
@@ -773,6 +847,8 @@ def run_batch(args: argparse.Namespace, render: bool) -> None:
     plateau_percent = configured_plateau if args.plateau_percent is None else args.plateau_percent
     if args.mode == "random" and (args.nsfw_percent is not None or args.plateau_percent is not None):
         raise AppError("--nsfw-percent and --plateau-percent are only valid with --mode photoshoot")
+    if args.xxx_only and (args.nsfw_percent is not None or args.plateau_percent is not None):
+        raise AppError("--xxx-only cannot be combined with --nsfw-percent or --plateau-percent")
     if args.mode == "random" and args.photoshoots != 1:
         raise AppError("--photoshoots is only valid with --mode photoshoot")
     if plateau_percent > nsfw_percent:
@@ -782,9 +858,10 @@ def run_batch(args: argparse.Namespace, render: bool) -> None:
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     print(
         f"mode={args.mode} count={args.count} photoshoots={photoshoot_count} "
-        f"total_images={args.count * photoshoot_count} prompt_seed={prompt_seed}"
+        f"total_images={args.count * photoshoot_count} prompt_seed={prompt_seed} "
+        f"content_mode={'xxx-only' if args.xxx_only else 'progressive'}"
     )
-    if args.mode == "photoshoot":
+    if args.mode == "photoshoot" and not args.xxx_only:
         print(f"nsfw_final_percent={nsfw_percent:g}")
         print(f"explicit_plateau_percent={plateau_percent:g}")
     if fixed_inference_seed is not None:
@@ -817,9 +894,16 @@ def run_batch(args: argparse.Namespace, render: bool) -> None:
             context = fixed if fixed is not None else composer.fixed_context()
             assert context is not None
             template = context["outfit"]["template"]
-            stage = stage_for_index(template, shot_index, args.count, args.mode, rng, nsfw_percent, plateau_percent)
+            if args.xxx_only:
+                stage = xxx_only_stage(template, shot_index, args.count, args.mode, rng)
+            else:
+                stage = stage_for_index(
+                    template, shot_index, args.count, args.mode, rng, nsfw_percent, plateau_percent
+                )
             scene = composer.resolve_scene(context, stage)
-            positive, negative, selected_ids = compile_scene(db, scene)
+            positive, negative, selected_ids = compile_scene(
+                db, scene, identity_consistency=args.mode == "photoshoot"
+            )
             inference_seed = fixed_inference_seed if fixed_inference_seed is not None else secrets.randbelow(2**63)
             if args.mode == "photoshoot":
                 progress = (
@@ -883,6 +967,11 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--photoshoots", type=positive_int, default=1, help="Number of distinct photoshoots (photoshoot mode only)")
         command.add_argument("--prompt-seed", type=int)
         command.add_argument("--inference-seed", type=inference_seed_value)
+        command.add_argument(
+            "--xxx-only",
+            action="store_true",
+            help="Make every image immediately explicit XXX (works with photoshoot and random modes)",
+        )
         command.add_argument(
             "--nsfw-percent",
             type=percent_value,

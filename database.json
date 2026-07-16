@@ -1,7 +1,7 @@
 {
   "_guide": {
     "purpose": "Edit this file directly. Prompt text is English for diffusion-model compatibility.",
-    "simple_item": "Every selectable item needs only id and prompt. Optional fields are weight, tags, requires, excludes, requires_tags, excludes_tags, requires_expression_tags, occupies_slots, allowed_colors and mix_tags.",
+    "simple_item": "Every selectable item needs only id and prompt. Optional fields are weight, tags, requires, excludes, requires_tags, requires_any_tags, excludes_tags, requires_expression_tags, occupies_slots, allowed_colors and mix_tags. requires_any_tags means at least one listed tag must be present.",
     "photoshoot": "A photoshoot fixes the assembled adult model, outfit, colors and location. It progresses through undressing into a predictable explicit plateau of rear views, close-ups and masturbation shots.",
     "random": "Random mode independently assembles every image and chooses any stage from the selected outfit template.",
     "outfit_templates": "Slots select garments by catalog and required_tags. color_group reuses a color. match_group asks pieces to share a mix tag.",
@@ -36,47 +36,18 @@
         "input": "seed"
       },
       {
-        "node": "FaceDetailer",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_2",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_3",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_4",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_5",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_6",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_7",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_8",
-        "input": "seed"
-      },
-      {
         "node": "HiresFix_Sampler",
         "input": "seed"
       }
     ]
   },
   "prompt_defaults": {
-    "positive_prefix": "solo portrait of one beautiful adult woman",
+    "positive_prefix": "(solo:1.4), (single subject:1.4), (exactly one beautiful adult woman:1.4)",
     "positive_suffix": "professional model photoshoot, anatomically coherent, detailed skin, realistic photography, high detail",
     "negative_prompt": "child, minor, underage, teen, teenager, young-looking, schoolgirl, multiple people, duplicate person, malformed anatomy, extra limbs, extra fingers, fused fingers, bad hands, distorted face, low quality, blurry, watermark, text",
+    "identity_consistency_prompt": "single subject identity anchor, one person only, consistent facial structure, consistent eyes, nose, lips and jawline, consistent hairstyle, hair length, hair color and body proportions",
+    "identity_consistency_strength": 1.3,
+    "identity_consistency_negative": "two women, second woman, multiple women, twins, twin sisters, clone, cloned woman, duplicated person, duplicate face, duplicate body, side-by-side women, split portrait, mirror duplicate, mirror reflection showing another person, different woman, different person, identity drift, inconsistent face, changing facial features, different eye color, different nose, different lips, changing hairstyle, different hairstyle, changing hair length, changing hair color, wig, inconsistent body proportions",
     "xxx_plateau_prompts": {
       "provocative_rear": "(XXX explicit adult pornography:1.5), (fully nude uncensored adult woman:1.4), (bare buttocks and exposed intimate anatomy from behind:1.4), pornographic rear-view composition",
       "intimate_closeup": "(XXX explicit adult pornography:1.5), (fully nude uncensored adult woman:1.4), (intimate anatomy clearly visible in extreme close-up:1.5), explicit pornographic close-up composition",
@@ -124,6 +95,54 @@
     {
       "id": "color_gray",
       "prompt": "charcoal gray"
+    },
+    {
+      "id": "color_scarlet",
+      "prompt": "scarlet red"
+    },
+    {
+      "id": "color_crimson",
+      "prompt": "dark crimson"
+    },
+    {
+      "id": "color_cobalt",
+      "prompt": "cobalt blue"
+    },
+    {
+      "id": "color_teal",
+      "prompt": "deep teal"
+    },
+    {
+      "id": "color_purple",
+      "prompt": "royal purple"
+    },
+    {
+      "id": "color_lilac",
+      "prompt": "soft lilac"
+    },
+    {
+      "id": "color_champagne",
+      "prompt": "champagne gold"
+    },
+    {
+      "id": "color_silver",
+      "prompt": "metallic silver"
+    },
+    {
+      "id": "color_chocolate",
+      "prompt": "dark chocolate brown"
+    },
+    {
+      "id": "color_tan",
+      "prompt": "warm tan"
+    },
+    {
+      "id": "color_coral",
+      "prompt": "soft coral"
+    },
+    {
+      "id": "color_leopard",
+      "prompt": "classic leopard print"
     }
   ],
   "human_model_parts": {
@@ -159,6 +178,26 @@
       {
         "id": "appearance_african",
         "prompt": "African facial appearance"
+      },
+      {
+        "id": "appearance_mediterranean",
+        "prompt": "Mediterranean facial appearance"
+      },
+      {
+        "id": "appearance_latina",
+        "prompt": "Latina facial appearance"
+      },
+      {
+        "id": "appearance_middle_eastern",
+        "prompt": "Middle Eastern facial appearance"
+      },
+      {
+        "id": "appearance_southeast_asian",
+        "prompt": "Southeast Asian facial appearance"
+      },
+      {
+        "id": "appearance_mixed_heritage",
+        "prompt": "distinctive mixed-heritage facial appearance"
       }
     ],
     "skin_tone": [
@@ -189,6 +228,41 @@
         "tags": [
           "dark_skin"
         ]
+      },
+      {
+        "id": "skin_porcelain",
+        "prompt": "luminous porcelain skin",
+        "tags": [
+          "light_skin"
+        ]
+      },
+      {
+        "id": "skin_light_warm",
+        "prompt": "light warm-toned skin",
+        "tags": [
+          "light_skin"
+        ]
+      },
+      {
+        "id": "skin_honey",
+        "prompt": "golden honey skin",
+        "tags": [
+          "medium_skin"
+        ]
+      },
+      {
+        "id": "skin_caramel",
+        "prompt": "rich caramel skin",
+        "tags": [
+          "medium_skin"
+        ]
+      },
+      {
+        "id": "skin_ebony",
+        "prompt": "luminous ebony skin",
+        "tags": [
+          "dark_skin"
+        ]
       }
     ],
     "face_shape": [
@@ -203,6 +277,22 @@
       {
         "id": "face_sculpted",
         "prompt": "elegantly sculpted face"
+      },
+      {
+        "id": "face_round",
+        "prompt": "soft youthful round adult face"
+      },
+      {
+        "id": "face_diamond",
+        "prompt": "refined diamond-shaped face"
+      },
+      {
+        "id": "face_oblong",
+        "prompt": "graceful oblong face"
+      },
+      {
+        "id": "face_square_soft",
+        "prompt": "softly squared elegant face"
       }
     ],
     "eye_shape": [
@@ -217,6 +307,22 @@
       {
         "id": "eyes_hooded",
         "prompt": "graceful hooded eyes"
+      },
+      {
+        "id": "eyes_upturned",
+        "prompt": "elegant upturned eyes"
+      },
+      {
+        "id": "eyes_deep_set",
+        "prompt": "expressive deep-set eyes"
+      },
+      {
+        "id": "eyes_catlike",
+        "prompt": "striking catlike eyes"
+      },
+      {
+        "id": "eyes_wide_set",
+        "prompt": "beautiful wide-set eyes"
       }
     ],
     "eye_color": [
@@ -235,6 +341,26 @@
       {
         "id": "eyes_hazel",
         "prompt": "hazel eyes"
+      },
+      {
+        "id": "eyes_gray",
+        "prompt": "smoky gray eyes"
+      },
+      {
+        "id": "eyes_amber",
+        "prompt": "luminous amber eyes"
+      },
+      {
+        "id": "eyes_dark_brown",
+        "prompt": "deep dark-brown eyes"
+      },
+      {
+        "id": "eyes_aqua",
+        "prompt": "bright aqua-blue eyes"
+      },
+      {
+        "id": "eyes_violet",
+        "prompt": "unusual violet-gray eyes"
       }
     ],
     "eyebrows": [
@@ -245,6 +371,18 @@
       {
         "id": "brows_defined",
         "prompt": "well-defined natural eyebrows"
+      },
+      {
+        "id": "brows_straight",
+        "prompt": "elegant straight eyebrows"
+      },
+      {
+        "id": "brows_full",
+        "prompt": "full natural eyebrows"
+      },
+      {
+        "id": "brows_high_arch",
+        "prompt": "dramatically arched eyebrows"
       }
     ],
     "nose": [
@@ -255,6 +393,18 @@
       {
         "id": "nose_delicate",
         "prompt": "delicate softly shaped nose"
+      },
+      {
+        "id": "nose_button",
+        "prompt": "small refined button nose"
+      },
+      {
+        "id": "nose_aquiline",
+        "prompt": "elegant aquiline nose"
+      },
+      {
+        "id": "nose_broad_refined",
+        "prompt": "beautifully proportioned broad nose"
       }
     ],
     "lips": [
@@ -269,6 +419,18 @@
       {
         "id": "lips_soft",
         "prompt": "soft natural lips"
+      },
+      {
+        "id": "lips_plush",
+        "prompt": "plush sensual lips"
+      },
+      {
+        "id": "lips_wide",
+        "prompt": "wide expressive mouth with shapely lips"
+      },
+      {
+        "id": "lips_delicate",
+        "prompt": "delicate finely shaped lips"
       }
     ],
     "cheekbones": [
@@ -279,6 +441,14 @@
       {
         "id": "cheekbones_soft",
         "prompt": "softly contoured cheekbones"
+      },
+      {
+        "id": "cheekbones_prominent",
+        "prompt": "prominent model-like cheekbones"
+      },
+      {
+        "id": "cheeks_full",
+        "prompt": "soft full cheeks"
       }
     ],
     "jawline": [
@@ -289,6 +459,14 @@
       {
         "id": "jaw_defined",
         "prompt": "elegantly defined jawline"
+      },
+      {
+        "id": "jaw_tapered",
+        "prompt": "gracefully tapered jawline"
+      },
+      {
+        "id": "jaw_strong",
+        "prompt": "strong feminine jawline"
       }
     ],
     "hair_texture": [
@@ -312,6 +490,27 @@
         "tags": [
           "curly_hair"
         ]
+      },
+      {
+        "id": "hair_texture_coily",
+        "prompt": "beautiful defined coily hair",
+        "tags": [
+          "coily_hair"
+        ]
+      },
+      {
+        "id": "hair_texture_silky",
+        "prompt": "silky smooth hair",
+        "tags": [
+          "straight_hair"
+        ]
+      },
+      {
+        "id": "hair_texture_beach_waves",
+        "prompt": "soft beach-wave hair texture",
+        "tags": [
+          "wavy_hair"
+        ]
       }
     ],
     "hair_length": [
@@ -334,6 +533,20 @@
         "prompt": "long hair",
         "tags": [
           "long_hair"
+        ]
+      },
+      {
+        "id": "hair_length_very_long",
+        "prompt": "very long waist-length hair",
+        "tags": [
+          "long_hair"
+        ]
+      },
+      {
+        "id": "hair_length_chin",
+        "prompt": "chin-length hair",
+        "tags": [
+          "medium_hair"
         ]
       }
     ],
@@ -365,6 +578,77 @@
         "requires_tags": [
           "long_hair"
         ]
+      },
+      {
+        "id": "hair_style_lob",
+        "prompt": "elegant long bob",
+        "requires_tags": [
+          "medium_hair"
+        ]
+      },
+      {
+        "id": "hair_style_side_swept",
+        "prompt": "glamorous side-swept hairstyle",
+        "requires_tags": [
+          "long_hair"
+        ]
+      },
+      {
+        "id": "hair_style_loose_curls",
+        "prompt": "loose cascading curls",
+        "requires_tags": [
+          "long_hair"
+        ]
+      },
+      {
+        "id": "hair_style_messy_bun",
+        "prompt": "softly messy high bun",
+        "requires_tags": [
+          "long_hair"
+        ]
+      },
+      {
+        "id": "hair_style_low_bun",
+        "prompt": "sleek elegant low bun",
+        "requires_tags": [
+          "long_hair"
+        ]
+      },
+      {
+        "id": "hair_style_braid",
+        "prompt": "long loose side braid",
+        "requires_tags": [
+          "long_hair"
+        ]
+      },
+      {
+        "id": "hair_style_half_up",
+        "prompt": "romantic half-up hairstyle",
+        "requires_tags": [
+          "long_hair"
+        ]
+      },
+      {
+        "id": "hair_style_shag",
+        "prompt": "layered shoulder-length shag",
+        "requires_tags": [
+          "medium_hair"
+        ]
+      },
+      {
+        "id": "hair_style_curly_bob",
+        "prompt": "voluminous curly bob",
+        "requires_tags": [
+          "medium_hair",
+          "curly_hair"
+        ]
+      },
+      {
+        "id": "hair_style_afro",
+        "prompt": "rounded natural afro hairstyle",
+        "requires_tags": [
+          "coily_hair"
+        ]
       }
     ],
     "hair_color": [
@@ -387,6 +671,38 @@
       {
         "id": "hair_platinum",
         "prompt": "platinum blonde hair"
+      },
+      {
+        "id": "hair_dark_brown",
+        "prompt": "dark chocolate-brown hair"
+      },
+      {
+        "id": "hair_chestnut",
+        "prompt": "glossy chestnut hair"
+      },
+      {
+        "id": "hair_copper",
+        "prompt": "vivid copper-red hair"
+      },
+      {
+        "id": "hair_strawberry_blonde",
+        "prompt": "strawberry-blonde hair"
+      },
+      {
+        "id": "hair_ash_blonde",
+        "prompt": "cool ash-blonde hair"
+      },
+      {
+        "id": "hair_silver",
+        "prompt": "fashionable silver hair"
+      },
+      {
+        "id": "hair_rose_gold",
+        "prompt": "soft rose-gold hair"
+      },
+      {
+        "id": "hair_blue_black",
+        "prompt": "blue-black hair"
       }
     ],
     "height": [
@@ -397,6 +713,14 @@
       {
         "id": "height_tall",
         "prompt": "tall model-like stature"
+      },
+      {
+        "id": "height_petite",
+        "prompt": "petite adult stature"
+      },
+      {
+        "id": "height_statuesque",
+        "prompt": "very tall statuesque model stature"
       }
     ],
     "body_frame": [
@@ -415,6 +739,30 @@
       {
         "id": "body_voluptuous",
         "prompt": "voluptuous feminine figure"
+      },
+      {
+        "id": "body_petite",
+        "prompt": "petite delicate feminine figure"
+      },
+      {
+        "id": "body_hourglass",
+        "prompt": "pronounced hourglass figure"
+      },
+      {
+        "id": "body_soft",
+        "prompt": "soft naturally rounded feminine figure"
+      },
+      {
+        "id": "body_fitness",
+        "prompt": "lean fitness-model figure"
+      },
+      {
+        "id": "body_plus_curvy",
+        "prompt": "beautiful full plus-size curvy figure"
+      },
+      {
+        "id": "body_lithe",
+        "prompt": "lithe dancer-like feminine figure"
       }
     ],
     "waist": [
@@ -425,6 +773,18 @@
       {
         "id": "waist_defined",
         "prompt": "well-defined waist"
+      },
+      {
+        "id": "waist_tiny",
+        "prompt": "very narrow hourglass waist"
+      },
+      {
+        "id": "waist_soft",
+        "prompt": "soft natural waist"
+      },
+      {
+        "id": "waist_athletic",
+        "prompt": "toned athletic waist"
       }
     ],
     "hips": [
@@ -439,6 +799,22 @@
       {
         "id": "hips_wide",
         "prompt": "wide feminine hips"
+      },
+      {
+        "id": "hips_petite",
+        "prompt": "petite softly curved hips"
+      },
+      {
+        "id": "hips_full",
+        "prompt": "full voluptuous hips"
+      },
+      {
+        "id": "hips_athletic",
+        "prompt": "toned athletic hips"
+      },
+      {
+        "id": "hips_hourglass",
+        "prompt": "dramatically flared hourglass hips"
       }
     ],
     "breast_size": [
@@ -457,6 +833,32 @@
       {
         "id": "breasts_full",
         "prompt": "full heavy breasts"
+      },
+      {
+        "id": "breasts_very_small",
+        "prompt": "very small natural breasts"
+      },
+      {
+        "id": "breasts_small_full",
+        "prompt": "small full breasts"
+      },
+      {
+        "id": "breasts_medium_full",
+        "prompt": "full medium-sized breasts"
+      },
+      {
+        "id": "breasts_very_large",
+        "prompt": "very large natural breasts"
+      },
+      {
+        "id": "breasts_extremely_large",
+        "prompt": "extremely large heavy natural breasts",
+        "weight": 0.35
+      },
+      {
+        "id": "breasts_asymmetric_subtle",
+        "prompt": "naturally full breasts with subtle realistic asymmetry",
+        "weight": 0.6
       }
     ],
     "breast_shape": [
@@ -471,6 +873,26 @@
       {
         "id": "breasts_perky",
         "prompt": "firm uplifted breast shape"
+      },
+      {
+        "id": "breasts_bell",
+        "prompt": "natural bell-shaped breasts"
+      },
+      {
+        "id": "breasts_wide_set",
+        "prompt": "naturally wide-set breasts"
+      },
+      {
+        "id": "breasts_close_set",
+        "prompt": "naturally close-set breasts"
+      },
+      {
+        "id": "breasts_soft_heavy",
+        "prompt": "soft naturally hanging breast shape"
+      },
+      {
+        "id": "breasts_shallow",
+        "prompt": "shallow gently sloped breast shape"
       }
     ],
     "areola_size": [
@@ -485,6 +907,22 @@
       {
         "id": "areola_large",
         "prompt": "large areolas"
+      },
+      {
+        "id": "areola_very_small",
+        "prompt": "very small areolas"
+      },
+      {
+        "id": "areola_very_large",
+        "prompt": "very large natural areolas"
+      },
+      {
+        "id": "areola_puffy",
+        "prompt": "soft puffy areolas"
+      },
+      {
+        "id": "areola_defined",
+        "prompt": "clearly defined circular areolas"
       }
     ],
     "areola_color": [
@@ -508,6 +946,41 @@
         "requires_tags": [
           "dark_skin"
         ]
+      },
+      {
+        "id": "areola_pale_pink",
+        "prompt": "pale pink areolas",
+        "requires_tags": [
+          "light_skin"
+        ]
+      },
+      {
+        "id": "areola_peach",
+        "prompt": "warm peach-toned areolas",
+        "requires_tags": [
+          "light_skin"
+        ]
+      },
+      {
+        "id": "areola_tan",
+        "prompt": "soft tan areolas",
+        "requires_tags": [
+          "medium_skin"
+        ]
+      },
+      {
+        "id": "areola_caramel",
+        "prompt": "caramel-brown areolas",
+        "requires_tags": [
+          "medium_skin"
+        ]
+      },
+      {
+        "id": "areola_dark_chocolate",
+        "prompt": "dark chocolate-brown areolas",
+        "requires_tags": [
+          "dark_skin"
+        ]
       }
     ],
     "nipple_size": [
@@ -522,6 +995,18 @@
       {
         "id": "nipples_prominent",
         "prompt": "prominent nipples"
+      },
+      {
+        "id": "nipples_tiny",
+        "prompt": "tiny nipples"
+      },
+      {
+        "id": "nipples_large",
+        "prompt": "large prominent nipples"
+      },
+      {
+        "id": "nipples_long",
+        "prompt": "long projecting nipples"
       }
     ],
     "nipple_shape": [
@@ -532,6 +1017,18 @@
       {
         "id": "nipples_erect",
         "prompt": "erect nipples"
+      },
+      {
+        "id": "nipples_flat",
+        "prompt": "soft flat nipples"
+      },
+      {
+        "id": "nipples_puffy",
+        "prompt": "puffy nipples"
+      },
+      {
+        "id": "nipples_projecting",
+        "prompt": "strongly projecting nipples"
       }
     ],
     "pubic_hair": [
@@ -546,6 +1043,30 @@
       {
         "id": "pubic_shaved",
         "prompt": "smoothly shaved pubic area"
+      },
+      {
+        "id": "pubic_brazilian",
+        "prompt": "neatly groomed Brazilian pubic style"
+      },
+      {
+        "id": "pubic_landing_strip",
+        "prompt": "precise narrow landing-strip pubic hair"
+      },
+      {
+        "id": "pubic_triangle",
+        "prompt": "neatly shaped triangular pubic hair"
+      },
+      {
+        "id": "pubic_light_natural",
+        "prompt": "light natural pubic hair"
+      },
+      {
+        "id": "pubic_full_natural",
+        "prompt": "full natural pubic hair"
+      },
+      {
+        "id": "pubic_very_short",
+        "prompt": "very short closely groomed pubic hair"
       }
     ],
     "genital_appearance": [
@@ -560,6 +1081,30 @@
       {
         "id": "genitals_compact",
         "prompt": "compact natural external female anatomy"
+      },
+      {
+        "id": "genitals_small_delicate",
+        "prompt": "small delicate natural external female anatomy"
+      },
+      {
+        "id": "genitals_soft_full",
+        "prompt": "soft full natural external female anatomy"
+      },
+      {
+        "id": "genitals_prominent",
+        "prompt": "prominent natural external female anatomy"
+      },
+      {
+        "id": "genitals_neat",
+        "prompt": "neatly defined natural external female anatomy"
+      },
+      {
+        "id": "genitals_plump",
+        "prompt": "plump rounded natural external female anatomy"
+      },
+      {
+        "id": "genitals_subtle",
+        "prompt": "subtle compact natural external female anatomy"
       }
     ],
     "facial_accents": [
@@ -578,6 +1123,30 @@
       {
         "id": "accent_long_lashes",
         "prompt": "long natural eyelashes"
+      },
+      {
+        "id": "accent_nose_freckles",
+        "prompt": "light freckles across her nose"
+      },
+      {
+        "id": "accent_mole_lip",
+        "prompt": "tiny beauty mark near her lips"
+      },
+      {
+        "id": "accent_mole_cheek",
+        "prompt": "distinctive beauty mark on one cheek"
+      },
+      {
+        "id": "accent_sun_kissed",
+        "prompt": "subtle sun-kissed complexion"
+      },
+      {
+        "id": "accent_glossy_skin",
+        "prompt": "soft healthy skin glow"
+      },
+      {
+        "id": "accent_lush_lashes",
+        "prompt": "lush curled eyelashes"
       }
     ],
     "makeup": [
@@ -592,6 +1161,30 @@
       {
         "id": "makeup_smoky",
         "prompt": "sophisticated smoky-eye makeup"
+      },
+      {
+        "id": "makeup_no_makeup",
+        "prompt": "fresh almost makeup-free face"
+      },
+      {
+        "id": "makeup_glamour",
+        "prompt": "high-glamour editorial makeup"
+      },
+      {
+        "id": "makeup_red_lip",
+        "prompt": "classic makeup with bold red lipstick"
+      },
+      {
+        "id": "makeup_bronzed",
+        "prompt": "warm bronzed makeup"
+      },
+      {
+        "id": "makeup_romantic",
+        "prompt": "soft romantic pink makeup"
+      },
+      {
+        "id": "makeup_wetlook",
+        "prompt": "glossy wet-look beauty makeup"
       }
     ],
     "manicure": [
@@ -602,6 +1195,30 @@
       {
         "id": "manicure_red",
         "prompt": "glossy red manicure"
+      },
+      {
+        "id": "manicure_black",
+        "prompt": "glossy black manicure"
+      },
+      {
+        "id": "manicure_french",
+        "prompt": "elegant French manicure"
+      },
+      {
+        "id": "manicure_burgundy",
+        "prompt": "dark burgundy manicure"
+      },
+      {
+        "id": "manicure_pink",
+        "prompt": "soft pink manicure"
+      },
+      {
+        "id": "manicure_metallic",
+        "prompt": "metallic silver manicure"
+      },
+      {
+        "id": "manicure_long_red",
+        "prompt": "long pointed red manicure"
       }
     ]
   },
@@ -691,6 +1308,284 @@
           "color_red",
           "color_pink"
         ]
+      },
+      {
+        "id": "top_home_oversized_tee",
+        "prompt": "soft oversized home T-shirt",
+        "tags": [
+          "home",
+          "casual",
+          "everyday"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_gray",
+          "color_pink",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "top_ribbed_tank",
+        "prompt": "close-fitting ribbed tank top",
+        "tags": [
+          "home",
+          "casual",
+          "everyday"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_black",
+          "color_gray",
+          "color_beige"
+        ]
+      },
+      {
+        "id": "top_off_shoulder_knit",
+        "prompt": "soft off-the-shoulder knit top",
+        "tags": [
+          "home",
+          "casual",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_ivory",
+          "color_beige",
+          "color_gray",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "top_zip_hoodie",
+        "prompt": "cropped zip-front hoodie",
+        "tags": [
+          "home",
+          "casual",
+          "sporty"
+        ],
+        "allowed_colors": [
+          "color_gray",
+          "color_black",
+          "color_pink",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "top_cardigan",
+        "prompt": "soft fitted buttoned cardigan",
+        "tags": [
+          "home",
+          "everyday",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_ivory",
+          "color_beige",
+          "color_gray",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "top_denim_shirt",
+        "prompt": "fitted denim shirt",
+        "tags": [
+          "casual",
+          "everyday",
+          "outdoor"
+        ],
+        "allowed_colors": [
+          "color_navy",
+          "color_cobalt",
+          "color_black"
+        ]
+      },
+      {
+        "id": "top_tied_white_shirt",
+        "prompt": "white shirt tied above the waist",
+        "tags": [
+          "casual",
+          "office",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "top_open_blouse",
+        "prompt": "partly unbuttoned fitted blouse",
+        "tags": [
+          "office",
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_ivory",
+          "color_black",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "top_satin_halter",
+        "prompt": "backless satin halter top",
+        "tags": [
+          "elegant",
+          "silk",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_champagne",
+          "color_emerald"
+        ]
+      },
+      {
+        "id": "top_lace_crop",
+        "prompt": "delicate lace crop top",
+        "tags": [
+          "lace",
+          "boudoir",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "top_sheer_mesh",
+        "prompt": "transparent sheer mesh long-sleeve top",
+        "tags": [
+          "sheer",
+          "erotic",
+          "explicit"
+        ],
+        "mix_tags": [
+          "sheer"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "top_corset",
+        "prompt": "structured overbust corset top",
+        "tags": [
+          "corset",
+          "boudoir",
+          "erotic",
+          "elegant"
+        ],
+        "mix_tags": [
+          "corset"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "top_bustier",
+        "prompt": "fitted satin bustier top",
+        "tags": [
+          "corset",
+          "silk",
+          "erotic",
+          "elegant"
+        ],
+        "mix_tags": [
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_red",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "top_leather_halter",
+        "prompt": "fitted leather halter top",
+        "tags": [
+          "leather",
+          "erotic",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "top_plunge_body",
+        "prompt": "extreme plunge-neck fitted top",
+        "tags": [
+          "erotic",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_white",
+          "color_emerald"
+        ]
+      },
+      {
+        "id": "top_sports_bra_style",
+        "prompt": "supportive athletic crop top",
+        "tags": [
+          "sporty",
+          "casual",
+          "home"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_gray",
+          "color_white",
+          "color_cobalt"
+        ]
+      },
+      {
+        "id": "top_fishnet_shirt",
+        "prompt": "open-weave fishnet shirt",
+        "tags": [
+          "fishnet",
+          "sheer",
+          "erotic",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_white"
+        ]
+      },
+      {
+        "id": "top_sequin",
+        "prompt": "sparkling sequin camisole",
+        "tags": [
+          "party",
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_silver",
+          "color_champagne",
+          "color_red"
+        ]
       }
     ],
     "lowerwear": [
@@ -772,6 +1667,230 @@
           "color_black",
           "color_beige",
           "color_white"
+        ]
+      },
+      {
+        "id": "lower_lounge_shorts",
+        "prompt": "soft fitted lounge shorts",
+        "tags": [
+          "home",
+          "casual"
+        ],
+        "allowed_colors": [
+          "color_gray",
+          "color_pink",
+          "color_black",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "lower_pajama_shorts",
+        "prompt": "silky pajama shorts",
+        "tags": [
+          "home",
+          "silk",
+          "boudoir"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_pink",
+          "color_ivory",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "lower_yoga_leggings",
+        "prompt": "high-waisted fitted yoga leggings",
+        "tags": [
+          "home",
+          "sporty",
+          "casual"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_gray",
+          "color_navy",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "lower_sweatpants",
+        "prompt": "low-rise soft lounge sweatpants",
+        "tags": [
+          "home",
+          "casual"
+        ],
+        "allowed_colors": [
+          "color_gray",
+          "color_black",
+          "color_beige"
+        ]
+      },
+      {
+        "id": "lower_denim_shorts",
+        "prompt": "very short fitted denim shorts",
+        "tags": [
+          "casual",
+          "outdoor",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_navy",
+          "color_cobalt",
+          "color_black",
+          "color_white"
+        ]
+      },
+      {
+        "id": "lower_mini_skirt",
+        "prompt": "high-waisted mini skirt",
+        "tags": [
+          "casual",
+          "erotic",
+          "party"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_pink",
+          "color_leopard"
+        ]
+      },
+      {
+        "id": "lower_pleated_mini",
+        "prompt": "short pleated fashion skirt",
+        "tags": [
+          "casual",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_gray",
+          "color_black",
+          "color_burgundy",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "lower_satin_skirt",
+        "prompt": "bias-cut satin midi skirt",
+        "tags": [
+          "silk",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_emerald",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "lower_slit_skirt",
+        "prompt": "fitted long skirt with a very high thigh slit",
+        "tags": [
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "lower_leather_shorts",
+        "prompt": "tight leather micro-shorts",
+        "tags": [
+          "leather",
+          "erotic",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red"
+        ]
+      },
+      {
+        "id": "lower_latex_skirt",
+        "prompt": "glossy latex-look mini skirt",
+        "tags": [
+          "fetish",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_purple"
+        ]
+      },
+      {
+        "id": "lower_sheer_skirt",
+        "prompt": "transparent sheer maxi skirt",
+        "tags": [
+          "sheer",
+          "boudoir",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "lower_wrap_sarong",
+        "prompt": "short translucent wrap sarong",
+        "tags": [
+          "swimwear",
+          "outdoor",
+          "sheer"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_black",
+          "color_coral",
+          "color_teal"
+        ]
+      },
+      {
+        "id": "lower_riding_pants",
+        "prompt": "fitted elegant riding trousers",
+        "tags": [
+          "outdoor",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_chocolate"
+        ]
+      },
+      {
+        "id": "lower_cargo_pants",
+        "prompt": "low-rise fitted cargo trousers",
+        "tags": [
+          "casual",
+          "outdoor"
+        ],
+        "allowed_colors": [
+          "color_beige",
+          "color_gray",
+          "color_black",
+          "color_emerald"
+        ]
+      },
+      {
+        "id": "lower_micro_skirt",
+        "prompt": "extremely short fitted micro skirt",
+        "tags": [
+          "erotic",
+          "explicit"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_leopard"
         ]
       }
     ],
@@ -928,6 +2047,532 @@
           "color_red",
           "color_pink"
         ]
+      },
+      {
+        "id": "dress_home_tshirt",
+        "prompt": "soft oversized T-shirt dress",
+        "tags": [
+          "home",
+          "casual",
+          "everyday"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_gray",
+          "color_black",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "dress_knit_home",
+        "prompt": "soft fitted knit lounge dress",
+        "tags": [
+          "home",
+          "everyday",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_beige",
+          "color_gray",
+          "color_ivory",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "dress_shirt",
+        "prompt": "fitted button-front shirt dress",
+        "tags": [
+          "everyday",
+          "office",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_navy",
+          "color_beige",
+          "color_cobalt"
+        ]
+      },
+      {
+        "id": "dress_sweater",
+        "prompt": "short off-the-shoulder sweater dress",
+        "tags": [
+          "home",
+          "casual",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_ivory",
+          "color_gray",
+          "color_beige",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "dress_summer_maxi",
+        "prompt": "flowing backless summer maxi dress",
+        "tags": [
+          "outdoor",
+          "everyday",
+          "elegant"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_coral",
+          "color_teal",
+          "color_emerald"
+        ]
+      },
+      {
+        "id": "dress_linen",
+        "prompt": "light belted linen dress",
+        "tags": [
+          "outdoor",
+          "casual",
+          "everyday"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_beige",
+          "color_tan",
+          "color_coral"
+        ]
+      },
+      {
+        "id": "dress_lace_mini",
+        "prompt": "short fitted lace dress",
+        "tags": [
+          "lace",
+          "elegant",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "dress_mesh_mini",
+        "prompt": "transparent mesh mini dress",
+        "tags": [
+          "sheer",
+          "erotic",
+          "explicit"
+        ],
+        "mix_tags": [
+          "sheer"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "dress_sequin_mini",
+        "prompt": "sparkling backless sequin mini dress",
+        "tags": [
+          "party",
+          "elegant",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_silver",
+          "color_champagne",
+          "color_red"
+        ]
+      },
+      {
+        "id": "dress_velvet",
+        "prompt": "deep-plunge velvet cocktail dress",
+        "tags": [
+          "elegant",
+          "formal",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_burgundy",
+          "color_emerald",
+          "color_purple"
+        ]
+      },
+      {
+        "id": "dress_satin_cowl",
+        "prompt": "backless satin cowl-neck dress",
+        "tags": [
+          "silk",
+          "elegant",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_red",
+          "color_emerald"
+        ]
+      },
+      {
+        "id": "robe_terry_bath",
+        "prompt": "plush loosely belted terry bathrobe",
+        "tags": [
+          "home",
+          "bathrobe",
+          "boudoir"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear",
+          "outerwear"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_ivory",
+          "color_pink",
+          "color_gray"
+        ]
+      },
+      {
+        "id": "robe_silk_long",
+        "prompt": "long flowing silk robe",
+        "tags": [
+          "silk",
+          "bathrobe",
+          "boudoir",
+          "elegant"
+        ],
+        "mix_tags": [
+          "silk"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear",
+          "outerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_red",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "robe_lace_open",
+        "prompt": "open-front transparent lace robe",
+        "tags": [
+          "lace",
+          "sheer",
+          "boudoir",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear",
+          "outerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "nightgown_satin",
+        "prompt": "long satin nightgown with a high slit",
+        "tags": [
+          "home",
+          "silk",
+          "boudoir",
+          "elegant"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_pink",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "nightgown_sheer",
+        "prompt": "transparent chiffon babydoll nightgown",
+        "tags": [
+          "home",
+          "sheer",
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "sheer"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_pink",
+          "color_red"
+        ]
+      },
+      {
+        "id": "bodysuit_lace",
+        "prompt": "deep-plunge lace bodysuit",
+        "tags": [
+          "lace",
+          "lingerie",
+          "boudoir",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace",
+          "elegant_lingerie"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "bodysuit_sheer",
+        "prompt": "transparent sheer mesh bodysuit",
+        "tags": [
+          "sheer",
+          "lingerie",
+          "explicit"
+        ],
+        "mix_tags": [
+          "sheer",
+          "erotic_lingerie"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "bodysuit_strappy",
+        "prompt": "strappy cutout lingerie bodysuit",
+        "tags": [
+          "lingerie",
+          "fetish",
+          "erotic"
+        ],
+        "mix_tags": [
+          "strappy"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "bodysuit_leather",
+        "prompt": "fitted leather-look zip-front bodysuit",
+        "tags": [
+          "leather",
+          "fetish",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red"
+        ]
+      },
+      {
+        "id": "swimsuit_classic",
+        "prompt": "elegant high-cut one-piece swimsuit",
+        "tags": [
+          "swimwear",
+          "outdoor",
+          "elegant"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_navy",
+          "color_red"
+        ]
+      },
+      {
+        "id": "swimsuit_plunge",
+        "prompt": "extreme-plunge high-cut one-piece swimsuit",
+        "tags": [
+          "swimwear",
+          "outdoor",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_leopard"
+        ]
+      },
+      {
+        "id": "swimsuit_cutout",
+        "prompt": "dramatic cutout monokini",
+        "tags": [
+          "swimwear",
+          "outdoor",
+          "erotic"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_teal",
+          "color_purple"
+        ]
+      },
+      {
+        "id": "swimsuit_micro",
+        "prompt": "minimal micro one-piece swimsuit",
+        "tags": [
+          "swimwear",
+          "outdoor",
+          "explicit"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_leopard"
+        ]
+      },
+      {
+        "id": "catsuit_fishnet",
+        "prompt": "open-weave fishnet body stocking",
+        "tags": [
+          "fishnet",
+          "sheer",
+          "fetish",
+          "explicit"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_white"
+        ]
+      },
+      {
+        "id": "catsuit_lace",
+        "prompt": "full-body floral lace catsuit",
+        "tags": [
+          "lace",
+          "sheer",
+          "fetish",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
       }
     ],
     "bra": [
@@ -1016,6 +2661,357 @@
           "color_black",
           "color_burgundy",
           "color_ivory"
+        ]
+      },
+      {
+        "id": "bra_cotton_triangle",
+        "prompt": "soft cotton triangle bra",
+        "tags": [
+          "everyday",
+          "home"
+        ],
+        "mix_tags": [
+          "everyday",
+          "simple"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_black",
+          "color_gray",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "bra_seamless",
+        "prompt": "seamless lightly padded bra",
+        "tags": [
+          "everyday"
+        ],
+        "mix_tags": [
+          "everyday",
+          "simple"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_black",
+          "color_beige"
+        ]
+      },
+      {
+        "id": "bra_sports",
+        "prompt": "fitted sports bra",
+        "tags": [
+          "sporty",
+          "home",
+          "everyday"
+        ],
+        "mix_tags": [
+          "sporty",
+          "everyday"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_gray",
+          "color_cobalt"
+        ]
+      },
+      {
+        "id": "bra_soft_bralette",
+        "prompt": "soft unlined bralette",
+        "tags": [
+          "home",
+          "lingerie",
+          "everyday"
+        ],
+        "mix_tags": [
+          "soft_lingerie",
+          "everyday"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_pink",
+          "color_gray"
+        ]
+      },
+      {
+        "id": "bra_lace_bralette",
+        "prompt": "delicate lace bralette",
+        "tags": [
+          "lace",
+          "lingerie",
+          "elegant"
+        ],
+        "mix_tags": [
+          "lace",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_burgundy",
+          "color_lilac"
+        ]
+      },
+      {
+        "id": "bra_pushup_lace",
+        "prompt": "structured lace push-up bra",
+        "tags": [
+          "lace",
+          "lingerie",
+          "elegant",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "bra_demi_cup",
+        "prompt": "low-cut demi-cup bra",
+        "tags": [
+          "lingerie",
+          "elegant",
+          "erotic"
+        ],
+        "mix_tags": [
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_ivory",
+          "color_red",
+          "color_champagne"
+        ]
+      },
+      {
+        "id": "bra_plunge",
+        "prompt": "extreme-plunge bra",
+        "tags": [
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "erotic_lingerie",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "bra_satin_balconette",
+        "prompt": "smooth satin balconette bra",
+        "tags": [
+          "silk",
+          "lingerie",
+          "elegant"
+        ],
+        "mix_tags": [
+          "silk",
+          "soft_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_pink",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "bra_embroidered",
+        "prompt": "embroidered tulle underwire bra",
+        "tags": [
+          "sheer",
+          "lingerie",
+          "elegant"
+        ],
+        "mix_tags": [
+          "sheer",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_ivory",
+          "color_burgundy",
+          "color_emerald"
+        ]
+      },
+      {
+        "id": "bra_mesh_balconette",
+        "prompt": "transparent mesh balconette bra",
+        "tags": [
+          "sheer",
+          "lingerie",
+          "explicit"
+        ],
+        "mix_tags": [
+          "sheer",
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "bra_open_cup",
+        "prompt": "open-cup underwire bra exposing the breasts",
+        "tags": [
+          "lingerie",
+          "fetish",
+          "explicit"
+        ],
+        "mix_tags": [
+          "fetish",
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "bra_quarter_cup",
+        "prompt": "minimal quarter-cup bra",
+        "tags": [
+          "lingerie",
+          "fetish",
+          "explicit"
+        ],
+        "mix_tags": [
+          "fetish",
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_white"
+        ]
+      },
+      {
+        "id": "bra_strappy_cage",
+        "prompt": "strappy cage bra",
+        "tags": [
+          "strappy",
+          "lingerie",
+          "fetish",
+          "explicit"
+        ],
+        "mix_tags": [
+          "strappy",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "bra_leather",
+        "prompt": "structured leather bra",
+        "tags": [
+          "leather",
+          "lingerie",
+          "fetish"
+        ],
+        "mix_tags": [
+          "leather",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red"
+        ]
+      },
+      {
+        "id": "bra_vinyl",
+        "prompt": "glossy vinyl bra",
+        "tags": [
+          "fetish",
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "fetish",
+          "vinyl"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_purple"
+        ]
+      },
+      {
+        "id": "bra_front_clasp",
+        "prompt": "deep-cleavage front-clasp bra",
+        "tags": [
+          "lingerie",
+          "erotic",
+          "elegant"
+        ],
+        "mix_tags": [
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "bra_longline_lace",
+        "prompt": "boned longline lace bra",
+        "tags": [
+          "lace",
+          "corset",
+          "lingerie",
+          "elegant"
+        ],
+        "mix_tags": [
+          "lace",
+          "corset",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_ivory",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "bra_pearl_detail",
+        "prompt": "sheer bra decorated with delicate pearl straps",
+        "tags": [
+          "sheer",
+          "lingerie",
+          "luxury",
+          "erotic"
+        ],
+        "mix_tags": [
+          "sheer",
+          "luxury_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_ivory",
+          "color_champagne"
         ]
       }
     ],
@@ -1107,6 +3103,442 @@
           "color_red",
           "color_burgundy"
         ]
+      },
+      {
+        "id": "panties_cotton_bikini",
+        "prompt": "soft cotton bikini panties",
+        "tags": [
+          "everyday",
+          "home"
+        ],
+        "mix_tags": [
+          "everyday",
+          "simple"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_black",
+          "color_gray",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "panties_seamless",
+        "prompt": "seamless low-rise panties",
+        "tags": [
+          "everyday"
+        ],
+        "mix_tags": [
+          "everyday",
+          "simple"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_black",
+          "color_beige"
+        ]
+      },
+      {
+        "id": "panties_hipster",
+        "prompt": "soft fitted hipster panties",
+        "tags": [
+          "everyday",
+          "home"
+        ],
+        "mix_tags": [
+          "everyday",
+          "simple"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_gray",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "panties_boyshort",
+        "prompt": "close-fitting boyshort panties",
+        "tags": [
+          "home",
+          "everyday"
+        ],
+        "mix_tags": [
+          "everyday",
+          "sporty"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_gray",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "panties_sport",
+        "prompt": "athletic seamless briefs",
+        "tags": [
+          "sporty",
+          "everyday"
+        ],
+        "mix_tags": [
+          "sporty",
+          "everyday"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_gray",
+          "color_cobalt"
+        ]
+      },
+      {
+        "id": "panties_high_waist",
+        "prompt": "high-waisted shaping panties",
+        "tags": [
+          "elegant",
+          "lingerie"
+        ],
+        "mix_tags": [
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_ivory",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "panties_french_lace",
+        "prompt": "high-waisted French lace panties",
+        "tags": [
+          "lace",
+          "lingerie",
+          "elegant"
+        ],
+        "mix_tags": [
+          "lace",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_burgundy",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "panties_lace_cheeky",
+        "prompt": "cheeky-cut lace panties",
+        "tags": [
+          "lace",
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "panties_brazilian",
+        "prompt": "Brazilian-cut lace panties",
+        "tags": [
+          "lace",
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "panties_tanga",
+        "prompt": "high-cut tanga panties",
+        "tags": [
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "erotic_lingerie",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "panties_gstring",
+        "prompt": "minimal G-string",
+        "tags": [
+          "lingerie",
+          "erotic",
+          "explicit"
+        ],
+        "mix_tags": [
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_leopard"
+        ]
+      },
+      {
+        "id": "panties_micro_thong",
+        "prompt": "extremely minimal micro thong",
+        "tags": [
+          "lingerie",
+          "erotic",
+          "explicit"
+        ],
+        "mix_tags": [
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_leopard"
+        ]
+      },
+      {
+        "id": "panties_satin_thong",
+        "prompt": "smooth satin thong",
+        "tags": [
+          "silk",
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "silk",
+          "soft_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_pink",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "panties_silk_tap",
+        "prompt": "loose silk tap panties",
+        "tags": [
+          "silk",
+          "home",
+          "lingerie"
+        ],
+        "mix_tags": [
+          "silk",
+          "soft_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_pink",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "panties_mesh_bikini",
+        "prompt": "transparent mesh bikini panties",
+        "tags": [
+          "sheer",
+          "lingerie",
+          "explicit"
+        ],
+        "mix_tags": [
+          "sheer",
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "panties_mesh_thong",
+        "prompt": "transparent mesh thong",
+        "tags": [
+          "sheer",
+          "lingerie",
+          "explicit"
+        ],
+        "mix_tags": [
+          "sheer",
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "panties_strappy",
+        "prompt": "multi-strap cutout panties",
+        "tags": [
+          "strappy",
+          "lingerie",
+          "fetish",
+          "explicit"
+        ],
+        "mix_tags": [
+          "strappy",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "panties_crotchless_lace",
+        "prompt": "crotchless lace panties",
+        "tags": [
+          "lace",
+          "lingerie",
+          "fetish",
+          "explicit"
+        ],
+        "mix_tags": [
+          "lace",
+          "fetish",
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "panties_open_back",
+        "prompt": "open-back strappy panties",
+        "tags": [
+          "strappy",
+          "lingerie",
+          "fetish",
+          "explicit"
+        ],
+        "mix_tags": [
+          "strappy",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "panties_leather",
+        "prompt": "minimal leather panties",
+        "tags": [
+          "leather",
+          "lingerie",
+          "fetish"
+        ],
+        "mix_tags": [
+          "leather",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red"
+        ]
+      },
+      {
+        "id": "panties_vinyl",
+        "prompt": "glossy vinyl thong",
+        "tags": [
+          "fetish",
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "fetish",
+          "vinyl"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_purple"
+        ]
+      },
+      {
+        "id": "panties_pearl_string",
+        "prompt": "delicate pearl-string thong",
+        "tags": [
+          "luxury",
+          "lingerie",
+          "erotic",
+          "explicit"
+        ],
+        "mix_tags": [
+          "luxury_lingerie",
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_ivory",
+          "color_champagne",
+          "color_black"
+        ]
+      },
+      {
+        "id": "panties_ruffled",
+        "prompt": "playful ruffled lace panties",
+        "tags": [
+          "lace",
+          "lingerie",
+          "romantic"
+        ],
+        "mix_tags": [
+          "lace",
+          "soft_lingerie"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_pink",
+          "color_lilac",
+          "color_black"
+        ]
+      },
+      {
+        "id": "panties_leopard_thong",
+        "prompt": "leopard-print thong",
+        "tags": [
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_leopard",
+          "color_black"
+        ]
       }
     ],
     "legwear": [
@@ -1196,6 +3628,379 @@
           "color_white",
           "color_red"
         ]
+      },
+      {
+        "id": "legwear_ultrasheer_pantyhose",
+        "prompt": "ultra-sheer glossy pantyhose",
+        "tags": [
+          "pantyhose",
+          "sheer",
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_gray"
+        ]
+      },
+      {
+        "id": "legwear_backseam_pantyhose",
+        "prompt": "sheer back-seam pantyhose",
+        "tags": [
+          "pantyhose",
+          "sheer",
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige"
+        ]
+      },
+      {
+        "id": "legwear_highwaist_pantyhose",
+        "prompt": "silky high-waisted pantyhose",
+        "tags": [
+          "pantyhose",
+          "everyday",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_gray"
+        ]
+      },
+      {
+        "id": "legwear_open_pantyhose",
+        "prompt": "open-crotch sheer pantyhose",
+        "tags": [
+          "pantyhose",
+          "sheer",
+          "erotic",
+          "explicit"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_red"
+        ]
+      },
+      {
+        "id": "legwear_fishnet_pantyhose",
+        "prompt": "classic fine fishnet pantyhose",
+        "tags": [
+          "pantyhose",
+          "fishnet",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "legwear_large_fishnet",
+        "prompt": "bold wide-mesh fishnet tights",
+        "tags": [
+          "pantyhose",
+          "fishnet",
+          "erotic",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red"
+        ]
+      },
+      {
+        "id": "legwear_rhinestone_fishnet",
+        "prompt": "rhinestone-studded fishnet tights",
+        "tags": [
+          "pantyhose",
+          "fishnet",
+          "erotic",
+          "luxury"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_silver"
+        ]
+      },
+      {
+        "id": "legwear_floral_lace_tights",
+        "prompt": "intricate floral lace tights",
+        "tags": [
+          "pantyhose",
+          "lace",
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "legwear_dot_tights",
+        "prompt": "sheer polka-dot tights",
+        "tags": [
+          "pantyhose",
+          "playful",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige"
+        ]
+      },
+      {
+        "id": "legwear_bow_tights",
+        "prompt": "sheer tights with satin bows at the back",
+        "tags": [
+          "pantyhose",
+          "playful",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "legwear_sheer_thighhigh",
+        "prompt": "minimal sheer thigh-high stockings",
+        "tags": [
+          "stockings",
+          "sheer",
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_white"
+        ]
+      },
+      {
+        "id": "legwear_satinband_thighhigh",
+        "prompt": "thigh-high stockings with wide satin bands",
+        "tags": [
+          "stockings",
+          "silk",
+          "boudoir",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_champagne"
+        ]
+      },
+      {
+        "id": "legwear_bow_thighhigh",
+        "prompt": "thigh-high stockings finished with small bows",
+        "tags": [
+          "stockings",
+          "playful",
+          "lingerie",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_pink",
+          "color_red"
+        ]
+      },
+      {
+        "id": "legwear_fishnet_thighhigh",
+        "prompt": "fishnet thigh-high stockings",
+        "tags": [
+          "stockings",
+          "fishnet",
+          "erotic",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "legwear_wide_lace_thighhigh",
+        "prompt": "thigh-high stockings with broad floral lace tops",
+        "tags": [
+          "stockings",
+          "lace",
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "legwear_backseam_stockings",
+        "prompt": "vintage back-seam garter stockings",
+        "tags": [
+          "stockings",
+          "garter",
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_white"
+        ]
+      },
+      {
+        "id": "legwear_glossy_stockings",
+        "prompt": "glossy high-shine thigh stockings",
+        "tags": [
+          "stockings",
+          "fetish",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_red"
+        ]
+      },
+      {
+        "id": "legwear_white_kneesocks",
+        "prompt": "soft white knee-high socks",
+        "tags": [
+          "socks",
+          "home",
+          "casual",
+          "playful"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "legwear_ribbed_kneesocks",
+        "prompt": "ribbed knee-high socks",
+        "tags": [
+          "socks",
+          "home",
+          "casual"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_gray",
+          "color_black",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "legwear_overknee_socks",
+        "prompt": "soft over-the-knee socks",
+        "tags": [
+          "socks",
+          "home",
+          "cozy",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_gray",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "legwear_slouch_socks",
+        "prompt": "casually slouched ankle socks",
+        "tags": [
+          "socks",
+          "home",
+          "casual",
+          "sporty"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_gray",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "legwear_lace_anklets",
+        "prompt": "delicate lace-trimmed ankle socks",
+        "tags": [
+          "socks",
+          "lace",
+          "playful",
+          "home"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_black",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "legwear_cashmere_socks",
+        "prompt": "luxuriously soft cashmere knee socks",
+        "tags": [
+          "socks",
+          "home",
+          "cozy",
+          "luxury"
+        ],
+        "allowed_colors": [
+          "color_ivory",
+          "color_gray",
+          "color_beige",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "legwear_leather_thighs",
+        "prompt": "fitted leather thigh-high stockings",
+        "tags": [
+          "stockings",
+          "leather",
+          "fetish",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "legwear_vinyl_thighs",
+        "prompt": "glossy vinyl thigh-high stockings",
+        "tags": [
+          "stockings",
+          "fetish",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_purple"
+        ]
       }
     ],
     "footwear": [
@@ -1262,6 +4067,240 @@
           "color_red",
           "color_ivory"
         ]
+      },
+      {
+        "id": "shoes_kitten_heels",
+        "prompt": "delicate pointed kitten heels",
+        "tags": [
+          "elegant",
+          "office"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "shoes_slingback",
+        "prompt": "elegant slingback heels",
+        "tags": [
+          "elegant",
+          "office"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_champagne",
+          "color_red"
+        ]
+      },
+      {
+        "id": "shoes_platform_pumps",
+        "prompt": "high platform pumps",
+        "tags": [
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy",
+          "color_leopard"
+        ]
+      },
+      {
+        "id": "shoes_platform_stilettos",
+        "prompt": "extreme platform stiletto heels",
+        "tags": [
+          "erotic",
+          "fetish",
+          "boudoir"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_white",
+          "color_silver"
+        ]
+      },
+      {
+        "id": "shoes_peep_toe",
+        "prompt": "high peep-toe heels",
+        "tags": [
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_red",
+          "color_champagne"
+        ]
+      },
+      {
+        "id": "shoes_mule_heels",
+        "prompt": "open-back high-heeled mules",
+        "tags": [
+          "home",
+          "boudoir",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_champagne",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "shoes_boudoir_mules",
+        "prompt": "feather-trimmed boudoir mules",
+        "tags": [
+          "boudoir",
+          "luxury",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_pink",
+          "color_red",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "shoes_clear_heels",
+        "prompt": "transparent high platform heels",
+        "tags": [
+          "erotic",
+          "fetish"
+        ],
+        "allowed_colors": [
+          "color_silver",
+          "color_black"
+        ]
+      },
+      {
+        "id": "shoes_laceup_heels",
+        "prompt": "lace-up high heels wrapping around the ankles",
+        "tags": [
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_champagne"
+        ]
+      },
+      {
+        "id": "shoes_tbar_heels",
+        "prompt": "vintage T-bar high heels",
+        "tags": [
+          "elegant",
+          "boudoir"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_burgundy",
+          "color_champagne"
+        ]
+      },
+      {
+        "id": "shoes_thigh_boots",
+        "prompt": "high-heeled thigh-high boots",
+        "tags": [
+          "erotic",
+          "fetish",
+          "leather"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "shoes_knee_boots",
+        "prompt": "fitted high-heeled knee boots",
+        "tags": [
+          "outdoor",
+          "elegant",
+          "leather"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_chocolate",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "shoes_heeled_sandals",
+        "prompt": "minimal high-heeled sandals",
+        "tags": [
+          "outdoor",
+          "elegant",
+          "swimwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_champagne",
+          "color_tan"
+        ]
+      },
+      {
+        "id": "shoes_espadrilles",
+        "prompt": "high wedge espadrilles",
+        "tags": [
+          "outdoor",
+          "casual",
+          "swimwear"
+        ],
+        "allowed_colors": [
+          "color_beige",
+          "color_white",
+          "color_tan"
+        ]
+      },
+      {
+        "id": "shoes_ballet_flats",
+        "prompt": "delicate ballet flats",
+        "tags": [
+          "home",
+          "casual",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_beige",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "shoes_barefoot",
+        "prompt": "bare feet with neatly polished toes",
+        "tags": [
+          "home",
+          "outdoor",
+          "boudoir",
+          "swimwear"
+        ]
+      },
+      {
+        "id": "shoes_satin_slippers",
+        "prompt": "delicate satin bedroom slippers",
+        "tags": [
+          "home",
+          "boudoir"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_champagne",
+          "color_pink",
+          "color_ivory"
+        ]
       }
     ],
     "outerwear": [
@@ -1301,6 +4340,131 @@
           "color_beige",
           "color_black",
           "color_navy"
+        ]
+      },
+      {
+        "id": "outer_satin_kimono",
+        "prompt": "flowing satin kimono",
+        "tags": [
+          "home",
+          "boudoir",
+          "silk",
+          "luxury"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy",
+          "color_champagne",
+          "color_pink",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "outer_sheer_robe",
+        "prompt": "transparent floor-length chiffon robe",
+        "tags": [
+          "home",
+          "boudoir",
+          "erotic",
+          "sheer"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_pink",
+          "color_lilac"
+        ]
+      },
+      {
+        "id": "outer_lace_robe",
+        "prompt": "delicate open-front lace robe",
+        "tags": [
+          "home",
+          "boudoir",
+          "erotic",
+          "lace"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "outer_cashmere_cardigan",
+        "prompt": "soft oversized cashmere cardigan",
+        "tags": [
+          "home",
+          "casual",
+          "cozy"
+        ],
+        "allowed_colors": [
+          "color_beige",
+          "color_gray",
+          "color_ivory",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "outer_denim_jacket",
+        "prompt": "cropped fitted denim jacket",
+        "tags": [
+          "casual",
+          "outdoor"
+        ],
+        "allowed_colors": [
+          "color_navy",
+          "color_white",
+          "color_black"
+        ]
+      },
+      {
+        "id": "outer_faux_fur",
+        "prompt": "plush faux-fur evening wrap",
+        "tags": [
+          "elegant",
+          "formal",
+          "luxury"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_ivory",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "outer_silk_shawl",
+        "prompt": "light silk shoulder shawl",
+        "tags": [
+          "elegant",
+          "formal",
+          "outdoor"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_navy",
+          "color_champagne",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "outer_pool_coverup",
+        "prompt": "sheer flowing poolside cover-up",
+        "tags": [
+          "swimwear",
+          "outdoor",
+          "sheer"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_teal",
+          "color_coral"
         ]
       }
     ],
@@ -1351,6 +4515,198 @@
           "color_black",
           "color_white",
           "color_red"
+        ]
+      },
+      {
+        "id": "accessory_body_chain",
+        "prompt": "delicate gold body chain tracing the waist",
+        "tags": [
+          "erotic",
+          "luxury",
+          "jewelry"
+        ],
+        "allowed_colors": [
+          "color_champagne",
+          "color_silver"
+        ]
+      },
+      {
+        "id": "accessory_anklet",
+        "prompt": "fine gleaming ankle chain",
+        "tags": [
+          "casual",
+          "swimwear",
+          "jewelry"
+        ],
+        "allowed_colors": [
+          "color_champagne",
+          "color_silver"
+        ]
+      },
+      {
+        "id": "accessory_hoop_earrings",
+        "prompt": "polished oversized hoop earrings",
+        "tags": [
+          "casual",
+          "erotic",
+          "jewelry"
+        ],
+        "allowed_colors": [
+          "color_champagne",
+          "color_silver"
+        ]
+      },
+      {
+        "id": "accessory_diamond_studs",
+        "prompt": "small brilliant diamond stud earrings",
+        "tags": [
+          "elegant",
+          "luxury",
+          "jewelry"
+        ]
+      },
+      {
+        "id": "accessory_layered_necklaces",
+        "prompt": "layered fine necklaces",
+        "tags": [
+          "casual",
+          "elegant",
+          "jewelry"
+        ],
+        "allowed_colors": [
+          "color_champagne",
+          "color_silver"
+        ]
+      },
+      {
+        "id": "accessory_silk_hair_ribbon",
+        "prompt": "silk ribbon tied elegantly in her hair",
+        "tags": [
+          "romantic",
+          "home",
+          "outdoor"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_pink",
+          "color_lilac"
+        ]
+      },
+      {
+        "id": "accessory_wide_brim_hat",
+        "prompt": "elegant wide-brim sun hat",
+        "tags": [
+          "outdoor",
+          "garden",
+          "swimwear"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_beige",
+          "color_tan"
+        ]
+      },
+      {
+        "id": "accessory_sunglasses",
+        "prompt": "luxury cat-eye sunglasses",
+        "tags": [
+          "outdoor",
+          "swimwear",
+          "casual"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_chocolate"
+        ]
+      },
+      {
+        "id": "accessory_opera_gloves",
+        "prompt": "long satin opera gloves",
+        "tags": [
+          "formal",
+          "elegant",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_champagne"
+        ]
+      },
+      {
+        "id": "accessory_lace_gloves",
+        "prompt": "delicate wrist-length lace gloves",
+        "tags": [
+          "boudoir",
+          "lace",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red"
+        ]
+      },
+      {
+        "id": "accessory_waist_chain",
+        "prompt": "fine jeweled chain resting low on the hips",
+        "tags": [
+          "erotic",
+          "swimwear",
+          "jewelry"
+        ],
+        "allowed_colors": [
+          "color_champagne",
+          "color_silver"
+        ]
+      },
+      {
+        "id": "accessory_leg_garters",
+        "prompt": "matching decorative lace thigh garters",
+        "tags": [
+          "garter",
+          "lace",
+          "lingerie",
+          "erotic"
+        ],
+        "mix_tags": [
+          "lace"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "accessory_leather_choker",
+        "prompt": "sleek fitted leather choker",
+        "tags": [
+          "fetish",
+          "leather",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red"
+        ]
+      },
+      {
+        "id": "accessory_pearl_body_chain",
+        "prompt": "luxurious strands of pearls draped across the torso",
+        "tags": [
+          "boudoir",
+          "luxury",
+          "erotic"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_ivory"
         ]
       }
     ]
@@ -2201,6 +5557,571 @@
           ]
         }
       ]
+    },
+    {
+      "id": "template_cozy_home",
+      "weight": 2,
+      "slots": {
+        "upperwear": {
+          "catalog": "upperwear",
+          "required": true,
+          "required_tags": [
+            "home"
+          ]
+        },
+        "lowerwear": {
+          "catalog": "lowerwear",
+          "required": true,
+          "required_tags": [
+            "home"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "home"
+          ]
+        },
+        "legwear": {
+          "catalog": "legwear",
+          "required": false,
+          "chance": 0.75,
+          "required_tags": [
+            "socks"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.6,
+          "required_tags": [
+            "home"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "home_dressed",
+          "level": "covered",
+          "visible_slots": [
+            "upperwear",
+            "lowerwear",
+            "legwear",
+            "footwear"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "home_relaxed",
+          "level": "lingerie",
+          "visible_slots": [
+            "upperwear",
+            "panties",
+            "legwear"
+          ],
+          "body_visibility": []
+        }
+      ]
+    },
+    {
+      "id": "template_bathrobe_private",
+      "weight": 2,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_tags": [
+            "bathrobe"
+          ]
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "lingerie"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "lingerie"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.7,
+          "required_tags": [
+            "home"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "bathrobe_closed",
+          "level": "covered",
+          "visible_slots": [
+            "full_body",
+            "footwear"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "bathrobe_open_lingerie",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "footwear"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "bathrobe_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "footwear"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template_private_garden",
+      "weight": 2,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_tags": [
+            "outdoor"
+          ]
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "elegant"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "elegant"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": true,
+          "required_tags": [
+            "outdoor"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.8,
+          "required_tags": [
+            "outdoor"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "garden_dressed",
+          "level": "covered",
+          "visible_slots": [
+            "full_body",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "garden_lingerie",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        }
+      ]
+    },
+    {
+      "id": "template_poolside_swimwear",
+      "weight": 2,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_tags": [
+            "swimwear"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.65,
+          "required_tags": [
+            "swimwear"
+          ]
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.7,
+          "required_tags": [
+            "swimwear"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.8,
+          "required_tags": [
+            "swimwear"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "poolside_coverup",
+          "level": "covered",
+          "visible_slots": [
+            "full_body",
+            "outerwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "poolside_swimsuit",
+          "level": "lingerie",
+          "visible_slots": [
+            "full_body",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        }
+      ]
+    },
+    {
+      "id": "template_luxury_lingerie",
+      "weight": 2,
+      "slots": {
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "luxury"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "luxury"
+          ]
+        },
+        "legwear": {
+          "catalog": "legwear",
+          "required": false,
+          "chance": 0.8,
+          "required_tags": [
+            "stockings"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": true,
+          "required_tags": [
+            "boudoir"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.8,
+          "required_tags": [
+            "luxury"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "luxury_lingerie",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "legwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "luxury_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "legwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        },
+        {
+          "id": "luxury_nude",
+          "level": "nude",
+          "visible_slots": [
+            "legwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples",
+            "pubic_area",
+            "genitals"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template_fishnet_fetish",
+      "weight": 2,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_tags": [
+            "fishnet"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "fetish"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": true,
+          "required_tags": [
+            "fetish"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.7,
+          "required_tags": [
+            "fetish"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "fishnet_dressed",
+          "level": "lingerie",
+          "visible_slots": [
+            "full_body",
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "fishnet_revealing",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        },
+        {
+          "id": "fishnet_explicit",
+          "level": "explicit",
+          "visible_slots": [
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples",
+            "pubic_area",
+            "genitals"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template_leather_editorial",
+      "slots": {
+        "upperwear": {
+          "catalog": "upperwear",
+          "required": true,
+          "required_tags": [
+            "leather"
+          ]
+        },
+        "lowerwear": {
+          "catalog": "lowerwear",
+          "required": true,
+          "required_tags": [
+            "leather"
+          ]
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "fetish"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "fetish"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": true,
+          "required_tags": [
+            "leather"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.75,
+          "required_tags": [
+            "leather"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "leather_dressed",
+          "level": "covered",
+          "visible_slots": [
+            "upperwear",
+            "lowerwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "leather_lingerie",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "leather_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template_playful_socks",
+      "weight": 2,
+      "slots": {
+        "upperwear": {
+          "catalog": "upperwear",
+          "required": true,
+          "required_tags": [
+            "home"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "home"
+          ]
+        },
+        "legwear": {
+          "catalog": "legwear",
+          "required": true,
+          "required_tags": [
+            "socks"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "playful_homewear",
+          "level": "covered",
+          "visible_slots": [
+            "upperwear",
+            "panties",
+            "legwear"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "playful_lingerie",
+          "level": "lingerie",
+          "visible_slots": [
+            "panties",
+            "legwear"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "playful_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "legwear"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        }
+      ]
     }
   ],
   "interiors": [
@@ -2265,6 +6186,187 @@
         "intimate",
         "luxury"
       ]
+    },
+    {
+      "id": "interior_master_bedroom",
+      "prompt": "inside a spacious private master bedroom with layered linens",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "intimate",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_cottage_bedroom",
+      "prompt": "inside a cozy secluded cottage bedroom",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "cozy",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_attic_bedroom",
+      "prompt": "inside a warm private attic bedroom beneath timber beams",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "cozy",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_villa_suite",
+      "prompt": "inside an opulent private villa suite",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "luxury",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_penthouse_lounge",
+      "prompt": "inside a secluded luxury penthouse lounge",
+      "tags": [
+        "indoor",
+        "living_room",
+        "luxury",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_fireplace_lounge",
+      "prompt": "inside a private lounge warmed by a modern fireplace",
+      "tags": [
+        "indoor",
+        "living_room",
+        "cozy",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_sunroom",
+      "prompt": "inside a bright private sunroom filled with soft daylight",
+      "tags": [
+        "indoor",
+        "living_room",
+        "garden",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_conservatory",
+      "prompt": "inside a secluded glass conservatory surrounded by greenery",
+      "tags": [
+        "indoor",
+        "garden",
+        "romantic",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_luxury_bathroom",
+      "prompt": "inside a luxurious private marble bathroom",
+      "tags": [
+        "indoor",
+        "bathroom",
+        "intimate",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_rain_shower",
+      "prompt": "inside a private spa bathroom with a glass rain shower",
+      "tags": [
+        "indoor",
+        "bathroom",
+        "intimate",
+        "spa"
+      ]
+    },
+    {
+      "id": "interior_walkin_closet",
+      "prompt": "inside a lavish private walk-in wardrobe",
+      "tags": [
+        "indoor",
+        "dressing_room",
+        "luxury",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_private_kitchen",
+      "prompt": "inside a stylish private designer kitchen",
+      "tags": [
+        "indoor",
+        "kitchen",
+        "home",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_private_pool",
+      "prompt": "beside a secluded indoor villa pool",
+      "tags": [
+        "indoor",
+        "pool",
+        "spa",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_garden_patio",
+      "prompt": "on a secluded private garden patio screened by greenery",
+      "tags": [
+        "outdoor",
+        "garden",
+        "private",
+        "romantic"
+      ]
+    },
+    {
+      "id": "interior_private_lawn",
+      "prompt": "on a secluded manicured private lawn",
+      "tags": [
+        "outdoor",
+        "garden",
+        "private",
+        "nature"
+      ]
+    },
+    {
+      "id": "interior_flower_garden",
+      "prompt": "in a hidden private flower garden in full bloom",
+      "tags": [
+        "outdoor",
+        "garden",
+        "private",
+        "romantic",
+        "nature"
+      ]
+    },
+    {
+      "id": "interior_forest_clearing",
+      "prompt": "in a secluded sunlit forest clearing far from any path",
+      "tags": [
+        "outdoor",
+        "nature",
+        "private",
+        "forest"
+      ]
+    },
+    {
+      "id": "interior_lakeside_cabin_deck",
+      "prompt": "on the private deck of a remote lakeside cabin",
+      "tags": [
+        "outdoor",
+        "nature",
+        "private",
+        "deck"
+      ]
     }
   ],
   "furniture": [
@@ -2277,7 +6379,7 @@
         "sitting_surface"
       ],
       "requires_tags": [
-        "indoor"
+        "bedroom"
       ]
     },
     {
@@ -2290,6 +6392,11 @@
       ],
       "requires_tags": [
         "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio"
       ]
     },
     {
@@ -2301,6 +6408,13 @@
       ],
       "requires_tags": [
         "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio",
+        "dressing_room",
+        "kitchen"
       ]
     },
     {
@@ -2312,6 +6426,12 @@
       ],
       "requires_tags": [
         "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio",
+        "dressing_room"
       ]
     },
     {
@@ -2346,6 +6466,245 @@
       ],
       "requires_tags": [
         "indoor"
+      ]
+    },
+    {
+      "id": "furniture_canopy_bed",
+      "prompt": "on a luxurious canopy bed with rumpled linen sheets",
+      "tags": [
+        "bed",
+        "lying_surface",
+        "sitting_surface",
+        "intimate"
+      ],
+      "requires_tags": [
+        "bedroom"
+      ]
+    },
+    {
+      "id": "furniture_velvet_bed",
+      "prompt": "on a deep velvet-upholstered bed with satin sheets",
+      "tags": [
+        "bed",
+        "lying_surface",
+        "sitting_surface",
+        "luxury"
+      ],
+      "requires_tags": [
+        "bedroom"
+      ]
+    },
+    {
+      "id": "furniture_chaise",
+      "prompt": "on an elegant curved chaise longue",
+      "tags": [
+        "sofa",
+        "lying_surface",
+        "sitting_surface",
+        "luxury"
+      ],
+      "requires_tags": [
+        "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio",
+        "dressing_room"
+      ]
+    },
+    {
+      "id": "furniture_sectional_sofa",
+      "prompt": "on a broad soft sectional sofa",
+      "tags": [
+        "sofa",
+        "lying_surface",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "living_room"
+      ]
+    },
+    {
+      "id": "furniture_velvet_armchair",
+      "prompt": "in a deep velvet armchair",
+      "tags": [
+        "chair",
+        "sitting_surface",
+        "luxury"
+      ],
+      "requires_tags": [
+        "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio",
+        "dressing_room"
+      ]
+    },
+    {
+      "id": "furniture_vanity",
+      "prompt": "seated at an illuminated dressing-table vanity",
+      "tags": [
+        "chair",
+        "mirror",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "dressing_room"
+      ]
+    },
+    {
+      "id": "furniture_bathtub",
+      "prompt": "in a deep freestanding bathtub",
+      "tags": [
+        "bathtub",
+        "lying_surface",
+        "sitting_surface",
+        "wet_surface"
+      ],
+      "requires_tags": [
+        "bathroom"
+      ]
+    },
+    {
+      "id": "furniture_shower_wall",
+      "prompt": "against the misted glass wall of a rain shower",
+      "tags": [
+        "wall",
+        "standing_area",
+        "wet_surface"
+      ],
+      "requires_tags": [
+        "bathroom"
+      ]
+    },
+    {
+      "id": "furniture_kitchen_counter",
+      "prompt": "beside a polished stone kitchen island",
+      "tags": [
+        "counter",
+        "sitting_surface",
+        "standing_area"
+      ],
+      "requires_tags": [
+        "kitchen"
+      ]
+    },
+    {
+      "id": "furniture_windowsill",
+      "prompt": "on a broad private windowsill",
+      "tags": [
+        "sitting_surface",
+        "window",
+        "standing_area"
+      ],
+      "requires_tags": [
+        "indoor"
+      ]
+    },
+    {
+      "id": "furniture_soft_rug",
+      "prompt": "on a thick plush rug",
+      "tags": [
+        "floor",
+        "lying_surface",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "indoor"
+      ]
+    },
+    {
+      "id": "furniture_pool_edge_indoor",
+      "prompt": "seated on the smooth edge of the private pool",
+      "tags": [
+        "pool_edge",
+        "sitting_surface",
+        "wet_surface"
+      ],
+      "requires_tags": [
+        "pool"
+      ]
+    },
+    {
+      "id": "furniture_garden_bench",
+      "prompt": "on a secluded wrought-iron garden bench",
+      "tags": [
+        "bench",
+        "sitting_surface",
+        "garden"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_sun_lounger",
+      "prompt": "on a cushioned private sun lounger",
+      "tags": [
+        "lounger",
+        "lying_surface",
+        "sitting_surface",
+        "garden"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_picnic_blanket",
+      "prompt": "on a soft blanket spread over the private lawn",
+      "tags": [
+        "blanket",
+        "lying_surface",
+        "sitting_surface",
+        "nature"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_garden_wall",
+      "prompt": "against a secluded ivy-covered garden wall",
+      "tags": [
+        "wall",
+        "standing_area",
+        "garden"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_tree_trunk",
+      "prompt": "beside a broad tree trunk in the secluded clearing",
+      "tags": [
+        "tree",
+        "standing_area",
+        "nature"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_cabin_deck",
+      "prompt": "on the timber deck beside a private cabin",
+      "tags": [
+        "floor",
+        "lying_surface",
+        "sitting_surface",
+        "nature"
+      ],
+      "requires_tags": [
+        "outdoor"
       ]
     }
   ],
@@ -2719,10 +7078,568 @@
     },
     {
       "id": "pose_explicit_kneeling",
-      "prompt": "explicit kneeling pose presenting her nude body",
+      "prompt": "explicit kneeling pose with knees spread wide, presenting her nude body",
       "tags": [
         "kneeling",
-        "explicit_pose"
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_bed_edge_arch",
+      "prompt": "sitting on the bed edge with her back elegantly arched",
+      "tags": [
+        "sitting",
+        "sitting_surface",
+        "erotic_pose"
+      ],
+      "requires_tags": [
+        "sitting_surface"
+      ],
+      "allowed_levels": [
+        "covered",
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_bed_stretched",
+      "prompt": "stretched lengthwise across the bed with elongated legs",
+      "tags": [
+        "lying",
+        "lying_surface",
+        "erotic_pose"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "covered",
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_side_recline",
+      "prompt": "reclining gracefully on her side with one knee raised",
+      "tags": [
+        "lying",
+        "lying_surface",
+        "erotic_pose"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_sofa_sprawl",
+      "prompt": "relaxed diagonally across the sofa with long legs extended",
+      "tags": [
+        "lying",
+        "lying_surface",
+        "erotic_pose"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "covered",
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_chair_reverse",
+      "prompt": "sitting backward on a chair with her torso leaning over the backrest",
+      "tags": [
+        "sitting",
+        "sitting_surface",
+        "provocative_rear",
+        "erotic_pose"
+      ],
+      "requires_tags": [
+        "sitting_surface"
+      ],
+      "allowed_levels": [
+        "lingerie",
+        "topless",
+        "nude",
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_wall_arch",
+      "prompt": "leaning against the wall with an elegant deep back arch",
+      "tags": [
+        "standing",
+        "wall",
+        "erotic_pose"
+      ],
+      "requires_tags": [
+        "wall"
+      ],
+      "allowed_levels": [
+        "covered",
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_kneeling_heels",
+      "prompt": "kneeling upright with hips resting above her high heels",
+      "tags": [
+        "kneeling",
+        "erotic_pose"
+      ],
+      "allowed_levels": [
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_garden_recline",
+      "prompt": "reclining on a private lawn blanket with one knee bent",
+      "tags": [
+        "lying",
+        "lying_surface",
+        "outdoor_pose",
+        "erotic_pose"
+      ],
+      "requires_tags": [
+        "lying_surface",
+        "outdoor"
+      ],
+      "allowed_levels": [
+        "covered",
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_pool_edge",
+      "prompt": "sitting at the private pool edge with both legs elegantly extended",
+      "tags": [
+        "sitting",
+        "sitting_surface",
+        "swimwear_pose"
+      ],
+      "requires_tags": [
+        "pool_edge"
+      ],
+      "allowed_levels": [
+        "covered",
+        "lingerie",
+        "topless"
+      ]
+    },
+    {
+      "id": "pose_bathtub_recline",
+      "prompt": "reclining in the bathtub with shoulders raised above the rim",
+      "tags": [
+        "lying",
+        "lying_surface",
+        "wet_pose",
+        "erotic_pose"
+      ],
+      "requires_tags": [
+        "bathtub"
+      ],
+      "allowed_levels": [
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_topless_back_arch",
+      "prompt": "topless with both hands lifting her hair and chest arched toward camera",
+      "tags": [
+        "standing",
+        "topless_pose",
+        "erotic_pose"
+      ],
+      "allowed_levels": [
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "pose_nude_knees_apart",
+      "prompt": "seated nude with knees held apart in a confident editorial pose",
+      "tags": [
+        "sitting",
+        "open_legs",
+        "nude_pose",
+        "erotic_pose"
+      ],
+      "allowed_levels": [
+        "nude",
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_rear_bent_over",
+      "prompt": "bent forward in a deliberate rear-facing explicit pose",
+      "tags": [
+        "explicit_pose",
+        "provocative_rear",
+        "open_legs"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_rear_kneeling",
+      "prompt": "kneeling rear-facing with hips raised toward the camera",
+      "tags": [
+        "explicit_pose",
+        "provocative_rear",
+        "open_legs",
+        "kneeling"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_intimate_macro_recline",
+      "prompt": "reclined with legs raised for an extreme intimate anatomical close-up",
+      "tags": [
+        "explicit_pose",
+        "intimate_closeup",
+        "open_legs",
+        "lying"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_masturbation_bed",
+      "prompt": "reclining on the bed with legs spread and one hand between her thighs",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "lying"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_masturbation_kneeling",
+      "prompt": "kneeling with thighs open and one hand visibly between her legs",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "kneeling"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_legs_vertical",
+      "prompt": "lying on her back with both legs extended vertically upward and spread wide",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "lying",
+        "legs_up"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_legs_overhead",
+      "prompt": "reclining with both legs drawn high over her head, intimate anatomy fully exposed",
+      "tags": [
+        "explicit_pose",
+        "intimate_closeup",
+        "masturbation_pose",
+        "open_legs",
+        "lying",
+        "legs_up"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_knees_chest",
+      "prompt": "lying back with both knees pulled tightly toward her chest and spread apart",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "lying",
+        "legs_up"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_wide_v",
+      "prompt": "lying back with straight legs forming a dramatic wide V toward the camera",
+      "tags": [
+        "explicit_pose",
+        "intimate_closeup",
+        "open_legs",
+        "lying",
+        "legs_up"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_butterfly",
+      "prompt": "reclining in an open butterfly position with soles together and knees spread flat",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "lying"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_bed_edge_open",
+      "prompt": "sitting on the bed edge leaning back on her hands with legs spread extremely wide",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "sitting",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "sitting_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_chair_open",
+      "prompt": "sitting deep in a chair with ankles planted far apart and hips tilted toward camera",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "sitting",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "sitting_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_one_leg_high",
+      "prompt": "reclining with one straight leg raised overhead and the other opened sideways",
+      "tags": [
+        "explicit_pose",
+        "intimate_closeup",
+        "open_legs",
+        "lying",
+        "legs_up"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_ankles_held",
+      "prompt": "lying back while holding both ankles high and pulling her legs wide apart",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "lying",
+        "legs_up"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_squat_open",
+      "prompt": "balanced in a deep wide squat with knees fully apart and body facing camera",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "squatting"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_rear_spread",
+      "prompt": "rear-facing and bent forward while deliberately holding her buttocks apart",
+      "tags": [
+        "explicit_pose",
+        "provocative_rear",
+        "open_legs"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_rear_leg_raised",
+      "prompt": "rear-facing with one foot raised on the posing surface, exposing her intimate anatomy",
+      "tags": [
+        "explicit_pose",
+        "provocative_rear",
+        "open_legs",
+        "standing"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_allfours_arch",
+      "prompt": "on all fours with a deep back arch and hips lifted directly toward camera",
+      "tags": [
+        "explicit_pose",
+        "provocative_rear",
+        "open_legs",
+        "all_fours"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_mirror_rear",
+      "prompt": "bent forward in front of a mirror, showing both her rear view and reflection",
+      "tags": [
+        "explicit_pose",
+        "provocative_rear",
+        "open_legs",
+        "mirror"
+      ],
+      "requires_tags": [
+        "mirror"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_closeup_breast_squeeze",
+      "prompt": "tight torso close-up with both hands squeezing her breasts together",
+      "tags": [
+        "explicit_pose",
+        "intimate_closeup",
+        "breast_focus"
+      ],
+      "requires_tags": [
+        "breasts",
+        "nipples"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_closeup_nipple_play",
+      "prompt": "extreme breast close-up with fingers visibly framing both nipples",
+      "tags": [
+        "explicit_pose",
+        "intimate_closeup",
+        "breast_focus"
+      ],
+      "requires_tags": [
+        "breasts",
+        "nipples"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_closeup_spread_front",
+      "prompt": "extreme frontal intimate close-up with legs fully spread outside the frame",
+      "tags": [
+        "explicit_pose",
+        "intimate_closeup",
+        "open_legs"
+      ],
+      "requires_tags": [
+        "genitals"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_closeup_spread_rear",
+      "prompt": "extreme rear intimate close-up with buttocks deliberately held apart",
+      "tags": [
+        "explicit_pose",
+        "intimate_closeup",
+        "provocative_rear",
+        "open_legs"
+      ],
+      "requires_tags": [
+        "genitals"
       ],
       "allowed_levels": [
         "explicit"
@@ -2941,6 +7858,486 @@
       "allowed_levels": [
         "explicit"
       ]
+    },
+    {
+      "id": "action_open_robe",
+      "prompt": "slowly opening her robe to reveal the lingerie beneath",
+      "tags": [
+        "undressing_action",
+        "erotic_action"
+      ],
+      "allowed_levels": [
+        "covered",
+        "lingerie"
+      ]
+    },
+    {
+      "id": "action_slide_shoulder_strap",
+      "prompt": "sliding one delicate shoulder strap down her arm",
+      "tags": [
+        "undressing_action",
+        "erotic_action"
+      ],
+      "allowed_levels": [
+        "covered",
+        "lingerie"
+      ]
+    },
+    {
+      "id": "action_unhook_bra",
+      "prompt": "reaching behind to unhook her bra",
+      "tags": [
+        "undressing_action",
+        "erotic_action"
+      ],
+      "allowed_levels": [
+        "lingerie",
+        "topless"
+      ]
+    },
+    {
+      "id": "action_stocking_adjust",
+      "prompt": "slowly adjusting the top of one thigh-high stocking",
+      "tags": [
+        "erotic_action"
+      ],
+      "requires_tags": [
+        "legwear"
+      ],
+      "allowed_levels": [
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "action_sheet_wrap",
+      "prompt": "drawing a soft sheet loosely around her hips",
+      "tags": [
+        "erotic_action"
+      ],
+      "allowed_levels": [
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "action_body_caress",
+      "prompt": "tracing one hand slowly along her waist and hip",
+      "tags": [
+        "erotic_action"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "lingerie",
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "action_breast_caress",
+      "prompt": "sensually cupping and caressing one exposed breast",
+      "tags": [
+        "erotic_action"
+      ],
+      "requires_tags": [
+        "breasts"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
+      ],
+      "allowed_levels": [
+        "topless",
+        "nude"
+      ]
+    },
+    {
+      "id": "action_rear_display",
+      "prompt": "deliberately arching and presenting her bare rear toward the camera",
+      "tags": [
+        "explicit_action",
+        "provocative_action",
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_intimate_spread",
+      "prompt": "using her fingers to deliberately present her intimate anatomy for the close-up",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_finger_stimulation",
+      "prompt": "visibly stimulating herself with her fingers",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_dual_stimulation",
+      "prompt": "using an adult vibrator while visibly caressing her breast",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_prop_tags": [
+        "vibrator"
+      ],
+      "requires_expression_tags": [
+        "intense_pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_squeeze_breasts_together",
+      "prompt": "firmly squeezing both breasts together with her hands",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "breasts",
+        "nipples",
+        "breast_focus"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_lift_breasts",
+      "prompt": "lifting both breasts from underneath and presenting them directly to camera",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "breasts",
+        "nipples",
+        "breast_focus"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_pinching_nipples",
+      "prompt": "visibly pinching and rolling both nipples between her fingers",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "breasts",
+        "nipples",
+        "breast_focus"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_spread_intimate_anatomy",
+      "prompt": "using two fingers to spread her exposed intimate anatomy wide for the camera",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_hold_legs_wide",
+      "prompt": "gripping behind both knees and pulling her legs as wide apart as possible",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_hold_ankles_up",
+      "prompt": "holding both ankles overhead to keep her body completely open to camera",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs",
+        "legs_up"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_rear_cheek_spread",
+      "prompt": "using both hands to pull her buttocks apart for an explicit rear display",
+      "tags": [
+        "explicit_action",
+        "provocative_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_rear_arch_and_look",
+      "prompt": "arching her hips hard toward camera while looking back over her shoulder",
+      "tags": [
+        "explicit_action",
+        "provocative_action",
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_rear_hand_between_legs",
+      "prompt": "reaching between her thighs from behind while maintaining the rear-facing display",
+      "tags": [
+        "explicit_action",
+        "provocative_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_two_finger_stimulation",
+      "prompt": "rhythmically stimulating herself with two clearly visible fingers",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_finger_insertion",
+      "prompt": "explicitly penetrating herself with her fingers while holding her legs open",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "intense_pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_clitoral_stimulation",
+      "prompt": "visibly rubbing her exposed clitoris with focused circular finger movement",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_breast_and_finger_play",
+      "prompt": "squeezing one breast while explicitly stimulating herself with the other hand",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "breasts",
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "intense_pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_vibrator_legs_up",
+      "prompt": "pressing an adult vibrator firmly against herself while holding both legs raised wide",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs",
+        "legs_up"
+      ],
+      "requires_prop_tags": [
+        "vibrator"
+      ],
+      "requires_expression_tags": [
+        "intense_pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_toy_deep_use",
+      "prompt": "actively using a penetrative adult toy while keeping her body fully open to camera",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_prop_tags": [
+        "penetrative_toy"
+      ],
+      "requires_expression_tags": [
+        "intense_pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "action_orgasmic_tension",
+      "prompt": "tensing her thighs around her hand at the visible peak of stimulation",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "requires_expression_tags": [
+        "intense_pleasure_expression"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
     }
   ],
   "props": [
@@ -3010,6 +8407,139 @@
         "penetrative_toy",
         "explicit"
       ]
+    },
+    {
+      "id": "prop_satin_pillow",
+      "prompt": "with a plush satin pillow held loosely against her body",
+      "tags": [
+        "boudoir_prop"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ]
+    },
+    {
+      "id": "prop_linen_sheet",
+      "prompt": "with rumpled white linen sheets gathered around her",
+      "tags": [
+        "home_prop",
+        "boudoir_prop"
+      ],
+      "requires_tags": [
+        "lying_surface"
+      ]
+    },
+    {
+      "id": "prop_bath_towel",
+      "prompt": "holding a thick white bath towel loosely around her body",
+      "tags": [
+        "bathroom_prop"
+      ],
+      "requires_tags": [
+        "bathroom"
+      ]
+    },
+    {
+      "id": "prop_silk_fan",
+      "prompt": "holding an elegant folding silk fan",
+      "tags": [
+        "elegant_prop",
+        "boudoir_prop"
+      ],
+      "excludes_tags": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_fresh_flowers",
+      "prompt": "holding a small bouquet of fresh garden flowers",
+      "tags": [
+        "romantic_prop",
+        "garden_prop"
+      ],
+      "excludes_tags": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_sunscreen",
+      "prompt": "holding a small bottle of luxury sunscreen",
+      "tags": [
+        "swimwear_prop",
+        "garden_prop"
+      ],
+      "excludes_tags": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_camera",
+      "prompt": "holding a compact vintage camera",
+      "tags": [
+        "fashion_prop",
+        "casual_prop"
+      ],
+      "excludes_tags": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_coffee_cup",
+      "prompt": "holding a warm ceramic coffee cup",
+      "tags": [
+        "home_prop",
+        "casual_prop"
+      ],
+      "excludes_tags": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_feather",
+      "prompt": "holding a long soft decorative feather",
+      "tags": [
+        "boudoir_prop",
+        "erotic_prop"
+      ],
+      "excludes_tags": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_wand_vibrator",
+      "prompt": "cordless wand vibrator visibly positioned for active use",
+      "tags": [
+        "adult_toy",
+        "vibrator",
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_bullet_vibrator",
+      "prompt": "compact bullet vibrator visibly held at the point of contact",
+      "tags": [
+        "adult_toy",
+        "vibrator",
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_luxury_toy",
+      "prompt": "premium sculpted silicone adult toy visibly positioned for active use",
+      "tags": [
+        "adult_toy",
+        "penetrative_toy",
+        "explicit"
+      ]
+    },
+    {
+      "id": "prop_crystal_toy",
+      "prompt": "polished crystal adult toy visibly positioned for active use",
+      "tags": [
+        "adult_toy",
+        "penetrative_toy",
+        "explicit"
+      ]
     }
   ],
   "expressions": [
@@ -3056,6 +8586,48 @@
       "tags": [
         "intense_pleasure_expression"
       ]
+    },
+    {
+      "id": "expression_playful",
+      "prompt": "playful knowing smile with bright direct eye contact"
+    },
+    {
+      "id": "expression_serene",
+      "prompt": "serene relaxed expression with softly closed lips"
+    },
+    {
+      "id": "expression_bold",
+      "prompt": "bold self-assured gaze directly into the lens"
+    },
+    {
+      "id": "expression_shy_sultry",
+      "prompt": "shy downward glance paired with a subtle sultry smile",
+      "tags": [
+        "aroused_expression"
+      ]
+    },
+    {
+      "id": "expression_breathless",
+      "prompt": "breathless aroused expression with flushed cheeks and parted lips",
+      "tags": [
+        "aroused_expression",
+        "pleasure_expression"
+      ]
+    },
+    {
+      "id": "expression_ecstatic",
+      "prompt": "ecstatic pleasure expression with eyes squeezed closed and lips open",
+      "tags": [
+        "pleasure_expression",
+        "intense_pleasure_expression"
+      ]
+    },
+    {
+      "id": "expression_overwhelmed",
+      "prompt": "overwhelmed orgasmic expression with flushed skin and unfocused eyes",
+      "tags": [
+        "intense_pleasure_expression"
+      ]
     }
   ],
   "moods": [
@@ -3074,6 +8646,30 @@
     {
       "id": "mood_moody",
       "prompt": "moody cinematic atmosphere"
+    },
+    {
+      "id": "mood_cozy_morning",
+      "prompt": "cozy unhurried private-morning atmosphere"
+    },
+    {
+      "id": "mood_romantic",
+      "prompt": "soft romantic and deeply intimate atmosphere"
+    },
+    {
+      "id": "mood_playful",
+      "prompt": "playful flirtatious editorial mood"
+    },
+    {
+      "id": "mood_sensual",
+      "prompt": "confident sensual adults-only magazine atmosphere"
+    },
+    {
+      "id": "mood_fetish_luxury",
+      "prompt": "dark polished luxury-fetish atmosphere"
+    },
+    {
+      "id": "mood_summer_private",
+      "prompt": "warm secluded summer-retreat atmosphere"
     }
   ],
   "photography_styles": [
@@ -3096,6 +8692,42 @@
     {
       "id": "photo_editorial",
       "prompt": "high-end editorial fashion photography"
+    },
+    {
+      "id": "photo_morning_lifestyle",
+      "prompt": "bright diffused morning window light, premium lifestyle editorial photography"
+    },
+    {
+      "id": "photo_golden_hour",
+      "prompt": "warm private-garden golden-hour light, creamy background separation"
+    },
+    {
+      "id": "photo_poolside",
+      "prompt": "crisp reflected pool light, luxury swimwear campaign photography"
+    },
+    {
+      "id": "photo_lowkey_erotic",
+      "prompt": "low-key sculpting light with controlled highlights, premium erotic editorial"
+    },
+    {
+      "id": "photo_flash_magazine",
+      "prompt": "direct polished magazine flash, precise skin texture, bold high-fashion finish"
+    },
+    {
+      "id": "photo_satin_boudoir",
+      "prompt": "warm bedside practical lights reflected across satin, premium boudoir photography"
+    },
+    {
+      "id": "photo_macro_intimate",
+      "prompt": "clinical-quality macro detail with soft flattering diffusion and precise anatomical focus"
+    },
+    {
+      "id": "photo_film_grain",
+      "prompt": "fine 35mm film grain, rich color separation, art-book editorial finish"
+    },
+    {
+      "id": "photo_spa_soft",
+      "prompt": "humid diffused spa light, luminous skin highlights, luxury wellness campaign finish"
     }
   ]
 }

@@ -1,5 +1,6 @@
 # Generated images and runtime output
 outputs/
+workflow.json
 
 # Python cache and tooling
 __pycache__/

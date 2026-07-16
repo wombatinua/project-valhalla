@@ -12,6 +12,27 @@ The project intentionally stays compact:
 
 Stability Matrix remains the visual workflow editor. This application handles content composition, photoshoot progression, workflow patching, and batch generation.
 
+## Production content database
+
+`database.json` is a production-scale, manually editable catalog with more than 680 selectable records. Its current balance includes roughly:
+
+- 220 compositional adult-model traits;
+- 215 garments and fashion accessories;
+- 18 algorithmic outfit templates;
+- 25 private interiors and secluded nature locations;
+- 25 compatible pieces of furniture and posing surfaces;
+- 60 fashion, lifestyle, boudoir, nude, close-up, and explicit poses;
+- 41 actions, 20 props, and dedicated action-compatible expressions;
+- 24 mood and photography treatments.
+
+The wardrobe covers everyday casual wear, office and evening fashion, homewear, pajamas, bathrobes, dresses, private-garden outfits, swimwear, bras, many cuts of panties and thongs, corsetry, lace, sheer garments, leather, fishnets, pantyhose, stockings, socks, high heels, boots, slippers, jewelry, garters, and editorial accessories. Templates are recipes rather than fixed outfits, so compatible pieces, matching tags, slots, and colors can be recombined into many coherent sets.
+
+All locations are private. Outdoor content is limited to secluded gardens, private lawns, villa patios, remote cabin decks, and isolated nature clearings; the catalog intentionally contains no streets, clubs, shops, transit, or other public locations. Furniture uses location requirements so bathroom, pool, indoor, and outdoor surfaces are selected only where their required environmental tags exist.
+
+Human models are always explicitly adult women aged 21 or 22 and are assembled from independently editable face, eyes, hair, complexion, stature, figure, breast, areola, nipple, pubic-hair, external-anatomy, makeup, manicure, and accent catalogs. Anatomical prompt fragments are emitted only at stages where the relevant body area is visible.
+
+Every record has a globally unique descriptive ID. New records can usually be added by copying the nearest related item and changing `id`, `prompt`, tags, and colors. Run a large `dry-run` after edits; the validator rejects duplicate IDs, unknown colors and references, invalid stages, and incompatible resolved scenes before any GPU work starts.
+
 ## Requirements
 
 - Python 3.11 or newer (currently tested with Python 3.13)
@@ -38,7 +59,7 @@ For a guided launch, run:
 ./launcher.sh
 ```
 
-The wizard shows the active ComfyUI, workflow, and output settings, then guides you through:
+The wizard clears the terminal between each logical screen, shows the active ComfyUI, workflow, and output settings, then guides you through:
 
 - generate, dry-run, capture, or help;
 - photoshoot or random mode;
@@ -52,6 +73,8 @@ It prints a complete summary and asks for confirmation before launching `app.py`
 ```bash
 PYTHON_BIN=.venv/bin/python ./launcher.sh
 ```
+
+At startup, the launcher checks whether the selected Python can import `requests`. If necessary, it initializes `pip` through `ensurepip` and installs `requests` automatically before showing the main menu.
 
 ## Quick start
 
@@ -96,6 +119,25 @@ python3 app.py generate \
   --count 10
 ```
 
+Start immediately with a completely explicit photoshoot:
+
+```bash
+python3 app.py generate \
+  --mode photoshoot \
+  --photoshoots 3 \
+  --count 12 \
+  --xxx-only
+```
+
+Generate unrelated randomized XXX images with a new model and set for every frame:
+
+```bash
+python3 app.py generate \
+  --mode random \
+  --count 50 \
+  --xxx-only
+```
+
 Run `python3 app.py COMMAND --help` for the complete options of a command.
 
 ## Commands
@@ -130,6 +172,7 @@ python3 app.py dry-run \
   [--photoshoots N] \
   [--prompt-seed N] \
   [--inference-seed N] \
+  [--xxx-only] \
   [--nsfw-percent 0..100] \
   [--plateau-percent 0..100]
 ```
@@ -170,11 +213,35 @@ With `--photoshoots N`, each photoshoot independently assembles a new human mode
 
 The model signature contains every selected human trait, including traits that are not visible in a clothed frame.
 
+To reduce identity drift, photoshoot prompts also contain a weighted identity-reference block. It repeats the fixed facial structure, eyes, nose, lips, jawline, complexion, hairstyle, hair length, hair color, stature, and body proportions identically in every frame. A dedicated negative fragment discourages a different face, hairstyle, hair color, and proportions. These controls are manually adjustable in `prompt_defaults`:
+
+```json
+"identity_consistency_prompt": "same adult woman throughout the photoshoot, ...",
+"identity_consistency_strength": 1.3,
+"identity_consistency_negative": "different woman, identity drift, ..."
+```
+
+The default strength of `1.3` is deliberately firm without overwhelming pose and action instructions. A fixed `--inference-seed` provides the strongest available visual continuity. Leaving it blank still randomizes inference per image as designed and may produce more facial variation even though the model signature and identity block remain fixed. Guaranteed pixel-level identity ultimately depends on the captured workflow; an identity/reference-image node can improve it further when supported by that workflow.
+
 ### Random
 
 `--mode random` independently assembles every frame. Human traits, outfit, stage, location, pose, and action can all change.
 
 `--nsfw-percent` and `--plateau-percent` are intentionally unavailable in random mode because random mode selects independent stages.
+
+## Full XXX mode
+
+`--xxx-only` bypasses clothed, lingerie, topless, and nude-transition stages. Every generated prompt starts at the fully explicit plateau with all anatomical visibility enabled and no garment slots visible.
+
+With `--mode photoshoot`, the adult model, identity lock, private location, lighting, and overall visual treatment remain fixed. The complete batch is divided predictably and as evenly as possible into:
+
+1. provocative explicit rear views;
+2. extreme intimate and breast close-ups;
+3. masturbation and adult-toy actions with compatible expressions.
+
+With `--mode random`, every image independently assembles a different adult model, outfit context, private location, furniture, lighting, pose, action, prop, and expression. Every frame remains explicit, while the three XXX categories are selected randomly.
+
+`--xxx-only` works with both `dry-run` and `generate`, including multi-photoshoot batches. It cannot be combined with `--nsfw-percent` or `--plateau-percent` because those percentages describe the progressive mode that XXX-only bypasses.
 
 ## NSFW photoshoot progression
 

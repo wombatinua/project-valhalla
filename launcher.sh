@@ -15,6 +15,41 @@ die() {
     exit 1
 }
 
+clear_screen() {
+    # Avoid escape sequences when output is redirected or used by automated tests.
+    if [ -t 1 ]; then
+        printf '\033[2J\033[H'
+    fi
+}
+
+screen_header() {
+    clear_screen
+    printf 'Project Valhalla Prompt Composer\n'
+    printf '%s\n\n' '---------------------------------'
+    printf '%s\n\n' "$1"
+}
+
+ensure_requests() {
+    if "$PYTHON_BIN" -c 'import requests' >/dev/null 2>&1; then
+        return
+    fi
+
+    screen_header 'Dependency setup'
+    printf 'Python package "requests" is missing for: %s\n' "$PYTHON_BIN"
+    printf 'Installing it now with pip...\n\n'
+    if ! "$PYTHON_BIN" -m pip --version >/dev/null 2>&1; then
+        printf 'pip is unavailable; bootstrapping it with ensurepip...\n\n'
+        "$PYTHON_BIN" -m ensurepip --upgrade || \
+            die "Could not initialize pip for $PYTHON_BIN"
+    fi
+    if ! "$PYTHON_BIN" -m pip install requests; then
+        die "Could not install requests. Install it manually with: $PYTHON_BIN -m pip install requests"
+    fi
+    "$PYTHON_BIN" -c 'import requests' >/dev/null 2>&1 || \
+        die "requests was installed but cannot be imported by $PYTHON_BIN"
+    printf '\nDependency installed successfully.\n'
+}
+
 read_value() {
     prompt=$1
     printf '%s' "$prompt"
@@ -85,7 +120,7 @@ ask_optional_prompt_seed() {
 
 ask_optional_inference_seed() {
     while :; do
-        read_value 'Inference seed [blank = random for every image]: '
+        read_value 'Inference seed [fixed seed = strongest identity consistency; blank = random per image]: '
         INFERENCE_SEED=$REPLY
         if [ -z "$INFERENCE_SEED" ]; then
             return
@@ -148,6 +183,7 @@ confirm_launch() {
 command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python executable not found: $PYTHON_BIN"
 [ -f "$APP" ] || die "Application not found: $APP"
 [ -f "$DATABASE" ] || die "Database not found: $DATABASE"
+ensure_requests
 
 SETTINGS_SUMMARY=$(
     "$PYTHON_BIN" -c '
@@ -177,8 +213,7 @@ print(d["settings"].get("photoshoot_progression", {}).get("explicit_plateau_perc
 ' "$DATABASE" 2>/dev/null
 ) || die "Could not read the default explicit plateau percentage"
 
-printf '\nProject Valhalla Prompt Composer\n'
-printf '%s\n' '---------------------------------'
+screen_header 'Main menu'
 printf '%s\n\n' "$SETTINGS_SUMMARY"
 printf '%s\n' 'Choose an action:'
 printf '%s\n' '  1) Generate images'
@@ -200,13 +235,15 @@ while :; do
 done
 
 if [ "$COMMAND" = capture ]; then
+    screen_header 'Capture ComfyUI workflow'
     read_value 'Replace workflow.json if it already exists? [y/N]: '
     FORCE_CAPTURE=false
     case "$REPLY" in
         y|Y|yes|YES|Yes) FORCE_CAPTURE=true ;;
     esac
 
-    printf '\nCommand: capture\n'
+    screen_header 'Confirm capture'
+    printf 'Command: capture\n'
     printf 'Replace existing workflow: %s\n\n' "$FORCE_CAPTURE"
     confirm_launch
 
@@ -217,7 +254,8 @@ if [ "$COMMAND" = capture ]; then
     exec "$@"
 fi
 
-printf '\nChoose generation mode:\n'
+screen_header 'Generation mode'
+printf 'Choose generation mode:\n'
 printf '%s\n' '  1) Photoshoot (fixed model/outfit/location with progressive stages)'
 printf '%s\n' '  2) Random (independent scene for every image)'
 while :; do
@@ -229,16 +267,32 @@ while :; do
     esac
 done
 
+screen_header 'Content mode'
+printf '%s\n' '  1) Normal / progressive content'
+printf '%s\n' '  2) Full XXX from the first image'
+while :; do
+    read_value 'Content [1]: '
+    case "${REPLY:-1}" in
+        1) XXX_ONLY=false; break ;;
+        2) XXX_ONLY=true; break ;;
+        *) printf 'Choose 1 or 2.\n' ;;
+    esac
+done
+
 PHOTOSHOOTS=1
+screen_header 'Batch size'
 if [ "$MODE" = photoshoot ]; then
     ask_photoshoot_count
 fi
 ask_count
+
+screen_header 'Random seeds'
 ask_optional_prompt_seed
 ask_optional_inference_seed
 NSFW_PERCENT=
 PLATEAU_PERCENT=
-if [ "$MODE" = photoshoot ]; then
+if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
+    screen_header 'Photoshoot progression'
     printf 'The final percentage advances through topless, nude, and explicit stages.\n'
     printf 'The plateau is the final fully explicit part: rear views, close-ups, then masturbation.\n'
     printf 'Use 0 to disable the forced NSFW ending.\n'
@@ -246,10 +300,15 @@ if [ "$MODE" = photoshoot ]; then
     ask_plateau_percent
 fi
 
-printf '\nLaunch summary\n'
+screen_header 'Launch summary'
 printf '%s\n' '--------------'
 printf 'Command: %s\n' "$COMMAND"
 printf 'Mode: %s\n' "$MODE"
+if [ "$XXX_ONLY" = true ]; then
+    printf 'Content: full XXX from the first image\n'
+else
+    printf 'Content: normal / progressive\n'
+fi
 if [ "$MODE" = photoshoot ]; then
     printf 'Photoshoots: %s\n' "$PHOTOSHOOTS"
     printf 'Images per photoshoot: %s\n' "$COUNT"
@@ -267,7 +326,7 @@ if [ -n "$INFERENCE_SEED" ]; then
 else
     printf 'Inference seed: random for every image\n'
 fi
-if [ "$MODE" = photoshoot ]; then
+if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
     if [ -n "$NSFW_PERCENT" ]; then
         printf 'NSFW final percentage: %s (command override)\n' "$NSFW_PERCENT"
     else
@@ -298,6 +357,9 @@ fi
 if [ -n "$PLATEAU_PERCENT" ]; then
     set -- "$@" --plateau-percent "$PLATEAU_PERCENT"
 fi
+if [ "$XXX_ONLY" = true ]; then
+    set -- "$@" --xxx-only
+fi
 
-printf '\n'
+clear_screen
 exec "$@"
