@@ -1,0 +1,724 @@
+{
+  "UNETLoader": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "cielbleuZIT_v2.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "VAELoader": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ultra_ae.safetensors"
+    }
+  },
+  "CLIPLoader": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2"
+    }
+  },
+  "CLIP_Skip_Base": {
+    "class_type": "CLIPSetLastLayer",
+    "inputs": {
+      "clip": [
+        "CLIPLoader",
+        0
+      ],
+      "stop_at_clip_layer": -2
+    }
+  },
+  "EmptySD3LatentImage": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": {
+      "width": 1152,
+      "height": 896,
+      "batch_size": 1
+    }
+  },
+  "PositiveCLIP_Base": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "text": "beautiful girl, sitting in armchair, full body visible in frame"
+    }
+  },
+  "NegativeCLIP_Base": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "text": ""
+    }
+  },
+  "ModelSamplingAuraFlow": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "UNETLoader",
+        0
+      ],
+      "shift": 3.0
+    }
+  },
+  "Sampler": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "latent_image": [
+        "EmptySD3LatentImage",
+        0
+      ],
+      "denoise": 1.0
+    }
+  },
+  "VAEDecode_1": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "Sampler",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ]
+    }
+  },
+  "UltralyticsDetectorProvider": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/person_yolov8m-seg.pt"
+    }
+  },
+  "FaceDetailer": {
+    "class_type": "FaceDetailer",
+    "inputs": {
+      "image": [
+        "VAEDecode_1",
+        0
+      ],
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ],
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "bbox_detector": [
+        "UltralyticsDetectorProvider",
+        0
+      ],
+      "guide_size": 256.0,
+      "guide_size_for": true,
+      "max_size": 768.0,
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3.0,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "wildcard": "",
+      "drop_size": 10,
+      "cycle": 1,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "UltralyticsDetectorProvider_2": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/Eyeful_v2-Paired.pt"
+    }
+  },
+  "FaceDetailer_2": {
+    "class_type": "FaceDetailer",
+    "inputs": {
+      "image": [
+        "FaceDetailer",
+        0
+      ],
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ],
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "bbox_detector": [
+        "UltralyticsDetectorProvider_2",
+        0
+      ],
+      "guide_size": 256.0,
+      "guide_size_for": true,
+      "max_size": 768.0,
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3.0,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "wildcard": "",
+      "drop_size": 10,
+      "cycle": 1,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "UltralyticsDetectorProvider_3": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/face_yolov9c.pt"
+    }
+  },
+  "FaceDetailer_3": {
+    "class_type": "FaceDetailer",
+    "inputs": {
+      "image": [
+        "FaceDetailer_2",
+        0
+      ],
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ],
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "bbox_detector": [
+        "UltralyticsDetectorProvider_3",
+        0
+      ],
+      "guide_size": 256.0,
+      "guide_size_for": true,
+      "max_size": 768.0,
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3.0,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "wildcard": "",
+      "drop_size": 10,
+      "cycle": 1,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "UltralyticsDetectorProvider_4": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/lips-v1.pt"
+    }
+  },
+  "FaceDetailer_4": {
+    "class_type": "FaceDetailer",
+    "inputs": {
+      "image": [
+        "FaceDetailer_3",
+        0
+      ],
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ],
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "bbox_detector": [
+        "UltralyticsDetectorProvider_4",
+        0
+      ],
+      "guide_size": 256.0,
+      "guide_size_for": true,
+      "max_size": 768.0,
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3.0,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "wildcard": "",
+      "drop_size": 10,
+      "cycle": 1,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "UltralyticsDetectorProvider_5": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/female-breast-v47.pt"
+    }
+  },
+  "FaceDetailer_5": {
+    "class_type": "FaceDetailer",
+    "inputs": {
+      "image": [
+        "FaceDetailer_4",
+        0
+      ],
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ],
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "bbox_detector": [
+        "UltralyticsDetectorProvider_5",
+        0
+      ],
+      "guide_size": 256.0,
+      "guide_size_for": true,
+      "max_size": 768.0,
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3.0,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "wildcard": "",
+      "drop_size": 10,
+      "cycle": 1,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "UltralyticsDetectorProvider_6": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/hand_yolov9c.pt"
+    }
+  },
+  "FaceDetailer_6": {
+    "class_type": "FaceDetailer",
+    "inputs": {
+      "image": [
+        "FaceDetailer_5",
+        0
+      ],
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ],
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "bbox_detector": [
+        "UltralyticsDetectorProvider_6",
+        0
+      ],
+      "guide_size": 256.0,
+      "guide_size_for": true,
+      "max_size": 768.0,
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3.0,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "wildcard": "",
+      "drop_size": 10,
+      "cycle": 1,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "UltralyticsDetectorProvider_7": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/foot-yolov8x-v20.pt"
+    }
+  },
+  "FaceDetailer_7": {
+    "class_type": "FaceDetailer",
+    "inputs": {
+      "image": [
+        "FaceDetailer_6",
+        0
+      ],
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ],
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "bbox_detector": [
+        "UltralyticsDetectorProvider_7",
+        0
+      ],
+      "guide_size": 256.0,
+      "guide_size_for": true,
+      "max_size": 768.0,
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3.0,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "wildcard": "",
+      "drop_size": 10,
+      "cycle": 1,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "UltralyticsDetectorProvider_8": {
+    "class_type": "UltralyticsDetectorProvider",
+    "inputs": {
+      "model_name": "bbox/vagina-v3.2.pt"
+    }
+  },
+  "FaceDetailer_8": {
+    "class_type": "FaceDetailer",
+    "inputs": {
+      "image": [
+        "FaceDetailer_7",
+        0
+      ],
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "clip": [
+        "CLIP_Skip_Base",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ],
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "bbox_detector": [
+        "UltralyticsDetectorProvider_8",
+        0
+      ],
+      "guide_size": 256.0,
+      "guide_size_for": true,
+      "max_size": 768.0,
+      "seed": 643921613,
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "denoise": 0.3,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": false,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3.0,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "wildcard": "",
+      "drop_size": 10,
+      "cycle": 1,
+      "tiled_encode": false,
+      "tiled_decode": false
+    }
+  },
+  "HiresFix_ModelUpscale_UpscaleModelLoader": {
+    "class_type": "UpscaleModelLoader",
+    "inputs": {
+      "model_name": "RealESRGAN_x2plus.pth"
+    }
+  },
+  "HiresFix_ModelUpscale_ImageUpscaleWithModel": {
+    "class_type": "ImageUpscaleWithModel",
+    "inputs": {
+      "upscale_model": [
+        "HiresFix_ModelUpscale_UpscaleModelLoader",
+        0
+      ],
+      "image": [
+        "FaceDetailer_8",
+        0
+      ]
+    }
+  },
+  "HiresFix_ImageScale": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "HiresFix_ModelUpscale_ImageUpscaleWithModel",
+        0
+      ],
+      "upscale_method": "bilinear",
+      "height": 1792,
+      "width": 2304,
+      "crop": "disabled"
+    }
+  },
+  "VAEEncode_1": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "HiresFix_ImageScale",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ]
+    }
+  },
+  "HiresFix_Sampler": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "ModelSamplingAuraFlow",
+        0
+      ],
+      "seed": 643921613,
+      "steps": 5,
+      "cfg": 1.0,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "simple",
+      "positive": [
+        "PositiveCLIP_Base",
+        0
+      ],
+      "negative": [
+        "NegativeCLIP_Base",
+        0
+      ],
+      "latent_image": [
+        "VAEEncode_1",
+        0
+      ],
+      "denoise": 0.3
+    }
+  },
+  "VAEDecode_2": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "HiresFix_Sampler",
+        0
+      ],
+      "vae": [
+        "VAELoader",
+        0
+      ]
+    }
+  },
+  "SaveImage": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": [
+        "VAEDecode_2",
+        0
+      ]
+    }
+  }
+}
