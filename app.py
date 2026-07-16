@@ -941,7 +941,7 @@ def short_id(value: str, width: int) -> str:
 
 def show_storyboard(storyboard: list[dict[str, Any]], title: str = "DIRECTOR'S DESK") -> None:
     director_clear()
-    print(f"🎬 {title}")
+    print(title)
     print("═" * 104)
     unique_contexts = {id(shot["context"]) for shot in storyboard}
     random_contexts = len(unique_contexts) > len({shot["photoshoot_index"] for shot in storyboard})
@@ -1026,85 +1026,64 @@ def director_uses_fzf() -> bool:
     return bool(fzf_binary() and sys.stdin.isatty() and sys.stdout.isatty())
 
 
-def semantic_fzf_label(label: str, prompt: str) -> str:
-    if label and ord(label[0]) > 0x2000:
-        return label
-    text = f"{prompt} {label}".lower()
-    rules = (
-        (("cancel",), "❌"),
-        (("back", "keep current", "auto", "default"), "↩️"),
-        (("inspect", "view full prompt"), "🔎"),
-        (("cast", "subject", "model"), "🎭"),
-        (("wardrobe", "outfit", "garment", "clothes"), "👗"),
-        (("location", "interior"), "🏠"),
-        (("surface", "furniture", "bed", "sofa", "chair"), "🛋️"),
-        (("photography", "camera", "photo style"), "📸"),
-        (("expression",), "😏"),
-        (("pose",), "🧍"),
-        (("action",), "🎬"),
-        (("stage", "xxx category"), "🎞️"),
-        (("mood",), "✨"),
-        (("reroll", "remix", "random"), "🔀"),
-        (("generate", "lights, camera", "accept"), "🚀"),
-        (("dry run",), "🧪"),
-        (("capture", "workflow"), "📥"),
-        (("help",), "❓"),
-        (("exit",), "🚪"),
-        (("set", "shot", "storyboard"), "🎬"),
-    )
-    for keywords, icon in rules:
-        if any(keyword in text for keyword in keywords):
-            return f"{icon} {label}"
-    return f"• {label}"
-
-
 def fzf_select(
     prompt: str,
     choices: list[tuple[str, Any]],
     default: Any | None = None,
-    default_label: str = "Auto / keep current",
     height: str = "72%",
 ) -> Any | None:
     executable = fzf_binary()
     if not executable or not sys.stdin.isatty() or not sys.stdout.isatty():
         return None
-    rows = [f"0\t{semantic_fzf_label(default_label, prompt)}"]
-    rows.extend(
-        f"{index}\t{semantic_fzf_label(label.replace(chr(9), ' '), prompt)}"
-        for index, (label, _) in enumerate(choices, 1)
-    )
-    try:
-        result = subprocess.run(
-            [
-                executable,
-                f"--height={height}",
-                "--layout=reverse",
-                "--border=rounded",
-                "--info=inline",
-                "--delimiter=\t",
-                "--with-nth=2..",
-                f"--prompt={prompt} › ",
-                "--header=Type to search • Enter select • Esc keep Auto",
-            ],
-            input="\n".join(rows) + "\n",
-            text=True,
-            stdout=subprocess.PIPE,
-            check=False,
-        )
-    except OSError:
-        return None
-    if result.returncode != 0 or not result.stdout.strip():
-        return None
-    try:
-        selected = int(result.stdout.split("\t", 1)[0])
-    except ValueError:
-        return None
-    return choices[selected - 1][1] if selected else default
+    rows = []
+    for index, (label, value) in enumerate(choices, 1):
+        display = label.replace(chr(9), " ")
+        if value is FZF_GROUP:
+            display = f"\033[2m{display}\033[0m"
+        rows.append(f"{index}\t{display}")
+    while True:
+        try:
+            result = subprocess.run(
+                [
+                    executable,
+                    f"--height={height}",
+                    "--layout=reverse",
+                    "--border=rounded",
+                    "--info=inline",
+                    "--ansi",
+                    "--delimiter=\t",
+                    "--with-nth=2..",
+                    f"--prompt={prompt} › ",
+                    "--header=Type to search • Enter select • Esc keep Auto",
+                ],
+                input="\n".join(rows) + "\n",
+                text=True,
+                stdout=subprocess.PIPE,
+                check=False,
+            )
+        except OSError:
+            return None
+        if result.returncode != 0 or not result.stdout.strip():
+            return default
+        try:
+            selected = int(result.stdout.split("\t", 1)[0])
+        except ValueError:
+            return default
+        value = choices[selected - 1][1]
+        if value is not FZF_GROUP:
+            return value
+
+
+FZF_GROUP = object()
+
+
+def fzf_group(title: str) -> tuple[str, Any]:
+    return (f"── {title.upper()} " + "─" * max(1, 28 - len(title)), FZF_GROUP)
 
 
 def director_menu_choice(
     prompt: str,
-    choices: list[tuple[str, str]],
+    choices: list[tuple[str, Any]],
     default: str,
 ) -> str:
     if director_uses_fzf():
@@ -1112,7 +1091,6 @@ def director_menu_choice(
             prompt,
             choices,
             default,
-            f"Default — {default}",
             height="42%",
         )
         return str(selected)
@@ -1228,7 +1206,7 @@ def remixed_human(
 
 def choose_subject_remix(composer: Composer, current: dict[str, Any]) -> dict[str, Any] | None:
     mode = select_labeled(
-        "🎭 SUBJECT REMIX — choose what stays locked",
+        "SUBJECT REMIX — choose what stays locked",
         [
             ("New completely random subject", "all"),
             (f"Keep ethnic appearance: {current['ethnic_appearance']['prompt']}", "ethnic"),
@@ -1263,7 +1241,7 @@ def choose_subject_remix(composer: Composer, current: dict[str, Any]) -> dict[st
                 candidate["areola_color"] = weighted_choice(composer.rng, compatible_colors)
         candidates.append(candidate)
     return select_labeled(
-        "🎭 CASTING CALL — choose the remixed subject",
+        "CASTING CALL — choose the remixed subject",
         [(human_cast_label(candidate), candidate) for candidate in candidates],
     )
 
@@ -1280,7 +1258,7 @@ def choose_wardrobe_remix(
     db: dict[str, Any], composer: Composer, current: dict[str, Any]
 ) -> dict[str, Any] | None:
     mode = select_labeled(
-        "👗 WARDROBE REMIX",
+        "WARDROBE REMIX",
         [
             ("Choose another outfit category / template", "template"),
             (f"Remix pieces and colors inside {current['template']['id']}", "same_template"),
@@ -1300,7 +1278,7 @@ def choose_wardrobe_remix(
             except AppError:
                 continue
     return select_labeled(
-        "👗 WARDROBE DEPARTMENT — choose a resolved outfit",
+        "WARDROBE DEPARTMENT — choose a resolved outfit",
         [(outfit_label(outfit), outfit) for outfit in candidates],
     )
 
@@ -1331,7 +1309,7 @@ def choose_location_remix(
 ) -> tuple[dict[str, Any], dict[str, Any]] | None:
     family = location_family(current)
     mode = select_labeled(
-        "🏠 LOCATION REMIX",
+        "LOCATION REMIX",
         [
             ("Choose any new interior", "all"),
             (f"Remix within the same location family: {', '.join(sorted(family)) or 'general'}", "family"),
@@ -1351,7 +1329,7 @@ def choose_location_remix(
     candidates = []
     for _ in range(count):
         candidates.extend(resolved_location_candidates(db, composer, interiors))
-    return select_labeled("🏠 LOCATION SCOUTING — choose a resolved set", candidates)
+    return select_labeled("LOCATION SCOUTING — choose a resolved set", candidates)
 
 
 def choose_surface_remix(
@@ -1363,7 +1341,7 @@ def choose_surface_remix(
     }
     current_types = tags(current) & surface_types
     mode = select_labeled(
-        "🛋️ SURFACE REMIX",
+        "SURFACE REMIX",
         [
             ("Choose any compatible surface", "all"),
             (f"Remix the same surface type: {', '.join(sorted(current_types)) or current['id']}", "type"),
@@ -1379,7 +1357,7 @@ def choose_surface_remix(
     if mode == "type" and current_types:
         candidates = [item for item in candidates if tags(item) & current_types]
     return select_labeled(
-        "🛋️ SURFACE & BLOCKING — choose a variant",
+        "SURFACE & BLOCKING — choose a variant",
         [(item["prompt"], item) for item in candidates],
     )
 
@@ -1420,12 +1398,16 @@ def direct_set(
         choice = director_menu_choice(
             "Set designer's choice",
             [
+                fzf_group("Casting"),
                 ("Cast / remix subject", "1"),
+                fzf_group("Styling"),
                 ("Change wardrobe", "2"),
-                ("Change location", "3"),
-                ("Change surface / furniture", "4"),
                 ("Change mood", "5"),
                 ("Change photography style", "6"),
+                fzf_group("Location"),
+                ("Change location", "3"),
+                ("Change surface / furniture", "4"),
+                fzf_group("Complete SET"),
                 ("Reroll the complete set", "7"),
                 ("Back to storyboard", "0"),
             ],
@@ -1458,7 +1440,7 @@ def direct_set(
             new_context["furniture"] = surface
         elif choice == "5":
             mood = select_labeled(
-                "✨ MOOD",
+                "MOOD",
                 [(item["prompt"], item) for item in db["moods"] if not item.get("disabled", False)],
             )
             if mood is None:
@@ -1466,7 +1448,7 @@ def direct_set(
             new_context["mood"] = mood
         elif choice == "6":
             style = select_labeled(
-                "📸 PHOTOGRAPHY STYLE",
+                "PHOTOGRAPHY STYLE",
                 [(item["prompt"], item) for item in db["photography_styles"] if not item.get("disabled", False)],
             )
             if style is None:
@@ -1523,7 +1505,7 @@ def choose_compatible_override(
             continue
         candidates.append((item, scene))
     return select_labeled(
-        f"🎥 Compatible {key}s for shot {shot['number']}",
+        f"Compatible {key}s for shot {shot['number']}",
         [(f"{item['id']} — {item['prompt']}", scene) for item, scene in candidates],
     )
 
@@ -1543,7 +1525,7 @@ def choose_expression(
             continue
         candidates.append((item, scene))
     return select_labeled(
-        f"🎭 Compatible expressions for shot {shot['number']}",
+        f"Compatible expressions for shot {shot['number']}",
         [(f"{item['id']} — {item['prompt']}", scene) for item, scene in candidates],
     )
 
@@ -1569,11 +1551,13 @@ def direct_one_shot(
         choice = director_menu_choice(
             "Director's choice",
             [
+                fzf_group("Composition"),
                 ("Stage / XXX category", "1"),
                 ("Pose", "2"),
                 ("Action", "3"),
                 ("Expression", "4"),
                 ("Reroll complete shot composition", "5"),
+                fzf_group("Review & navigation"),
                 ("View full prompt", "6"),
                 ("Back to storyboard", "0"),
             ],
@@ -1584,7 +1568,7 @@ def direct_one_shot(
         if choice == "1":
             options = director_stage_options(shot, args.xxx_only)
             stage = select_labeled(
-                f"🎞️ Stage for shot {shot['number']}",
+                f"Stage for shot {shot['number']}",
                 [(f"{stage['id']} ({stage['level']})", stage) for stage in options],
             )
             if stage:
@@ -1634,12 +1618,15 @@ def review_storyboard(
         choice = director_menu_choice(
             "Director's choice",
             [
+                fzf_group("Run"),
                 (("Lights, camera, generate!" if render else "Accept and print dry-run"), "1"),
                 ("Reroll the entire storyboard", "2"),
+                fzf_group("Direct"),
                 ("Cast & design a SET", "3"),
                 ("Reroll one shot", "4"),
                 ("Direct one shot", "5"),
                 ("Inspect one full prompt", "6"),
+                fzf_group("Exit"),
                 ("Cancel", "0"),
             ],
             "1",

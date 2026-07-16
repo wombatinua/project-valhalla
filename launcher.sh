@@ -127,23 +127,30 @@ fzf_choice() {
     if [ -z "${FZF_BIN:-}" ] || [ ! -t 0 ] || [ ! -t 1 ]; then
         return 1
     fi
-    rows="0\t↩️ Default — $default\n"
+    rows=
     for pair in "$@"; do
         value=${pair%%|*}
         label=${pair#*|}
+        case "$value" in
+            _group_*) label="\033[2m$label\033[0m" ;;
+        esac
         rows="${rows}${value}\t${label}\n"
     done
-    selected=$(printf '%b' "$rows" | "$FZF_BIN" \
-        --height=85% --layout=reverse --border=rounded --info=inline \
-        --delimiter='\t' --with-nth=2.. --prompt="$prompt › " \
-        --header='Type to search • Enter select • Esc use default') || selected=
-    if [ -z "$selected" ]; then
-        REPLY=$default
-    else
+    while :; do
+        selected=$(printf '%b' "$rows" | "$FZF_BIN" \
+            --height=70% --layout=reverse --border=rounded --info=inline --ansi \
+            --delimiter='\t' --with-nth=2.. --prompt="$prompt › " \
+            --header='Type to search • Enter select • Esc use default') || selected=
+        if [ -z "$selected" ]; then
+            REPLY=$default
+            return 0
+        fi
         REPLY=${selected%%	*}
-        [ "$REPLY" = 0 ] && REPLY=$default
-    fi
-    return 0
+        case "$REPLY" in
+            _group_*) continue ;;
+            *) return 0 ;;
+        esac
+    done
 }
 
 using_fzf() {
@@ -164,12 +171,13 @@ is_integer() {
 
 ask_count() {
     while :; do
+        current_count=${COUNT:-10}
         if [ "$MODE" = photoshoot ]; then
-            read_value 'Images per photoshoot [10]: '
+            read_value "Images per photoshoot [$current_count]: "
         else
-            read_value 'Random image count [10]: '
+            read_value "Random image count [$current_count]: "
         fi
-        COUNT=${REPLY:-10}
+        COUNT=${REPLY:-$current_count}
         case "$COUNT" in
             *[!0-9]*|'') printf 'Enter a positive whole number.\n' ;;
             *)
@@ -184,8 +192,9 @@ ask_count() {
 
 ask_photoshoot_count() {
     while :; do
-        read_value 'Number of different photoshoots [1]: '
-        PHOTOSHOOTS=${REPLY:-1}
+        current_photoshoots=${PHOTOSHOOTS:-1}
+        read_value "Number of different photoshoots [$current_photoshoots]: "
+        PHOTOSHOOTS=${REPLY:-$current_photoshoots}
         case "$PHOTOSHOOTS" in
             *[!0-9]*|'') printf 'Enter a positive whole number.\n' ;;
             *)
@@ -264,7 +273,7 @@ ask_plateau_percent() {
 }
 
 confirm_launch() {
-    if fzf_choice 'Confirmation' y 'y|🚀 Launch now' 'n|❌ Cancel'; then
+    if fzf_choice 'Confirmation' y 'y|Launch now' 'n|Cancel'; then
         case "$REPLY" in
             n) printf 'Cancelled.\n'; exit 0 ;;
             *) return ;;
@@ -275,6 +284,157 @@ confirm_launch() {
         n|N|no|NO|No) printf 'Cancelled.\n'; exit 0 ;;
         *) return ;;
     esac
+}
+
+reset_configuration() {
+    MODE=photoshoot
+    XXX_ONLY=false
+    REVIEW_STORYBOARD=true
+    PHOTOSHOOTS=1
+    COUNT=10
+    PROMPT_SEED=
+    INFERENCE_SEED=
+    NSFW_PERCENT=
+    PLATEAU_PERCENT=
+}
+
+configuration_summary() {
+    if [ "$MODE" = photoshoot ]; then
+        total=$((PHOTOSHOOTS * COUNT))
+        batch_text="$PHOTOSHOOTS × $COUNT = $total images"
+    else
+        total=$COUNT
+        batch_text="$COUNT independent images"
+    fi
+    [ "$XXX_ONLY" = true ] && content_text='Full XXX' || content_text='Normal / progressive'
+    [ "$REVIEW_STORYBOARD" = true ] && director_text='Interactive' || director_text='Automatic'
+    prompt_text=${PROMPT_SEED:-Random}
+    inference_text=${INFERENCE_SEED:-Random per image}
+    nsfw_text=${NSFW_PERCENT:-$DEFAULT_NSFW_PERCENT}
+    plateau_text=${PLATEAU_PERCENT:-$DEFAULT_PLATEAU_PERCENT}
+    printf 'Mode              %s\n' "$MODE"
+    printf 'Content           %s\n' "$content_text"
+    printf 'Batch             %s\n' "$batch_text"
+    printf 'Director          %s\n' "$director_text"
+    printf 'Prompt seed       %s\n' "$prompt_text"
+    printf 'Inference seed    %s\n' "$inference_text"
+    if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
+        nsfw_frames=$("$PYTHON_BIN" -c 'import math,sys; print(math.ceil(float(sys.argv[1])*int(sys.argv[2])/100))' "$nsfw_text" "$total")
+        plateau_frames=$("$PYTHON_BIN" -c 'import math,sys; print(math.ceil(float(sys.argv[1])*int(sys.argv[2])/100))' "$plateau_text" "$total")
+        printf 'NSFW ending       %s%% (~%s images)\n' "$nsfw_text" "$nsfw_frames"
+        printf 'XXX plateau       %s%% (~%s images)\n' "$plateau_text" "$plateau_frames"
+    fi
+}
+
+advanced_dashboard() {
+    while :; do
+        screen_header 'Configuration › Advanced'
+        configuration_summary
+        set -- \
+            '_group_randomness|── RANDOMNESS ─────────────────' \
+            "prompt_seed|Prompt seed — $prompt_text" \
+            "inference_seed|Inference seed — $inference_text"
+        if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
+            set -- "$@" \
+                '_group_progression|── PROGRESSION ─────────────────' \
+                "progression|NSFW ending $nsfw_text% / XXX plateau $plateau_text%"
+        fi
+        set -- "$@" \
+            '_group_back|── NAVIGATION ──────────────────' \
+            'back|Back to configuration'
+        fzf_choice 'Advanced' back "$@"
+        case "$REPLY" in
+            prompt_seed)
+                screen_header 'Configuration › Advanced › Prompt seed'
+                ask_optional_prompt_seed
+                ;;
+            inference_seed)
+                screen_header 'Configuration › Advanced › Inference seed'
+                ask_optional_inference_seed
+                ;;
+            progression)
+                if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
+                    screen_header 'Configuration › Advanced › Progression'
+                    ask_nsfw_percent
+                    ask_plateau_percent
+                fi
+                ;;
+            back) return ;;
+        esac
+    done
+}
+
+configuration_dashboard() {
+    while :; do
+        screen_header 'Configuration dashboard'
+        configuration_summary
+        if [ "$REVIEW_STORYBOARD" = true ]; then
+            if [ "$COMMAND" = generate ]; then
+                continue_label="Continue to Director — review $total image(s) before rendering"
+            else
+                continue_label="Continue to Director — review $total dry-run prompt(s)"
+            fi
+        else
+            if [ "$COMMAND" = generate ]; then
+                continue_label="Generate $total image(s)"
+            else
+                continue_label="Print $total dry-run prompt(s)"
+            fi
+        fi
+        printf '\nChoose what to change, then continue.\n'
+        fzf_choice 'Configure' launch \
+            '_group_run|── RUN ────────────────────────' \
+            "launch|$continue_label" \
+            '_group_shoot|── PHOTOSHOOT ─────────────────' \
+            "mode|Mode — $MODE" \
+            "content|Content — $content_text" \
+            "batch|Batch — $batch_text" \
+            "director|Director — $director_text" \
+            "advanced|Advanced — seeds and progression" \
+            '_group_navigation|── NAVIGATION ─────────────────' \
+            'reset|Reset settings' \
+            'main|Back to main menu'
+        action=$REPLY
+        case "$action" in
+            launch)
+                if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ] && ! "$PYTHON_BIN" -c \
+                    'import sys; raise SystemExit(float(sys.argv[1]) > float(sys.argv[2]))' \
+                    "${PLATEAU_PERCENT:-$DEFAULT_PLATEAU_PERCENT}" \
+                    "${NSFW_PERCENT:-$DEFAULT_NSFW_PERCENT}" 2>/dev/null
+                then
+                    screen_header 'Configuration needs attention'
+                    printf 'XXX plateau cannot exceed the NSFW ending.\n'
+                    printf 'Press Enter to return to the dashboard...'
+                    IFS= read -r _reply
+                    continue
+                fi
+                return
+                ;;
+            mode)
+                fzf_choice 'Mode' "$MODE" 'photoshoot|Photoshoot — connected SET' 'random|Random — independent images'
+                MODE=$REPLY
+                [ "$MODE" = random ] && PHOTOSHOOTS=1
+                ;;
+            content)
+                [ "$XXX_ONLY" = true ] && current_content=xxx || current_content=normal
+                fzf_choice 'Content' "$current_content" 'normal|Normal / progressive' 'xxx|Full XXX from the first image'
+                [ "$REPLY" = xxx ] && XXX_ONLY=true || XXX_ONLY=false
+                ;;
+            batch)
+                screen_header 'Valhalla › Configuration › Batch'
+                if [ "$MODE" = photoshoot ]; then ask_photoshoot_count; fi
+                ask_count
+                ;;
+            director)
+                [ "$REVIEW_STORYBOARD" = true ] && current_director=interactive || current_director=auto
+                fzf_choice 'Director' "$current_director" 'auto|Automatic — launch without review' 'interactive|Interactive — review before rendering'
+                [ "$REPLY" = interactive ] && REVIEW_STORYBOARD=true || REVIEW_STORYBOARD=false
+                ;;
+            advanced) advanced_dashboard ;;
+            reset) reset_configuration ;;
+            main) exec "$SCRIPT_DIR/launcher.sh" ;;
+        esac
+    done
 }
 
 command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python executable not found: $PYTHON_BIN"
@@ -322,7 +482,7 @@ if ! using_fzf; then
     printf '%s\n' '  5) Exit'
 fi
 
-if fzf_choice 'Main menu' 1 '1|🚀 Generate images' '2|🧪 Dry run (prompts only)' '3|📥 Capture latest ComfyUI workflow' '4|❓ Show app help' '5|🚪 Exit'; then
+if fzf_choice 'Main menu' 1 '_group_create|── CREATE ─────────────────────' '1|Generate images' '2|Dry run (prompts only)' '_group_tools|── TOOLS ──────────────────────' '3|Capture latest ComfyUI workflow' '4|Show app help' '_group_exit|── EXIT ───────────────────────' '5|Exit'; then
     selection=$REPLY
 else
     while :; do
@@ -341,7 +501,7 @@ esac
 
 if [ "$COMMAND" = capture ]; then
     screen_header 'Capture ComfyUI workflow'
-    if fzf_choice 'Capture workflow' n 'y|♻️ Replace existing workflow.json' 'n|↩️ Keep existing workflow.json'; then :; else
+    if fzf_choice 'Capture workflow' n 'y|Replace existing workflow.json' 'n|Keep existing workflow.json'; then :; else
         read_value 'Replace workflow.json if it already exists? [y/N]: '
     fi
     FORCE_CAPTURE=false
@@ -361,13 +521,18 @@ if [ "$COMMAND" = capture ]; then
     exec "$@"
 fi
 
+if using_fzf; then
+    reset_configuration
+    DASHBOARD_ACTIVE=true
+    configuration_dashboard
+else
 screen_header 'Generation mode'
 if ! using_fzf; then
     printf 'Choose generation mode:\n'
     printf '%s\n' '  1) Photoshoot (fixed model/outfit/location with progressive stages)'
     printf '%s\n' '  2) Random (independent scene for every image)'
 fi
-if fzf_choice 'Generation mode' 1 '1|📸 Photoshoot — connected SET and progression' '2|🎲 Random — independent scene per image'; then :; else
+if fzf_choice 'Generation mode' 1 '1|Photoshoot — connected SET and progression' '2|Random — independent scene per image'; then :; else
     while :; do read_value 'Mode [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
 fi
 case "${REPLY:-1}" in 1) MODE=photoshoot ;; 2) MODE=random ;; esac
@@ -377,7 +542,7 @@ if ! using_fzf; then
     printf '%s\n' '  1) Normal / progressive content'
     printf '%s\n' '  2) Full XXX from the first image'
 fi
-if fzf_choice 'Content mode' 1 '1|🎞️ Normal / progressive content' '2|🔞 Full XXX from the first image'; then :; else
+if fzf_choice 'Content mode' 1 '1|Normal / progressive content' '2|Full XXX from the first image'; then :; else
     while :; do read_value 'Content [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
 fi
 case "${REPLY:-1}" in 1) XXX_ONLY=false ;; 2) XXX_ONLY=true ;; esac
@@ -388,7 +553,7 @@ if ! using_fzf; then
     printf '%s\n' '  1) Auto — trust the director and continue'
     printf '%s\n' '  2) Interactive — review, reroll, and edit individual shots'
 fi
-if fzf_choice "Director's Desk" 1 '1|🤖 Auto — trust the director and continue' '2|🎬 Interactive — review and edit storyboard'; then :; else
+if fzf_choice "Director's Desk" 1 '1|Auto — trust the director and continue' '2|Interactive — review and edit storyboard'; then :; else
     while :; do read_value 'Storyboard [1]: '; case "${REPLY:-1}" in 1|2) break ;; *) printf 'Choose 1 or 2.\n' ;; esac; done
 fi
 case "${REPLY:-1}" in 1) REVIEW_STORYBOARD=false ;; 2) REVIEW_STORYBOARD=true ;; esac
@@ -413,7 +578,9 @@ if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
     ask_nsfw_percent
     ask_plateau_percent
 fi
+fi
 
+if [ "${DASHBOARD_ACTIVE:-false}" != true ]; then
 screen_header 'Launch summary'
 printf '%s\n' '--------------'
 printf 'Command: %s\n' "$COMMAND"
@@ -459,6 +626,7 @@ if [ "$MODE" = photoshoot ] && [ "$XXX_ONLY" = false ]; then
 fi
 printf '\n'
 confirm_launch
+fi
 
 set -- "$PYTHON_BIN" "$APP" "$COMMAND" --mode "$MODE" --count "$COUNT"
 if [ "$MODE" = photoshoot ]; then

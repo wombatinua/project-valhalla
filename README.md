@@ -71,17 +71,23 @@ For a guided launch, run:
 ./launcher.sh
 ```
 
-The wizard clears the terminal between each logical screen, shows the active ComfyUI, workflow, and output settings, then guides you through:
+With `fzf` available, the launcher opens one compact configuration dashboard immediately after the main action is chosen. Generate versus dry-run is selected once in the main menu and is not repeated as another setting.
 
-- generate, dry-run, capture, or help;
-- photoshoot or random mode;
-- automatic or interactive storyboard direction;
-- number of photoshoots and images per photoshoot;
-- optional prompt and inference seeds;
-- the photoshoot NSFW and explicit-plateau percentages;
-- capture overwrite protection.
+The dashboard shows:
 
-It prints a complete summary and asks for confirmation before launching `app.py`. Set `PYTHON_BIN` when a different Python executable or virtual environment is needed:
+- photoshoot versus independent random mode;
+- normal/progressive versus full-XXX content;
+- photoshoots, shots per SET, and calculated total image count;
+- automatic versus interactive Director;
+- prompt and inference seed behavior;
+- NSFW ending and explicit plateau percentages with estimated frame counts;
+- advanced seed/progression settings, reset, and return to the main menu.
+
+The dashboard has one primary action. With automatic direction it launches the selected generate/dry-run command; with interactive direction it clearly changes to **Continue to Director**. Selecting a setting edits only that field and returns to the dashboard. Seeds and progression live in one Advanced submenu, and unavailable progression controls are hidden in random/full-XXX modes. Escape preserves the current value. Selecting the primary action proceeds immediately because the dashboard itself is the editable summary. Without `fzf`, the original linear wizard and final confirmation remain available for redirected input and automation. Capture overwrite protection continues to use its own confirmation flow.
+
+`Director → Interactive` changes the dashboard’s primary action to **Continue to Director**. It builds the storyboard and opens Director's Desk; no ComfyUI generation is queued until the storyboard is explicitly accepted inside Director.
+
+Set `PYTHON_BIN` when a different Python executable or virtual environment is needed:
 
 ```bash
 PYTHON_BIN=.venv/bin/python ./launcher.sh
@@ -111,7 +117,7 @@ Before any GPU job is queued, the application resolves the complete batch and di
 - inspect the full positive and negative prompt;
 - cancel without contacting ComfyUI.
 
-Every fixed-choice screen uses an `fzf` picker, including the launcher, confirmation screens, storyboard actions, shot selection, SET design, stages, and all content catalogs. Selectable rows start with a semantic icon for quick visual scanning: casting, wardrobe, location, surface, pose, action, expression, stage, reroll, confirmation, and navigation each use a recognizable marker. Director command pickers use a compact lower-screen window so the SET card and storyboard remain visible above them; larger searchable catalogs expand only when opened. When a picker is active, the redundant numbered list is hidden. Type to search, press Enter to select, or Escape to use the displayed default/keep the current automatic choice. Numeric values such as counts, seeds, and percentages remain ordinary input fields. Pose and action lists contain only variants that the resolver can successfully combine with that shot. Expression choices are filtered against the selected action's required expression tags. When a stage is edited in photoshoot mode, the application rejects changes that would make undressing progression move backward. Set changes are resolved for the complete selected photoshoot, while random mode changes only the selected independent shot. Redirected/non-TTY runs retain the visible numbered-menu fallback for automation.
+Every fixed-choice screen uses an `fzf` picker, including the launcher, confirmation screens, storyboard actions, shot selection, SET design, stages, and all content catalogs. Higher-level menus are divided by dimmed semantic text headings such as Run, Production, Randomness, Casting, Styling, Location, and Navigation. Heading rows are non-actions: selecting one simply keeps the same picker open. Large fuzzy-search catalogs remain flat so headings do not interfere with filtering. Director command pickers use a compact lower-screen window so the SET card and storyboard remain visible above them; larger searchable catalogs expand only when opened. When a picker is active, the redundant numbered list and visible default row are hidden. Type to search, press Enter to select, or Escape to silently use the current default/keep the automatic choice. Numeric values such as counts, seeds, and percentages remain ordinary input fields. Pose and action lists contain only variants that the resolver can successfully combine with that shot. Expression choices are filtered against the selected action's required expression tags. When a stage is edited in photoshoot mode, the application rejects changes that would make undressing progression move backward. Set changes are resolved for the complete selected photoshoot, while random mode changes only the selected independent shot. Redirected/non-TTY runs retain the visible numbered-menu fallback for automation.
 
 The SET designer supports constrained remixing instead of forcing a completely new random selection:
 
