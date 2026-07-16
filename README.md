@@ -402,8 +402,15 @@ Runtime settings live near the top of `database.json`:
     "fixed": {
       "makeup": "makeup_no_makeup",
       "manicure": "manicure_none",
+      "height": "height_petite",
       "body_frame": "body_slender",
+      "waist": "waist_tiny",
+      "hips": "hips_petite",
       "breast_size": "breasts_very_small",
+      "breast_shape": "breasts_round",
+      "areola_size": "areola_very_small",
+      "nipple_size": "nipples_tiny",
+      "nipple_shape": "nipples_soft",
       "pubic_hair": "pubic_shaved",
       "genital_appearance": "genitals_small_delicate"
     },
@@ -425,7 +432,7 @@ Runtime settings live near the top of `database.json`:
 Relative paths are resolved from the directory containing `database.json`. Absolute paths are also accepted.
 
 `default_ethnic_appearance` controls automatic casting. Director can still choose another ethnicity or request a completely random subject.
-`human_defaults.fixed` locks automatic casting to specific database items, while `human_defaults.required_tags` keeps a category random within a tagged pool. The supplied defaults use no makeup, no manicure, a thin figure, tiny breasts, a completely shaved pubic area, a tiny external vulva, and a random ethnicity-compatible natural hair color. Explicit Director choices and section remixes can still override them.
+`human_defaults.fixed` locks automatic casting to specific database items, while `human_defaults.required_tags` keeps a category random within a tagged pool. The supplied natural/petite profile uses no makeup, no manicure, petite height, a slender frame, a tiny waist, petite hips, very small naturally shaped breasts, very small areolas, tiny soft nipples, a completely shaved pubic area, a tiny external vulva, and a random ethnicity-compatible natural hair color. Skin and areola pigmentation remain compatibly randomized. Explicit Director choices and section remixes can still override every trait.
 
 ComfyUI may return images from a `PreviewImage` node as temporary files. The application downloads both `temp` and permanent `output` images into `settings.output_dir`.
 

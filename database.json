@@ -18,8 +18,15 @@
       "fixed": {
         "makeup": "makeup_no_makeup",
         "manicure": "manicure_none",
+        "height": "height_petite",
         "body_frame": "body_slender",
+        "waist": "waist_tiny",
+        "hips": "hips_petite",
         "breast_size": "breasts_very_small",
+        "breast_shape": "breasts_round",
+        "areola_size": "areola_very_small",
+        "nipple_size": "nipples_tiny",
+        "nipple_shape": "nipples_soft",
         "pubic_hair": "pubic_shaved",
         "genital_appearance": "genitals_small_delicate"
       },
