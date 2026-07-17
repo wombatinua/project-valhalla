@@ -23,6 +23,7 @@ This file tracks agreed future work. Unchecked items are not implemented.
 - [x] Support complete-storyboard reroll, single-shot reroll, stage selection, and compatible pose/action/expression selection.
 - [x] Provide Casting & Set Design for subject, wardrobe, interior, surface, mood, and photography style.
 - [x] Support constrained subject, wardrobe, interior, and surface remixing.
+- [x] Support all-groups, semantic-group, and exact-item choices across Director catalogs.
 - [x] Prevent manually edited stages from reversing photoshoot progression.
 - [x] Keep automatic operation available without storyboard review.
 - [x] Use `fzf` for fixed-choice screens with a numbered non-TTY fallback.

@@ -1,40 +1,56 @@
 {
-  "_guide": {
-    "purpose": "Edit this file directly. Prompt text is English for diffusion-model compatibility.",
-    "simple_item": "Every selectable item needs only id and prompt. menu_label optionally supplies a short Director label. Set disabled to true to keep an item in the database while excluding it from all composer selections. Optional fields are menu_label, disabled, weight, tags, requires, excludes, requires_tags, requires_any_tags, excludes_tags, requires_expression_tags, occupies_slots, allowed_colors and mix_tags. requires_any_tags means at least one listed tag must be present.",
-    "photoshoot": "A photoshoot fixes the assembled adult model, outfit, colors and location. It progresses through undressing into a predictable explicit plateau of rear views, close-ups and masturbation shots.",
-    "random": "Random mode independently assembles every image and chooses any stage from the selected outfit template.",
-    "human_compatibility": "settings.default_ethnic_appearance controls automatic ethnicity. settings.human_defaults.fixed selects exact default traits, while required_tags selects a random compatible item from a tagged pool. Ethnic appearance records expose allows_*_skin and heritage_* tags. Later human categories use requires_tags or requires_any_tags because the composer accumulates tags in database order.",
-    "outfit_templates": "Slots select garments by catalog and required_tags. color_group reuses a color. match_group asks pieces to share a mix tag.",
-    "body_visibility": "Use breasts, nipples, pubic_area and genitals. Anatomy prompt fragments are emitted only when listed by a stage.",
-    "safety": "This database contains only explicitly adult women aged 21 or 22 and contains no teen-coded descriptions."
-  },
   "settings": {
     "comfy_url": "http://127.0.0.1:8188",
     "workflow_file": "./workflow.json",
     "output_dir": "./outputs",
-    "default_ethnic_appearance": "appearance_slavic",
     "human_defaults": {
-      "fixed": {
-        "makeup": "makeup_no_makeup",
-        "manicure": "manicure_none",
-        "height": "height_petite",
-        "body_frame": "body_slender",
-        "waist": "waist_tiny",
-        "hips": "hips_petite",
-        "breast_size": "breasts_very_small",
-        "breast_shape": "breasts_round",
-        "areola_size": "areola_very_small",
-        "nipple_size": "nipples_tiny",
-        "nipple_shape": "nipples_soft",
-        "pubic_hair": "pubic_shaved",
-        "genital_appearance": "genitals_small_delicate"
-      },
-      "required_tags": {
-        "hair_color": [
-          "natural_hair_color"
-        ]
+      "pools": {
+        "age": ["adult_age_21", "adult_age_22"],
+        "ethnic_appearance": ["appearance_slavic"],
+        "skin_tone": ["skin_fair", "skin_porcelain", "skin_light_warm"],
+        "face_shape": ["face_oval", "face_heart", "face_round", "face_square_soft"],
+        "eye_shape": ["eyes_almond", "eyes_round", "eyes_hooded", "eyes_deep_set"],
+        "eye_color": ["eyes_brown", "eyes_blue", "eyes_green", "eyes_hazel", "eyes_gray", "eyes_dark_brown", "eyes_aqua", "eyes_violet"],
+        "eyebrows": ["brows_soft_arch", "brows_defined", "brows_straight"],
+        "nose": ["nose_straight", "nose_delicate", "nose_button", "nose_aquiline"],
+        "lips": ["lips_bow", "lips_soft", "lips_delicate"],
+        "cheekbones": ["cheekbones_high", "cheekbones_soft", "cheekbones_prominent", "cheeks_full"],
+        "jawline": ["jaw_delicate", "jaw_defined", "jaw_tapered", "jaw_strong"],
+        "hair_texture": ["hair_texture_straight", "hair_texture_wavy", "hair_texture_silky", "hair_texture_beach_waves"],
+        "hair_length": ["hair_length_shoulder", "hair_length_long", "hair_length_very_long"],
+        "hair_style": ["hair_style_loose", "hair_style_ponytail", "hair_style_lob", "hair_style_messy_bun", "hair_style_low_bun", "hair_style_braid"],
+        "hair_color": ["hair_brown", "hair_blonde", "hair_dark_brown"],
+        "makeup": ["makeup_no_makeup", "makeup_natural"],
+        "manicure": ["manicure_none", "manicure_nude"],
+        "height": ["height_petite", "height_average"],
+        "body_frame": ["body_slender", "body_petite", "body_lithe"],
+        "waist": ["waist_tiny", "waist_slender"],
+        "hips": ["hips_petite", "hips_narrow"],
+        "breast_size": ["breasts_very_small", "breasts_small"],
+        "breast_shape": ["breasts_round", "breasts_teardrop"],
+        "areola_size": ["areola_very_small", "areola_small"],
+        "areola_color": ["areola_rose", "areola_pale_pink", "areola_peach"],
+        "nipple_size": ["nipples_tiny", "nipples_small"],
+        "nipple_shape": ["nipples_soft", "nipples_flat"],
+        "pubic_hair": ["pubic_shaved", "pubic_very_short", "pubic_natural"],
+        "genital_appearance": ["genitals_small_delicate", "genitals_subtle", "genitals_compact"],
+        "facial_accents": ["accent_freckles", "accent_beauty_mark", "accent_dimples"]
       }
+    },
+    "scene_defaults": {
+      "wardrobe_categories": ["normal"],
+      "environment_categories": ["normal"],
+      "pools": {
+        "interiors": ["interior_small_apartment_bedroom", "interior_ordinary_apartment_bedroom", "interior_rental_bedroom", "interior_compact_studio_apartment", "interior_small_apartment_living_room", "interior_ordinary_living_room"],
+        "furniture": ["furniture_simple_double_bed", "furniture_unmade_home_bed", "furniture_compact_fabric_sofa", "furniture_worn_home_sofa", "furniture_simple_wooden_chair", "furniture_thin_apartment_rug", "furniture_narrow_windowsill", "furniture_wall"],
+        "moods": ["mood_everyday_relaxed", "mood_ordinary_afternoon", "mood_casual_private"],
+        "photography_styles": ["photo_amateur_home", "photo_casual_handheld", "photo_simple_window"],
+        "explicit_photography_styles": ["photo_explicit_home_clear", "photo_explicit_handheld_close"]
+      }
+    },
+    "garment_modifiers": {
+      "pattern_chance": 0.22,
+      "texture_chance": 0.28
     },
     "http_timeout_seconds": 15,
     "poll_interval_seconds": 1,
@@ -45,78 +61,21 @@
       "explicit_plateau_percent": 30
     }
   },
-  "node_mapping": {
-    "positive_prompt": {
-      "node": "PositiveCLIP_Base",
-      "input": "text"
-    },
-    "negative_prompt": {
-      "node": "NegativeCLIP_Base",
-      "input": "text"
-    },
-    "inference_seed": [
-      {
-        "node": "Sampler",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_2",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_3",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_4",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_5",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_6",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_7",
-        "input": "seed"
-      },
-      {
-        "node": "FaceDetailer_8",
-        "input": "seed"
-      },
-      {
-        "node": "HiresFix_Sampler",
-        "input": "seed"
-      }
-    ],
-    "fast_mode": {
-      "base_sampler": "Sampler",
-      "output_targets": [
-        {
-          "node": "SaveImage",
-          "input": "images",
-          "source": ["VAEDecode_1", 0]
-        }
-      ]
-    }
-  },
   "prompt_defaults": {
-    "positive_prefix": "(solo adult woman:1.4), (single subject:1.4)",
-    "positive_suffix": "complete intact body, two arms, two legs, two hands, two feet, correct hands and feet, coherent anatomy, realistic professional photography, detailed skin, high detail",
+    "positive_prefix": "(solo {age}:1.4), (single subject:1.4)",
+    "cameltoe_prompt": "clearly visible natural cameltoe contour through the tight fabric",
+    "positive_suffix": "complete intact body, two arms, two legs, two hands, two feet, correct hands and feet, coherent anatomy, realistic photography, natural skin texture, high detail",
     "negative_prompt": "child, minor, underage, teen, young-looking, man, male, men, male body, male hands, penis, testicles, multiple people, duplicate person, twins, mirror, reflection, sex toy, vibrator, dildo, amputee, missing limb, missing arm, missing leg, detached limb, limb stump, prosthetic limb, extra limbs, extra arms, extra legs, duplicated limbs, fused limbs, malformed arms, malformed legs, bad hands, missing fingers, extra fingers, fused fingers, malformed fingers, bad feet, missing toes, extra toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
     "xxx_plateau_prompts": {
-      "provocative_rear": "(explicit nude rear view:1.5), exposed buttocks and genitals from behind, uncensored",
+      "provocative_rear": "(anatomically coherent rear-facing nude pose:1.5), back, shoulders, torso, pelvis and buttocks all facing away from the camera in one consistent direction, only the head and neck may turn to look back, exposed buttocks and genitals from behind, uncensored",
       "intimate_closeup": "(explicit intimate anatomical close-up:1.5), fully nude, clearly visible, uncensored",
+      "panties_aside": "(explicit panties-pulled-aside view:1.5), exposed vulva between parted legs, uncensored",
       "masturbation": "(hands-only masturbation:1.5), exposed genitals, fully nude, uncensored"
     },
-    "xxx_negative_additions": "clothes, underwear, covered breasts, covered genitals, censorship, mosaic, black bars, implied nudity"
+    "xxx_plateau_negative_additions": {
+      "provocative_rear": "front-facing shoulders, front-facing torso, chest facing camera, frontal breasts, simultaneous front and rear view, twisted spine, reversed torso, impossible torso rotation, disconnected waist, giant foreground buttocks, fisheye body distortion"
+    },
+    "xxx_negative_additions": "clothes, underwear, covered genitals, censorship, mosaic, black bars, implied nudity"
   },
   "colors": [
     {
@@ -206,6 +165,117 @@
     {
       "id": "color_leopard",
       "prompt": "classic leopard print"
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern_small_floral",
+      "prompt": "small delicate floral print",
+      "weight": 3,
+      "allowed_garment_ids": ["top_cotton_camisole", "top_tiefront_blouse_casual", "top_pointelle_cardigan", "dress_cotton_wrap_day", "dress_cotton_cami_mini", "dress_wrap_jersey_mini", "panties_ribbed_bikini", "panties_lace_bow"]
+    },
+    {
+      "id": "pattern_ditsy_flowers",
+      "prompt": "tiny scattered ditsy-flower print",
+      "weight": 3,
+      "allowed_garment_ids": ["top_spaghetti_tank", "top_cotton_camisole", "top_cropped_cardigan", "dress_cotton_wrap_day", "dress_cotton_cami_mini", "dress_wrap_jersey_mini", "panties_ruffled", "panties_ribbed_bikini"]
+    },
+    {
+      "id": "pattern_botanical",
+      "prompt": "flowing botanical leaf ornament",
+      "allowed_garment_ids": ["top_silk_blouse", "top_tiefront_blouse_casual", "dress_wrap_jersey_mini", "dress_cotton_wrap_day", "dress_scoop_tank_midi", "robe_silk_long"]
+    },
+    {
+      "id": "pattern_polka_dots",
+      "prompt": "classic small polka-dot print",
+      "weight": 2,
+      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "dress_square_neck_mini", "dress_cotton_wrap_day", "dress_casual_ruched_mini", "panties_cotton_bikini", "panties_ribbed_bikini"]
+    },
+    {
+      "id": "pattern_gingham",
+      "prompt": "small casual gingham check",
+      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "top_fitted_oxford_shirt", "lower_cotton_mini_skirt", "lower_wrap_cotton_mini", "dress_cotton_shirt_mini", "dress_cotton_wrap_day"]
+    },
+    {
+      "id": "pattern_soft_plaid",
+      "prompt": "soft understated plaid pattern",
+      "allowed_garment_ids": ["top_flannel_shirt", "top_cotton_button_shirt", "lower_pleated_micro_casual", "lower_aline_skirt", "lower_corduroy_mini"]
+    },
+    {
+      "id": "pattern_pinstripe",
+      "prompt": "subtle vertical pinstripe pattern",
+      "allowed_garment_ids": ["top_fitted_oxford_shirt", "top_stretch_button_shirt", "top_cotton_button_shirt", "lower_tailored_trousers", "lower_pencil_skirt", "dress_cotton_shirt_mini"]
+    },
+    {
+      "id": "pattern_houndstooth",
+      "prompt": "small refined houndstooth pattern",
+      "allowed_garment_ids": ["lower_pencil_skirt", "lower_aline_skirt", "lower_corduroy_mini", "dress_square_neck_mini", "outer_blazer"]
+    },
+    {
+      "id": "pattern_thin_stripes",
+      "prompt": "fine evenly spaced stripe pattern",
+      "weight": 2,
+      "allowed_garment_ids": ["top_cotton_tee", "top_boxy_tshirt", "top_crewneck_tshirt", "top_vneck_tshirt", "top_longsleeve_tshirt", "dress_tshirt_bodycon", "dress_buttonfront_jersey"]
+    },
+    {
+      "id": "pattern_tiny_hearts",
+      "prompt": "playful tiny-heart print",
+      "allowed_garment_ids": ["top_cotton_camisole", "top_lounge_brushed", "lower_jersey_shorts", "lower_lounge_dolphin_shorts", "panties_cotton_bikini", "panties_ribbed_bikini", "panties_ruffled"]
+    },
+    {
+      "id": "pattern_abstract_geometric",
+      "prompt": "restrained abstract geometric print",
+      "allowed_garment_ids": ["top_one_shoulder_jersey", "top_asymmetric_ribbed", "lower_aline_skirt", "dress_casual_ruched_mini", "dress_scoop_tank_midi", "swimsuit_cutout"]
+    },
+    {
+      "id": "pattern_delicate_vines",
+      "prompt": "delicate embroidered vine ornament",
+      "allowed_garment_ids": ["top_silk_blouse", "top_pointelle_cardigan", "top_tiefront_blouse_casual", "dress_cotton_wrap_day", "bra_balconette_lace", "panties_lace_embroidered", "robe_lace_open"]
+    }
+  ],
+  "fabric_textures": [
+    {
+      "id": "texture_fine_ribbed",
+      "prompt": "fine ribbed fabric texture",
+      "weight": 3,
+      "allowed_garment_ids": ["top_plain_tank", "top_cotton_camisole", "top_fitted_baby_tee", "top_cotton_halter", "lower_jersey_skirt", "dress_casual_bodycon_mini", "dress_cotton_cami_mini", "panties_cotton_bikini"]
+    },
+    {
+      "id": "texture_slub_cotton",
+      "prompt": "subtle natural slub-cotton texture",
+      "weight": 3,
+      "allowed_garment_ids": ["top_cotton_tee", "top_boxy_tshirt", "top_crewneck_tshirt", "top_vneck_tshirt", "top_basic_crop", "top_plain_tank", "dress_tshirt_bodycon", "dress_cotton_wrap_day"]
+    },
+    {
+      "id": "texture_brushed_cotton",
+      "prompt": "soft brushed-cotton finish",
+      "allowed_garment_ids": ["top_plain_sweatshirt", "top_pullover_hoodie", "top_cropped_sweatshirt", "top_lounge_brushed", "lower_plain_joggers", "lower_jersey_shorts", "lower_lounge_dolphin_shorts", "dress_hooded_sweatshirt_mini"]
+    },
+    {
+      "id": "texture_waffle_knit",
+      "prompt": "small waffle-knit texture",
+      "allowed_garment_ids": ["top_longsleeve_tshirt", "top_henley", "top_boatneck_jersey", "top_lounge_brushed", "lower_jersey_shorts", "dress_buttonfront_jersey"]
+    },
+    {
+      "id": "texture_cable_knit",
+      "prompt": "soft narrow cable-knit texture",
+      "allowed_garment_ids": ["top_cashmere", "top_cardigan", "top_cropped_cardigan", "top_pointelle_cardigan", "dress_knit_sweater_mini", "dress_offshoulder_knit_mini"]
+    },
+    {
+      "id": "texture_washed_denim",
+      "prompt": "naturally faded washed-denim finish",
+      "weight": 2,
+      "allowed_garment_ids": ["top_denim_shirt", "top_chambray_shirt", "lower_straight_jeans", "lower_relaxed_jeans", "lower_highwaist_jeans", "lower_mom_jeans", "lower_bootcut_jeans", "lower_cropped_jeans", "lower_denim_skirt", "lower_denim_mini_skirt", "dress_denim_fitted_mini", "dress_denim_buttonfront"]
+    },
+    {
+      "id": "texture_crinkled_cotton",
+      "prompt": "light naturally crinkled cotton texture",
+      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "top_spaghetti_tank", "lower_cotton_shorts", "lower_paperbag_shorts", "dress_cotton_shirt_mini", "dress_cotton_wrap_day"]
+    },
+    {
+      "id": "texture_soft_velour",
+      "prompt": "soft matte velour finish",
+      "allowed_garment_ids": ["top_zip_hoodie", "top_cropped_sweatshirt", "lower_velour_lounge_shorts", "lower_plain_joggers", "dress_hooded_sweatshirt_mini"]
     }
   ],
   "human_model_parts": {
@@ -1000,6 +1070,7 @@
       {
         "id": "hair_style_pixie",
         "prompt": "elegant pixie cut",
+        "tags": ["short_hairstyle"],
         "requires_tags": [
           "short_hair"
         ]
@@ -1007,6 +1078,7 @@
       {
         "id": "hair_style_bob",
         "prompt": "polished bob haircut",
+        "tags": ["medium_hairstyle"],
         "requires_tags": [
           "medium_hair"
         ]
@@ -1014,6 +1086,7 @@
       {
         "id": "hair_style_loose",
         "prompt": "hair worn loose",
+        "tags": ["long_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "long_hair"
         ]
@@ -1021,6 +1094,7 @@
       {
         "id": "hair_style_ponytail",
         "prompt": "sleek high ponytail",
+        "tags": ["long_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "long_hair"
         ]
@@ -1028,6 +1102,7 @@
       {
         "id": "hair_style_lob",
         "prompt": "elegant long bob",
+        "tags": ["medium_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "medium_hair"
         ]
@@ -1035,6 +1110,7 @@
       {
         "id": "hair_style_side_swept",
         "prompt": "glamorous side-swept hairstyle",
+        "tags": ["long_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "long_hair"
         ]
@@ -1042,6 +1118,7 @@
       {
         "id": "hair_style_loose_curls",
         "prompt": "loose cascading curls",
+        "tags": ["long_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "long_hair"
         ]
@@ -1049,6 +1126,7 @@
       {
         "id": "hair_style_messy_bun",
         "prompt": "softly messy high bun",
+        "tags": ["long_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "long_hair"
         ]
@@ -1056,6 +1134,7 @@
       {
         "id": "hair_style_low_bun",
         "prompt": "sleek elegant low bun",
+        "tags": ["long_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "long_hair"
         ]
@@ -1063,6 +1142,7 @@
       {
         "id": "hair_style_braid",
         "prompt": "long loose side braid",
+        "tags": ["long_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "long_hair"
         ]
@@ -1070,6 +1150,7 @@
       {
         "id": "hair_style_half_up",
         "prompt": "romantic half-up hairstyle",
+        "tags": ["long_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "long_hair"
         ]
@@ -1077,6 +1158,7 @@
       {
         "id": "hair_style_shag",
         "prompt": "layered shoulder-length shag",
+        "tags": ["medium_hairstyle", "default_hairstyle"],
         "requires_tags": [
           "medium_hair"
         ]
@@ -1084,6 +1166,7 @@
       {
         "id": "hair_style_curly_bob",
         "prompt": "voluminous curly bob",
+        "tags": ["medium_hairstyle"],
         "requires_tags": [
           "medium_hair",
           "curly_hair"
@@ -1092,8 +1175,10 @@
       {
         "id": "hair_style_afro",
         "prompt": "rounded natural afro hairstyle",
+        "tags": ["medium_hairstyle"],
         "requires_tags": [
-          "coily_hair"
+          "coily_hair",
+          "medium_hair"
         ]
       }
     ],
@@ -1121,7 +1206,8 @@
         "id": "hair_brown",
         "prompt": "rich brunette hair",
         "tags": [
-          "natural_hair_color"
+          "natural_hair_color",
+          "basic_natural_hair_color"
         ],
         "requires_any_tags": [
           "heritage_european",
@@ -1138,7 +1224,8 @@
         "id": "hair_blonde",
         "prompt": "golden blonde hair",
         "tags": [
-          "natural_hair_color"
+          "natural_hair_color",
+          "basic_natural_hair_color"
         ],
         "requires_any_tags": [
           "heritage_european",
@@ -1179,7 +1266,8 @@
         "id": "hair_dark_brown",
         "prompt": "dark chocolate-brown hair",
         "tags": [
-          "natural_hair_color"
+          "natural_hair_color",
+          "basic_natural_hair_color"
         ],
         "requires_any_tags": [
           "heritage_european",
@@ -1835,7 +1923,8 @@
         "prompt": "fitted cotton T-shirt",
         "tags": [
           "casual",
-          "everyday"
+          "everyday",
+          "normal_clothes"
         ],
         "allowed_colors": [
           "color_white",
@@ -2192,6 +2281,235 @@
           "color_champagne",
           "color_red"
         ]
+      },
+      {
+        "id": "top_plain_tank",
+        "prompt": "plain cotton tank top",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "top_racerback_tank",
+        "prompt": "simple racerback tank top",
+        "tags": ["normal_clothes", "casual", "everyday", "sporty"]
+      },
+      {
+        "id": "top_spaghetti_tank",
+        "prompt": "basic cotton spaghetti-strap top",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "top_boxy_tshirt",
+        "prompt": "plain boxy cotton T-shirt",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "top_crewneck_tshirt",
+        "prompt": "basic crew-neck T-shirt",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "top_vneck_tshirt",
+        "prompt": "simple V-neck cotton T-shirt",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "top_longsleeve_tshirt",
+        "prompt": "plain long-sleeve T-shirt",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "top_basic_crop",
+        "prompt": "simple cotton crop top",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "top_ribbed_crop",
+        "prompt": "basic ribbed crop top",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "top_cotton_camisole",
+        "prompt": "simple cotton camisole",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "top_plain_sweatshirt",
+        "prompt": "plain cotton sweatshirt",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "top_pullover_hoodie",
+        "prompt": "simple pullover hoodie",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "top_flannel_shirt",
+        "prompt": "casual checked flannel shirt",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "top_cotton_button_shirt",
+        "prompt": "plain cotton button-front shirt",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "top_henley",
+        "prompt": "simple fitted Henley top",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "top_fitted_oxford_shirt",
+        "prompt": "close-fitted cotton Oxford shirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_stretch_button_shirt",
+        "prompt": "stretch cotton button shirt fitted at the waist",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_deep_v_tee",
+        "prompt": "fitted deep-V cotton T-shirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_scoop_neck_tee",
+        "prompt": "close-fitting scoop-neck T-shirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_fitted_baby_tee",
+        "prompt": "short fitted baby T-shirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_square_neck_tank",
+        "prompt": "fitted square-neck tank top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_lowcut_ribbed_tank",
+        "prompt": "low-cut fitted ribbed tank top",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"]
+      },
+      {
+        "id": "top_cotton_halter",
+        "prompt": "simple fitted cotton halter top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_one_shoulder_jersey",
+        "prompt": "fitted one-shoulder jersey top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_wrap_crop_cotton",
+        "prompt": "casual wrap-front cotton crop top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_tiefront_blouse_casual",
+        "prompt": "casual tie-front fitted blouse",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_bodysuit_scoop",
+        "prompt": "smooth scoop-neck bodysuit-style top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_bodysuit_square",
+        "prompt": "close-fitted square-neck bodysuit-style top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_offshoulder_cotton",
+        "prompt": "simple fitted off-shoulder cotton top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "top_ribbed_henley_crop",
+        "prompt": "fitted ribbed Henley crop top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "allowed_colors": ["color_white", "color_ivory", "color_gray", "color_navy", "color_pink"]
+      },
+      {
+        "id": "top_mockneck_sleeveless",
+        "prompt": "fitted sleeveless mock-neck top",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_white", "color_black", "color_gray", "color_navy", "color_beige"]
+      },
+      {
+        "id": "top_boatneck_jersey",
+        "prompt": "soft fitted boat-neck jersey top",
+        "tags": ["normal_clothes", "casual", "everyday", "home"],
+        "allowed_colors": ["color_white", "color_ivory", "color_gray", "color_navy", "color_burgundy"]
+      },
+      {
+        "id": "top_pointelle_cardigan",
+        "prompt": "light fitted pointelle cardigan",
+        "tags": ["normal_clothes", "casual", "everyday", "home"],
+        "allowed_colors": ["color_white", "color_ivory", "color_beige", "color_pink", "color_lilac"]
+      },
+      {
+        "id": "top_cropped_cardigan",
+        "prompt": "simple cropped button cardigan",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "allowed_colors": ["color_white", "color_ivory", "color_gray", "color_navy", "color_burgundy"]
+      },
+      {
+        "id": "top_fine_knit_polo",
+        "prompt": "close-fitted fine-knit polo top",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_white", "color_ivory", "color_navy", "color_beige", "color_burgundy"]
+      },
+      {
+        "id": "top_waffle_longsleeve",
+        "prompt": "soft fitted waffle-knit long-sleeve top",
+        "tags": ["normal_clothes", "casual", "everyday", "home"],
+        "allowed_colors": ["color_white", "color_ivory", "color_gray", "color_beige", "color_pink"]
+      },
+      {
+        "id": "top_cropped_sweatshirt",
+        "prompt": "plain fitted cropped sweatshirt",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sporty", "sexy_casual"],
+        "allowed_colors": ["color_white", "color_gray", "color_navy", "color_pink", "color_lilac"]
+      },
+      {
+        "id": "top_zip_ribbed_polo",
+        "prompt": "fitted ribbed zip-collar top",
+        "tags": ["normal_clothes", "casual", "everyday", "sporty"],
+        "allowed_colors": ["color_white", "color_black", "color_gray", "color_navy", "color_cobalt"]
+      },
+      {
+        "id": "top_striped_breton",
+        "prompt": "fitted striped Breton shirt",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_white", "color_ivory", "color_navy"]
+      },
+      {
+        "id": "top_chambray_shirt",
+        "prompt": "soft fitted chambray shirt",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_cobalt", "color_navy", "color_gray"]
+      },
+      {
+        "id": "top_knotted_tee",
+        "prompt": "fitted cotton T-shirt knotted at the waist",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "allowed_colors": ["color_white", "color_black", "color_gray", "color_navy", "color_pink"]
+      },
+      {
+        "id": "top_asymmetric_ribbed",
+        "prompt": "fitted asymmetric ribbed top",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "allowed_colors": ["color_white", "color_black", "color_ivory", "color_burgundy", "color_navy"]
+      },
+      {
+        "id": "top_lounge_brushed",
+        "prompt": "soft brushed lounge top",
+        "tags": ["normal_clothes", "casual", "everyday", "home"],
+        "allowed_colors": ["color_white", "color_ivory", "color_gray", "color_beige", "color_pink"]
       }
     ],
     "lowerwear": [
@@ -2307,6 +2625,7 @@
       {
         "id": "lower_yoga_leggings",
         "prompt": "high-waisted fitted yoga leggings",
+        "reveals_cameltoe": true,
         "tags": [
           "home",
           "sporty",
@@ -2498,6 +2817,232 @@
           "color_red",
           "color_leopard"
         ]
+      },
+      {
+        "id": "lower_straight_jeans",
+        "prompt": "straight-leg blue jeans",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_relaxed_jeans",
+        "prompt": "relaxed-fit denim jeans",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_highwaist_jeans",
+        "prompt": "plain high-waisted jeans",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_cutoff_denim_shorts",
+        "prompt": "casual cutoff denim shorts",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_relaxed_denim_shorts",
+        "prompt": "relaxed denim shorts",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_cotton_shorts",
+        "prompt": "plain cotton shorts",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "lower_jersey_shorts",
+        "prompt": "soft jersey lounge shorts",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "lower_bike_shorts",
+        "prompt": "basic fitted bike shorts",
+        "reveals_cameltoe": true,
+        "tags": ["normal_clothes", "casual", "sporty"]
+      },
+      {
+        "id": "lower_denim_skirt",
+        "prompt": "simple denim skirt",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_denim_mini_skirt",
+        "prompt": "casual denim mini skirt",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_cotton_mini_skirt",
+        "prompt": "plain cotton mini skirt",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_aline_skirt",
+        "prompt": "simple A-line skirt",
+        "tags": ["normal_clothes", "casual", "everyday"]
+      },
+      {
+        "id": "lower_jersey_skirt",
+        "prompt": "soft casual jersey skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "lower_plain_joggers",
+        "prompt": "plain cotton joggers",
+        "tags": ["normal_clothes", "casual", "everyday", "home"]
+      },
+      {
+        "id": "lower_skinny_blue_jeans",
+        "prompt": "tight skinny blue jeans",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_skinny_black_jeans",
+        "prompt": "tight black skinny jeans",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_lowrise_jeans",
+        "prompt": "close-fitting low-rise jeans",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_highrise_sculpt_jeans",
+        "prompt": "high-rise body-sculpting jeans",
+        "reveals_cameltoe": true,
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_denim_hotpants",
+        "prompt": "ultra-short fitted denim hot pants",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_highcut_denim_shorts",
+        "prompt": "high-cut close-fitting denim shorts",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_stretch_denim_mini",
+        "prompt": "tight stretch-denim mini skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_cotton_micro_mini",
+        "prompt": "ultra-short fitted cotton mini skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_jersey_micro_skirt",
+        "prompt": "very short body-hugging jersey skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_pleated_micro_casual",
+        "prompt": "ultra-short casual pleated skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_ribbed_leggings",
+        "prompt": "body-contouring ribbed leggings",
+        "reveals_cameltoe": true,
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"]
+      },
+      {
+        "id": "lower_flared_leggings",
+        "prompt": "close-fitted flared leggings",
+        "reveals_cameltoe": true,
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"]
+      },
+      {
+        "id": "lower_shaping_bike_shorts",
+        "prompt": "body-shaping high-waisted bike shorts",
+        "reveals_cameltoe": true,
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"]
+      },
+      {
+        "id": "lower_mom_jeans",
+        "prompt": "casual high-waisted mom jeans",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_cobalt", "color_navy", "color_gray", "color_black"]
+      },
+      {
+        "id": "lower_bootcut_jeans",
+        "prompt": "fitted bootcut denim jeans",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_cobalt", "color_navy", "color_black"]
+      },
+      {
+        "id": "lower_cropped_jeans",
+        "prompt": "slim cropped ankle jeans",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_cobalt", "color_navy", "color_white", "color_black"]
+      },
+      {
+        "id": "lower_denim_culottes",
+        "prompt": "casual cropped denim culottes",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_cobalt", "color_navy", "color_white"]
+      },
+      {
+        "id": "lower_corduroy_mini",
+        "prompt": "simple fitted corduroy mini skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "allowed_colors": ["color_beige", "color_burgundy", "color_navy", "color_chocolate"]
+      },
+      {
+        "id": "lower_buttonfront_denim_skirt",
+        "prompt": "short button-front denim skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "allowed_colors": ["color_cobalt", "color_navy", "color_white", "color_black"]
+      },
+      {
+        "id": "lower_wrap_cotton_mini",
+        "prompt": "short fitted cotton wrap skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "allowed_colors": ["color_white", "color_black", "color_navy", "color_beige", "color_burgundy"]
+      },
+      {
+        "id": "lower_knit_mini_skirt",
+        "prompt": "soft fitted knit mini skirt",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "allowed_colors": ["color_ivory", "color_gray", "color_beige", "color_burgundy", "color_navy"]
+      },
+      {
+        "id": "lower_paperbag_shorts",
+        "prompt": "casual high-waisted paperbag shorts",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_white", "color_beige", "color_navy", "color_gray"]
+      },
+      {
+        "id": "lower_running_shorts",
+        "prompt": "simple fitted running shorts",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sporty"],
+        "allowed_colors": ["color_black", "color_gray", "color_navy", "color_cobalt", "color_pink"]
+      },
+      {
+        "id": "lower_lounge_dolphin_shorts",
+        "prompt": "soft cotton dolphin lounge shorts",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "allowed_colors": ["color_white", "color_gray", "color_navy", "color_pink", "color_lilac"]
+      },
+      {
+        "id": "lower_velour_lounge_shorts",
+        "prompt": "close-fitting velour lounge shorts",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "allowed_colors": ["color_gray", "color_navy", "color_burgundy", "color_pink"]
+      },
+      {
+        "id": "lower_smooth_yoga_leggings",
+        "prompt": "smooth high-waisted yoga leggings",
+        "reveals_cameltoe": true,
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sporty", "sexy_casual"],
+        "allowed_colors": ["color_black", "color_gray", "color_navy", "color_burgundy"]
+      },
+      {
+        "id": "lower_foldover_leggings",
+        "prompt": "fitted fold-over waist leggings",
+        "reveals_cameltoe": true,
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "allowed_colors": ["color_black", "color_gray", "color_navy", "color_chocolate"]
       }
     ],
     "full_body": [
@@ -3179,6 +3724,136 @@
           "color_white",
           "color_red"
         ]
+      },
+      {
+        "id": "dress_casual_bodycon_mini",
+        "prompt": "simple body-hugging cotton mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_ribbed_tank_mini",
+        "prompt": "close-fitting ribbed tank mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_scoopneck_shaping",
+        "prompt": "body-shaping scoop-neck jersey dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_square_neck_mini",
+        "prompt": "fitted square-neck casual mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_cotton_shirt_mini",
+        "prompt": "short fitted cotton shirt dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_tshirt_bodycon",
+        "prompt": "close-fitting short T-shirt dress",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_wrap_jersey_mini",
+        "prompt": "simple fitted wrap-front jersey mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_offshoulder_knit_mini",
+        "prompt": "casual off-shoulder fitted knit mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_denim_fitted_mini",
+        "prompt": "short fitted denim dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_halter_cotton_mini",
+        "prompt": "simple body-hugging cotton halter mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"]
+      },
+      {
+        "id": "dress_ribbed_polo_mini",
+        "prompt": "fitted ribbed polo mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_white", "color_black", "color_navy", "color_beige", "color_burgundy"]
+      },
+      {
+        "id": "dress_buttonfront_jersey",
+        "prompt": "short fitted button-front jersey dress",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_white", "color_gray", "color_navy", "color_beige", "color_pink"]
+      },
+      {
+        "id": "dress_knit_sweater_mini",
+        "prompt": "soft close-fitting sweater mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_ivory", "color_gray", "color_beige", "color_navy", "color_burgundy"]
+      },
+      {
+        "id": "dress_denim_buttonfront",
+        "prompt": "short fitted button-front denim dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_cobalt", "color_navy", "color_white", "color_black"]
+      },
+      {
+        "id": "dress_cotton_cami_mini",
+        "prompt": "simple fitted cotton camisole mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_white", "color_black", "color_gray", "color_navy", "color_pink"]
+      },
+      {
+        "id": "dress_long_sleeve_jersey_mini",
+        "prompt": "close-fitting long-sleeve jersey mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_black", "color_gray", "color_navy", "color_burgundy", "color_chocolate"]
+      },
+      {
+        "id": "dress_scoop_tank_midi",
+        "prompt": "fitted scoop-neck cotton midi dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_white", "color_black", "color_gray", "color_navy", "color_beige"]
+      },
+      {
+        "id": "dress_casual_ruched_mini",
+        "prompt": "simple ruched jersey mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_white", "color_black", "color_navy", "color_burgundy", "color_pink"]
+      },
+      {
+        "id": "dress_hooded_sweatshirt_mini",
+        "prompt": "fitted hooded sweatshirt mini dress",
+        "tags": ["normal_clothes", "casual", "everyday", "home", "sporty", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_gray", "color_navy", "color_black", "color_pink", "color_lilac"]
+      },
+      {
+        "id": "dress_cotton_wrap_day",
+        "prompt": "short casual cotton wrap dress",
+        "tags": ["normal_clothes", "casual", "everyday", "sexy_casual"],
+        "occupies_slots": ["upperwear", "lowerwear"],
+        "allowed_colors": ["color_white", "color_navy", "color_beige", "color_pink", "color_teal"]
       }
     ],
     "bra": [
@@ -3625,6 +4300,7 @@
       {
         "id": "panties_brief",
         "prompt": "smooth fitted panties",
+        "reveals_cameltoe": true,
         "tags": [
           "everyday"
         ],
@@ -3713,6 +4389,7 @@
       {
         "id": "panties_cotton_bikini",
         "prompt": "soft cotton bikini panties",
+        "reveals_cameltoe": true,
         "tags": [
           "everyday",
           "home"
@@ -3731,6 +4408,7 @@
       {
         "id": "panties_seamless",
         "prompt": "seamless low-rise panties",
+        "reveals_cameltoe": true,
         "tags": [
           "everyday"
         ],
@@ -3783,6 +4461,7 @@
       {
         "id": "panties_sport",
         "prompt": "athletic seamless briefs",
+        "reveals_cameltoe": true,
         "tags": [
           "sporty",
           "everyday"
@@ -3801,6 +4480,7 @@
       {
         "id": "panties_high_waist",
         "prompt": "high-waisted shaping panties",
+        "reveals_cameltoe": true,
         "tags": [
           "elegant",
           "lingerie"
@@ -3837,6 +4517,7 @@
       {
         "id": "panties_lace_cheeky",
         "prompt": "cheeky-cut lace panties",
+        "reveals_cameltoe": true,
         "tags": [
           "lace",
           "lingerie",
@@ -3856,6 +4537,7 @@
       {
         "id": "panties_brazilian",
         "prompt": "Brazilian-cut lace panties",
+        "reveals_cameltoe": true,
         "tags": [
           "lace",
           "lingerie",
@@ -4145,6 +4827,102 @@
           "color_leopard",
           "color_black"
         ]
+      },
+      {
+        "id": "panties_lace_bikini",
+        "prompt": "fine floral-lace bikini panties",
+        "reveals_cameltoe": true,
+        "tags": ["lace", "lingerie", "erotic"],
+        "mix_tags": ["lace", "elegant_lingerie"]
+      },
+      {
+        "id": "panties_lace_thong_narrow",
+        "prompt": "narrow delicate lace thong",
+        "tags": ["lace", "lingerie", "erotic"],
+        "mix_tags": ["lace", "erotic_lingerie"]
+      },
+      {
+        "id": "panties_lace_tanga_highcut",
+        "prompt": "high-cut floral-lace tanga panties",
+        "tags": ["lace", "lingerie", "erotic"],
+        "mix_tags": ["lace", "elegant_lingerie"]
+      },
+      {
+        "id": "panties_lace_lowrise",
+        "prompt": "low-rise scalloped lace panties",
+        "reveals_cameltoe": true,
+        "tags": ["lace", "lingerie", "erotic"],
+        "mix_tags": ["lace", "elegant_lingerie"]
+      },
+      {
+        "id": "panties_lace_highleg",
+        "prompt": "high-leg transparent lace panties",
+        "reveals_cameltoe": true,
+        "tags": ["lace", "sheer", "lingerie", "erotic"],
+        "mix_tags": ["lace", "erotic_lingerie"]
+      },
+      {
+        "id": "panties_lace_string",
+        "prompt": "thin side-string lace panties",
+        "tags": ["lace", "lingerie", "erotic"],
+        "mix_tags": ["lace", "erotic_lingerie"]
+      },
+      {
+        "id": "panties_lace_bow",
+        "prompt": "lace panties with small side bows",
+        "tags": ["lace", "lingerie", "romantic"],
+        "mix_tags": ["lace", "soft_lingerie"]
+      },
+      {
+        "id": "panties_lace_embroidered",
+        "prompt": "embroidered lace mesh panties",
+        "tags": ["lace", "sheer", "lingerie", "elegant"],
+        "mix_tags": ["lace", "elegant_lingerie"]
+      },
+      {
+        "id": "panties_lace_vfront",
+        "prompt": "low V-front lace panties",
+        "tags": ["lace", "lingerie", "erotic"],
+        "mix_tags": ["lace", "erotic_lingerie"]
+      },
+      {
+        "id": "panties_lace_cheeky_bow",
+        "prompt": "cheeky lace panties with a back bow",
+        "tags": ["lace", "lingerie", "erotic"],
+        "mix_tags": ["lace", "elegant_lingerie"]
+      },
+      {
+        "id": "panties_sheer_lace_brazilian",
+        "prompt": "sheer Brazilian lace panties",
+        "tags": ["lace", "sheer", "lingerie", "erotic"],
+        "mix_tags": ["lace", "erotic_lingerie"]
+      },
+      {
+        "id": "panties_cotton_thong",
+        "prompt": "simple cotton thong",
+        "reveals_cameltoe": true,
+        "tags": ["everyday", "home", "lingerie"],
+        "mix_tags": ["everyday", "simple"]
+      },
+      {
+        "id": "panties_ribbed_bikini",
+        "prompt": "soft ribbed bikini panties",
+        "reveals_cameltoe": true,
+        "tags": ["everyday", "home"],
+        "mix_tags": ["everyday", "simple"]
+      },
+      {
+        "id": "panties_modal_cheeky",
+        "prompt": "soft modal cheeky panties",
+        "reveals_cameltoe": true,
+        "tags": ["everyday", "home"],
+        "mix_tags": ["everyday", "simple"]
+      },
+      {
+        "id": "panties_satin_bikini",
+        "prompt": "smooth satin bikini panties",
+        "tags": ["silk", "lingerie", "elegant"],
+        "mix_tags": ["silk", "soft_lingerie"]
       }
     ],
     "legwear": [
@@ -4615,7 +5393,8 @@
         "prompt": "clean low-top sneakers",
         "tags": [
           "casual",
-          "everyday"
+          "everyday",
+          "normal_clothes"
         ],
         "allowed_colors": [
           "color_white",
@@ -4907,6 +5686,54 @@
           "color_pink",
           "color_ivory"
         ]
+      },
+      {
+        "id": "shoes_canvas_sneakers",
+        "prompt": "simple low-top canvas sneakers",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_white", "color_black", "color_gray", "color_navy"]
+      },
+      {
+        "id": "shoes_retro_trainers",
+        "prompt": "clean retro casual trainers",
+        "tags": ["normal_clothes", "casual", "everyday", "sporty"],
+        "allowed_colors": ["color_white", "color_gray", "color_navy", "color_beige"]
+      },
+      {
+        "id": "shoes_slipon_sneakers",
+        "prompt": "plain canvas slip-on sneakers",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_white", "color_black", "color_gray", "color_navy"]
+      },
+      {
+        "id": "shoes_casual_loafers",
+        "prompt": "simple flat casual loafers",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_black", "color_beige", "color_chocolate", "color_navy"]
+      },
+      {
+        "id": "shoes_maryjane_flats",
+        "prompt": "simple flat Mary Jane shoes",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_black", "color_beige", "color_burgundy", "color_chocolate"]
+      },
+      {
+        "id": "shoes_flat_sandals",
+        "prompt": "minimal flat leather sandals",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_black", "color_white", "color_beige", "color_tan", "color_chocolate"]
+      },
+      {
+        "id": "shoes_casual_ankle_boots",
+        "prompt": "simple low-heeled ankle boots",
+        "tags": ["normal_clothes", "casual", "everyday"],
+        "allowed_colors": ["color_black", "color_gray", "color_chocolate", "color_burgundy"]
+      },
+      {
+        "id": "shoes_house_slides",
+        "prompt": "simple soft house slides",
+        "tags": ["normal_clothes", "casual", "everyday", "home"],
+        "allowed_colors": ["color_white", "color_gray", "color_beige", "color_pink"]
       }
     ],
     "outerwear": [
@@ -5223,6 +6050,9 @@
           "swimwear",
           "casual"
         ],
+        "requires_environment_tags": [
+          "outdoor"
+        ],
         "allowed_colors": [
           "color_black",
           "color_chocolate"
@@ -5320,13 +6150,15 @@
   "outfit_templates": [
     {
       "id": "template_everyday_casual",
+      "wardrobe_category": "normal",
       "weight": 2,
       "slots": {
         "upperwear": {
           "catalog": "upperwear",
           "required": true,
           "required_tags": [
-            "casual"
+            "casual",
+            "normal_clothes"
           ],
           "color_group": "main"
         },
@@ -5334,7 +6166,8 @@
           "catalog": "lowerwear",
           "required": true,
           "required_tags": [
-            "casual"
+            "casual",
+            "normal_clothes"
           ]
         },
         "bra": {
@@ -5343,23 +6176,46 @@
           "required_tags": [
             "everyday"
           ],
-          "color_group": "lingerie",
-          "match_group": "lingerie"
+          "color_group": "lingerie"
         },
         "panties": {
           "catalog": "panties",
           "required": true,
-          "required_tags": [
-            "everyday"
+          "required_any_tags": [
+            "everyday",
+            "lace"
           ],
-          "color_group": "lingerie",
-          "match_group": "lingerie"
+          "excludes_tags": [
+            "fetish",
+            "explicit",
+            "leather",
+            "luxury"
+          ],
+          "color_group": "lingerie"
+        },
+        "legwear": {
+          "catalog": "legwear",
+          "required": false,
+          "chance": 0.7,
+          "required_any_tags": [
+            "socks",
+            "pantyhose",
+            "stockings",
+            "fishnet"
+          ],
+          "excludes_tags": [
+            "fetish",
+            "explicit",
+            "leather",
+            "luxury"
+          ]
         },
         "footwear": {
           "catalog": "footwear",
           "required": true,
           "required_tags": [
-            "casual"
+            "casual",
+            "normal_clothes"
           ]
         }
       },
@@ -5370,6 +6226,7 @@
           "visible_slots": [
             "upperwear",
             "lowerwear",
+            "legwear",
             "footwear"
           ],
           "body_visibility": []
@@ -5379,7 +6236,8 @@
           "level": "lingerie",
           "visible_slots": [
             "bra",
-            "panties"
+            "panties",
+            "legwear"
           ],
           "body_visibility": []
         }
@@ -5387,6 +6245,7 @@
     },
     {
       "id": "template_office_elegant",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -5485,6 +6344,7 @@
     },
     {
       "id": "template_cocktail_dress",
+      "wardrobe_category": "glamour",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -5567,6 +6427,7 @@
     },
     {
       "id": "template_evening_gown",
+      "wardrobe_category": "glamour",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -5648,6 +6509,7 @@
     },
     {
       "id": "template_romantic_bedroom",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -5721,6 +6583,7 @@
     },
     {
       "id": "template_classic_boudoir",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "bra": {
@@ -5812,6 +6675,7 @@
     },
     {
       "id": "template_stockings_garter",
+      "wardrobe_category": "glamour",
       "slots": {
         "bra": {
           "catalog": "bra",
@@ -5901,6 +6765,7 @@
     },
     {
       "id": "template_progressive_undressing",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -6015,6 +6880,7 @@
     },
     {
       "id": "template_nude_studio",
+      "wardrobe_category": "glamour",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -6068,6 +6934,7 @@
     },
     {
       "id": "template_explicit_solo",
+      "wardrobe_category": "glamour",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -6166,35 +7033,55 @@
     },
     {
       "id": "template_cozy_home",
+      "wardrobe_category": "normal",
       "weight": 2,
       "slots": {
         "upperwear": {
           "catalog": "upperwear",
           "required": true,
           "required_tags": [
-            "home"
+            "home",
+            "normal_clothes"
           ]
         },
         "lowerwear": {
           "catalog": "lowerwear",
           "required": true,
           "required_tags": [
-            "home"
+            "home",
+            "normal_clothes"
           ]
         },
         "panties": {
           "catalog": "panties",
           "required": true,
-          "required_tags": [
-            "home"
+          "required_any_tags": [
+            "everyday",
+            "home",
+            "lace"
+          ],
+          "excludes_tags": [
+            "fetish",
+            "explicit",
+            "leather",
+            "luxury"
           ]
         },
         "legwear": {
           "catalog": "legwear",
           "required": false,
           "chance": 0.75,
-          "required_tags": [
-            "socks"
+          "required_any_tags": [
+            "socks",
+            "pantyhose",
+            "stockings",
+            "fishnet"
+          ],
+          "excludes_tags": [
+            "fetish",
+            "explicit",
+            "leather",
+            "luxury"
           ]
         },
         "footwear": {
@@ -6231,7 +7118,61 @@
       ]
     },
     {
+      "id": "template_sexy_casual_dress",
+      "wardrobe_category": "normal",
+      "weight": 2,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_tags": ["normal_clothes", "sexy_casual"]
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": ["everyday"],
+          "color_group": "lingerie"
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_any_tags": ["everyday", "lace"],
+          "excludes_tags": ["fetish", "explicit", "leather", "luxury"],
+          "color_group": "lingerie"
+        },
+        "legwear": {
+          "catalog": "legwear",
+          "required": false,
+          "chance": 0.7,
+          "required_any_tags": ["socks", "pantyhose", "stockings", "fishnet"],
+          "excludes_tags": ["fetish", "explicit", "leather", "luxury"]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.65,
+          "required_any_tags": ["casual", "everyday", "home"],
+          "excludes_tags": ["fetish", "luxury"]
+        }
+      },
+      "stages": [
+        {
+          "id": "sexy_casual_dressed",
+          "level": "covered",
+          "visible_slots": ["full_body", "legwear", "footwear"],
+          "body_visibility": []
+        },
+        {
+          "id": "sexy_casual_lingerie",
+          "level": "lingerie",
+          "visible_slots": ["bra", "panties", "legwear"],
+          "body_visibility": []
+        }
+      ]
+    },
+    {
       "id": "template_bathrobe_private",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -6300,6 +7241,7 @@
     },
     {
       "id": "template_private_garden",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -6365,6 +7307,7 @@
     },
     {
       "id": "template_poolside_swimwear",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -6425,6 +7368,7 @@
     },
     {
       "id": "template_luxury_lingerie",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "bra": {
@@ -6511,6 +7455,7 @@
     },
     {
       "id": "template_fishnet_fetish",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -6586,6 +7531,7 @@
     },
     {
       "id": "template_leather_editorial",
+      "wardrobe_category": "glamour",
       "slots": {
         "upperwear": {
           "catalog": "upperwear",
@@ -6671,6 +7617,7 @@
     },
     {
       "id": "template_playful_socks",
+      "wardrobe_category": "glamour",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -6861,7 +7808,8 @@
         "indoor",
         "garden",
         "romantic",
-        "private"
+        "private",
+        "luxury"
       ]
     },
     {
@@ -6881,7 +7829,8 @@
         "indoor",
         "bathroom",
         "intimate",
-        "spa"
+        "spa",
+        "luxury"
       ]
     },
     {
@@ -6901,8 +7850,117 @@
         "indoor",
         "pool",
         "spa",
-        "private"
+        "private",
+        "luxury"
       ]
+    },
+    {
+      "id": "interior_small_apartment_bedroom",
+      "prompt": "inside a small everyday apartment bedroom",
+      "weight": 1.25,
+      "tags": ["indoor", "bedroom", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_ordinary_apartment_bedroom",
+      "prompt": "inside an ordinary lived-in apartment bedroom",
+      "weight": 1.25,
+      "tags": ["indoor", "bedroom", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_rental_bedroom",
+      "prompt": "inside a simple rented apartment bedroom",
+      "weight": 1.2,
+      "tags": ["indoor", "bedroom", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_spare_bedroom",
+      "prompt": "inside a modest private spare bedroom",
+      "weight": 1.15,
+      "tags": ["indoor", "bedroom", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_suburban_bedroom",
+      "prompt": "inside a normal suburban home bedroom",
+      "weight": 1.2,
+      "tags": ["indoor", "bedroom", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_older_apartment_bedroom",
+      "prompt": "inside a tidy older apartment bedroom",
+      "weight": 1.15,
+      "tags": ["indoor", "bedroom", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_compact_studio_apartment",
+      "prompt": "inside a compact one-room studio apartment",
+      "weight": 1.25,
+      "tags": ["indoor", "bedroom", "living_room", "studio", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_simple_studio_flat",
+      "prompt": "inside a simple open-plan studio flat",
+      "weight": 1.2,
+      "tags": ["indoor", "bedroom", "living_room", "studio", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_small_apartment_living_room",
+      "prompt": "inside a small everyday apartment living room",
+      "weight": 1.25,
+      "tags": ["indoor", "living_room", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_ordinary_living_room",
+      "prompt": "inside an ordinary comfortable home living room",
+      "weight": 1.25,
+      "tags": ["indoor", "living_room", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_rental_living_room",
+      "prompt": "inside a modest rented apartment living room",
+      "weight": 1.2,
+      "tags": ["indoor", "living_room", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_older_apartment_living_room",
+      "prompt": "inside a tidy older apartment living room",
+      "weight": 1.15,
+      "tags": ["indoor", "living_room", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_compact_apartment_kitchen",
+      "prompt": "inside a compact everyday apartment kitchen",
+      "weight": 1.2,
+      "tags": ["indoor", "kitchen", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_ordinary_home_kitchen",
+      "prompt": "inside an ordinary practical home kitchen",
+      "weight": 1.2,
+      "tags": ["indoor", "kitchen", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_small_apartment_bathroom",
+      "prompt": "inside a small clean apartment bathroom",
+      "weight": 1.15,
+      "tags": ["indoor", "bathroom", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_ordinary_home_bathroom",
+      "prompt": "inside an ordinary tiled home bathroom",
+      "weight": 1.15,
+      "tags": ["indoor", "bathroom", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_apartment_home_office",
+      "prompt": "inside a simple private apartment home office",
+      "weight": 1.1,
+      "tags": ["indoor", "studio", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_apartment_hallway",
+      "prompt": "inside a quiet ordinary apartment hallway",
+      "weight": 1.05,
+      "tags": ["indoor", "hallway", "apartment", "home", "everyday", "private"]
     },
     {
       "id": "interior_garden_patio",
@@ -7043,16 +8101,86 @@
       ]
     },
     {
+      "id": "furniture_simple_double_bed",
+      "prompt": "on a simple double bed with cotton sheets",
+      "tags": ["bed", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["bedroom"]
+    },
+    {
+      "id": "furniture_unmade_home_bed",
+      "prompt": "on a casually unmade everyday bed",
+      "tags": ["bed", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["bedroom"]
+    },
+    {
+      "id": "furniture_compact_fabric_sofa",
+      "prompt": "on a compact fabric sofa",
+      "tags": ["sofa", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["living_room"]
+    },
+    {
+      "id": "furniture_worn_home_sofa",
+      "prompt": "on a comfortable slightly worn home sofa",
+      "tags": ["sofa", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["living_room"]
+    },
+    {
+      "id": "furniture_simple_wooden_chair",
+      "prompt": "beside a simple wooden chair",
+      "tags": ["chair", "sitting_surface", "everyday"],
+      "requires_tags": ["indoor"],
+      "requires_any_tags": ["bedroom", "living_room", "studio", "kitchen", "hallway"]
+    },
+    {
+      "id": "furniture_small_home_armchair",
+      "prompt": "in a small comfortable home armchair",
+      "tags": ["chair", "sitting_surface", "everyday"],
+      "requires_tags": ["indoor"],
+      "requires_any_tags": ["bedroom", "living_room", "studio"]
+    },
+    {
+      "id": "furniture_thin_apartment_rug",
+      "prompt": "on a simple woven apartment rug",
+      "tags": ["floor", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["indoor"]
+    },
+    {
+      "id": "furniture_laminate_counter",
+      "prompt": "beside a clean laminate kitchen counter",
+      "tags": ["counter", "sitting_surface", "standing_area", "everyday"],
+      "requires_tags": ["kitchen"]
+    },
+    {
+      "id": "furniture_standard_bathtub",
+      "prompt": "in a standard built-in bathtub",
+      "tags": ["bathtub", "lying_surface", "sitting_surface", "wet_surface", "everyday"],
+      "requires_tags": ["bathroom"]
+    },
+    {
+      "id": "furniture_tiled_shower_wall",
+      "prompt": "against a clean tiled shower wall",
+      "tags": ["wall", "standing_area", "wet_surface", "everyday"],
+      "requires_tags": ["bathroom"]
+    },
+    {
+      "id": "furniture_narrow_windowsill",
+      "prompt": "beside a narrow apartment windowsill",
+      "tags": ["window", "standing_area", "everyday"],
+      "requires_tags": ["indoor", "apartment"]
+    },
+    {
       "id": "furniture_canopy_bed",
       "prompt": "on a luxurious canopy bed with rumpled linen sheets",
       "tags": [
         "bed",
         "lying_surface",
         "sitting_surface",
-        "intimate"
+        "intimate",
+        "luxury"
       ],
       "requires_tags": [
-        "bedroom"
+        "bedroom",
+        "luxury"
       ]
     },
     {
@@ -7065,7 +8193,8 @@
         "luxury"
       ],
       "requires_tags": [
-        "bedroom"
+        "bedroom",
+        "luxury"
       ]
     },
     {
@@ -7078,7 +8207,8 @@
         "luxury"
       ],
       "requires_tags": [
-        "indoor"
+        "indoor",
+        "luxury"
       ],
       "requires_any_tags": [
         "bedroom",
@@ -7107,7 +8237,8 @@
         "luxury"
       ],
       "requires_tags": [
-        "indoor"
+        "indoor",
+        "luxury"
       ],
       "requires_any_tags": [
         "bedroom",
@@ -7267,7 +8398,7 @@
   "poses": [
     {
       "id": "pose_standing_front",
-      "prompt": "standing in a poised front-facing fashion pose",
+      "prompt": "standing naturally and facing the camera",
       "tags": [
         "standing"
       ],
@@ -7819,7 +8950,7 @@
     },
     {
       "id": "pose_nude_knees_apart",
-      "prompt": "seated nude with knees held apart in a confident editorial pose",
+      "prompt": "seated nude with knees held apart in a relaxed confident pose",
       "tags": [
         "sitting",
         "open_legs",
@@ -8117,22 +9248,183 @@
         "explicit"
       ]
     },
-    {
-      "id": "pose_closeup_spread_rear",
-      "prompt": "extreme rear intimate close-up with buttocks deliberately held apart",
-      "tags": [
-        "explicit_pose",
-        "intimate_closeup",
-        "provocative_rear",
-        "open_legs"
+      {
+        "id": "pose_closeup_spread_rear",
+        "prompt": "tight eye-level rear three-quarter close-up, lower back, hips, pelvis and upper thighs aligned naturally, torso and pelvis both facing away from the camera, legs apart",
+        "tags": [
+          "explicit_pose",
+          "provocative_rear",
+          "open_legs"
       ],
       "requires_tags": [
         "genitals"
       ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    }
+        "allowed_levels": [
+          "explicit"
+        ]
+      },
+      {
+        "id": "pose_window_daydream",
+        "prompt": "standing beside the window with one shoulder turned toward the camera",
+        "tags": ["standing", "fashion"],
+        "requires_tags": ["window"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_relaxed_weight_shift",
+        "prompt": "standing casually with her weight shifted onto one hip",
+        "tags": ["standing", "fashion"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_arms_overhead_stretch",
+        "prompt": "standing in a relaxed full-body stretch with both arms overhead",
+        "tags": ["standing", "fashion"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_floor_crosslegged",
+        "prompt": "sitting casually cross-legged on the floor with a relaxed posture",
+        "tags": ["sitting", "floor_pose"],
+        "requires_tags": ["floor"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_chair_sideways",
+        "prompt": "sitting sideways on the chair with one arm resting on its back",
+        "tags": ["sitting", "fashion"],
+        "requires_tags": ["sitting_surface", "chair"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_sofa_knees_tucked",
+        "prompt": "sitting comfortably on the sofa with both knees tucked to one side",
+        "tags": ["sitting", "home_pose"],
+        "requires_tags": ["sitting_surface", "sofa"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_bed_sitting_relaxed",
+        "prompt": "sitting naturally near the bed edge with her hands resting beside her",
+        "tags": ["sitting", "home_pose"],
+        "requires_tags": ["sitting_surface", "bed"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_floor_one_knee_up",
+        "prompt": "sitting on the floor with one knee raised and the other leg relaxed",
+        "tags": ["sitting", "floor_pose", "fashion"],
+        "requires_tags": ["floor"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_casual_half_turn",
+        "prompt": "caught in a natural half-turn with her hair and clothes softly in motion",
+        "tags": ["standing", "fashion"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_wall_one_knee",
+        "prompt": "leaning against the wall with one knee bent and foot resting behind her",
+        "tags": ["standing", "wall", "fashion"],
+        "requires_tags": ["wall"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_recline_head_on_hand",
+        "prompt": "reclining on her side with her head supported by one hand",
+        "tags": ["lying", "side_pose", "home_pose"],
+        "requires_tags": ["lying_surface"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_kneeling_casual_turn",
+        "prompt": "kneeling comfortably with her torso turned in a casual three-quarter angle",
+        "tags": ["kneeling", "fashion"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "pose_explicit_rear_wall_arch",
+        "prompt": "rear-facing against the wall with a deep hip arch and legs apart",
+        "tags": ["explicit_pose", "provocative_rear", "open_legs", "standing", "wall"],
+        "requires_tags": ["wall"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_explicit_rear_bed_edge",
+        "prompt": "kneeling at the bed edge facing away with hips raised toward the camera",
+        "tags": ["explicit_pose", "provocative_rear", "open_legs", "kneeling"],
+        "requires_tags": ["lying_surface", "bed"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_explicit_rear_squat",
+        "prompt": "rear-facing in a deep wide squat while looking back toward the camera",
+        "tags": ["explicit_pose", "provocative_rear", "open_legs", "squatting"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_explicit_rear_sidebend",
+        "prompt": "rear-facing with legs apart and torso bent diagonally across the frame",
+        "tags": ["explicit_pose", "provocative_rear", "open_legs", "standing"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_closeup_thigh_frame",
+        "prompt": "tight frontal crop framed between widely opened thighs",
+        "tags": ["explicit_pose", "intimate_closeup", "open_legs"],
+        "requires_tags": ["genitals"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_closeup_side_intimate",
+        "prompt": "tight side-angle intimate close-up with one knee lifted out of frame",
+        "tags": ["explicit_pose", "intimate_closeup", "open_legs"],
+        "requires_tags": ["genitals"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_closeup_breasts_overhead",
+        "prompt": "tight overhead torso crop emphasizing both exposed breasts",
+        "tags": ["explicit_pose", "intimate_closeup", "breast_focus"],
+        "requires_tags": ["breasts", "nipples"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_closeup_breasts_side",
+        "prompt": "tight side-angle breast close-up with her torso gently twisted",
+        "tags": ["explicit_pose", "intimate_closeup", "breast_focus"],
+        "requires_tags": ["breasts", "nipples"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_masturbation_floor_recline",
+        "prompt": "reclining on the floor with knees wide and one hand between her thighs",
+        "tags": ["explicit_pose", "masturbation_pose", "open_legs", "lying"],
+        "requires_tags": ["floor", "genitals"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_masturbation_chair_edge",
+        "prompt": "perched at the chair edge with hips forward, legs wide, and one hand between her thighs",
+        "tags": ["explicit_pose", "masturbation_pose", "open_legs", "sitting"],
+        "requires_tags": ["sitting_surface", "chair", "genitals"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_masturbation_side_recline",
+        "prompt": "reclining on one side with the upper knee raised and one hand visibly between her thighs",
+        "tags": ["explicit_pose", "masturbation_pose", "open_legs", "lying", "side_pose"],
+        "requires_tags": ["lying_surface", "genitals"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "pose_masturbation_knees_raised",
+        "prompt": "lying back with both knees raised and spread while one hand reaches between her thighs",
+        "tags": ["explicit_pose", "masturbation_pose", "open_legs", "lying"],
+        "requires_tags": ["lying_surface", "genitals"],
+        "allowed_levels": ["explicit"]
+      }
   ],
   "actions": [
     {
@@ -8530,6 +9822,14 @@
       ]
     },
     {
+      "id": "action_pull_panties_aside",
+      "prompt": "pulling the narrow crotch of her panties aside with one hand to expose her vulva",
+      "tags": ["explicit_action", "panties_aside_action", "explicit"],
+      "requires_tags": ["panties", "genitals", "open_legs"],
+      "requires_expression_tags": ["aroused_expression"],
+      "allowed_levels": ["explicit"]
+    },
+    {
       "id": "action_rear_cheek_spread",
       "prompt": "using both hands to pull her buttocks apart for an explicit rear display",
       "tags": [
@@ -8658,8 +9958,8 @@
         "explicit"
       ]
     },
-    {
-      "id": "action_orgasmic_tension",
+      {
+        "id": "action_orgasmic_tension",
       "prompt": "tensing her thighs around her hand at the visible peak of stimulation",
       "tags": [
         "explicit_action",
@@ -8673,10 +9973,179 @@
       "requires_expression_tags": [
         "intense_pleasure_expression"
       ],
-      "allowed_levels": [
-        "explicit"
-      ]
-    }
+        "allowed_levels": [
+          "explicit"
+        ]
+      },
+      {
+        "id": "action_tuck_hair",
+        "prompt": "casually tucking a loose strand of hair behind one ear",
+        "tags": ["fashion_action"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "action_smooth_top",
+        "prompt": "naturally smoothing the front of her top with one hand",
+        "tags": ["fashion_action"],
+        "requires_tags": ["upperwear"],
+        "allowed_levels": ["covered"]
+      },
+      {
+        "id": "action_adjust_waistband",
+        "prompt": "casually adjusting the waistband of her everyday clothes",
+        "tags": ["fashion_action"],
+        "requires_tags": ["lowerwear"],
+        "allowed_levels": ["covered"]
+      },
+      {
+        "id": "action_hands_at_waist",
+        "prompt": "resting both hands casually at her waist",
+        "tags": ["fashion_action"],
+        "allowed_levels": ["covered"]
+      },
+      {
+        "id": "action_touch_wrist",
+        "prompt": "casually resting one hand around her opposite wrist",
+        "tags": ["fashion_action"],
+        "allowed_levels": ["covered"]
+      },
+      {
+        "id": "action_relaxed_stretch",
+        "prompt": "lifting both arms in an easy relaxed stretch",
+        "tags": ["fashion_action"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "action_glance_away",
+        "prompt": "glancing naturally away from the camera as if caught between poses",
+        "tags": ["fashion_action"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "action_lean_forward_relaxed",
+        "prompt": "leaning slightly forward with a relaxed candid posture",
+        "tags": ["fashion_action"],
+        "allowed_levels": ["covered", "lingerie"]
+      },
+      {
+        "id": "action_hand_on_thigh",
+        "prompt": "resting one hand softly along her upper thigh",
+        "tags": ["sensual_action", "erotic_action"],
+        "requires_expression_tags": ["aroused_expression"],
+        "allowed_levels": ["lingerie", "topless", "nude"]
+      },
+      {
+        "id": "action_trace_collarbone",
+        "prompt": "slowly tracing her fingertips along her collarbone",
+        "tags": ["sensual_action", "erotic_action"],
+        "allowed_levels": ["lingerie", "topless", "nude"]
+      },
+      {
+        "id": "action_gather_hair",
+        "prompt": "gathering her hair above her neck with both hands",
+        "tags": ["sensual_action", "erotic_action"],
+        "allowed_levels": ["lingerie", "topless", "nude"]
+      },
+      {
+        "id": "action_slide_hand_hip",
+        "prompt": "slowly sliding one hand from her waist across the curve of her hip",
+        "tags": ["sensual_action", "erotic_action"],
+        "requires_expression_tags": ["aroused_expression"],
+        "allowed_levels": ["lingerie", "topless", "nude"]
+      },
+      {
+        "id": "action_rear_hands_on_hips",
+        "prompt": "planting both hands on her hips while deliberately presenting a strong rear arch",
+        "tags": ["explicit_action", "provocative_action", "explicit"],
+        "requires_expression_tags": ["aroused_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_rear_lookback_smile",
+        "prompt": "holding the rear-facing display while giving the camera a provocative look back",
+        "tags": ["explicit_action", "provocative_action", "explicit"],
+        "requires_expression_tags": ["aroused_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_rear_lift_one_cheek",
+        "prompt": "lifting one buttock with her hand to intensify the explicit rear display",
+        "tags": ["explicit_action", "provocative_action", "explicit"],
+        "requires_expression_tags": ["aroused_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_rear_thighs_open",
+        "prompt": "pressing her thighs farther apart while maintaining the rear-facing pose",
+        "tags": ["explicit_action", "provocative_action", "explicit"],
+        "requires_tags": ["open_legs"],
+        "requires_expression_tags": ["aroused_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_frame_breasts",
+        "prompt": "framing both exposed breasts closely with her hands for the camera",
+        "tags": ["explicit_action", "closeup_action", "explicit"],
+        "requires_tags": ["breasts", "nipples", "breast_focus"],
+        "requires_expression_tags": ["aroused_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_breast_pressure",
+        "prompt": "pressing both exposed breasts upward and inward with her forearms",
+        "tags": ["explicit_action", "closeup_action", "explicit"],
+        "requires_tags": ["breasts", "nipples", "breast_focus"],
+        "requires_expression_tags": ["pleasure_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_intimate_hold_open",
+        "prompt": "holding her exposed intimate anatomy open steadily for the tight camera framing",
+        "tags": ["explicit_action", "closeup_action", "explicit"],
+        "requires_tags": ["genitals", "open_legs"],
+        "requires_expression_tags": ["aroused_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_intimate_trace",
+        "prompt": "slowly tracing her fingertips around her exposed intimate anatomy in close-up",
+        "tags": ["explicit_action", "closeup_action", "explicit"],
+        "requires_tags": ["genitals", "open_legs"],
+        "requires_expression_tags": ["pleasure_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_slow_finger_rub",
+        "prompt": "slowly rubbing herself with two fingers while keeping her thighs spread",
+        "tags": ["explicit_action", "masturbation_action", "explicit"],
+        "requires_tags": ["genitals", "open_legs"],
+        "requires_expression_tags": ["pleasure_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_one_hand_stimulation",
+        "prompt": "maintaining focused one-handed intimate stimulation with her body fully visible",
+        "tags": ["explicit_action", "masturbation_action", "explicit"],
+        "requires_tags": ["genitals", "open_legs"],
+        "requires_expression_tags": ["pleasure_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_breast_clitoral_play",
+        "prompt": "cupping one breast while visibly rubbing her exposed clitoris with the other hand",
+        "tags": ["explicit_action", "masturbation_action", "explicit"],
+        "requires_tags": ["breasts", "genitals", "open_legs"],
+        "requires_expression_tags": ["intense_pleasure_expression"],
+        "allowed_levels": ["explicit"]
+      },
+      {
+        "id": "action_peak_body_tension",
+        "prompt": "arching and visibly tensing her body around her stimulating hand at the peak",
+        "tags": ["explicit_action", "masturbation_action", "explicit"],
+        "requires_tags": ["genitals", "open_legs"],
+        "requires_expression_tags": ["intense_pleasure_expression"],
+        "allowed_levels": ["explicit"]
+      }
   ],
   "props": [
     {
@@ -8805,17 +10274,26 @@
         "explicit"
       ]
     },
-    {
-      "id": "prop_feather",
-      "prompt": "holding a long soft decorative feather",
+      {
+        "id": "prop_feather",
+        "prompt": "holding a long soft decorative feather",
       "tags": [
         "boudoir_prop",
         "erotic_prop"
       ],
-      "excludes_tags": [
-        "explicit"
-      ]
-    }
+        "excludes_tags": [
+          "explicit"
+        ]
+      },
+      {
+        "id": "prop_teddy_bear",
+        "prompt": "holding a soft cuddly teddy bear close to her chest",
+        "tags": [
+          "home_prop",
+          "casual_prop",
+          "playful_prop"
+        ]
+      }
   ],
   "expressions": [
     {
@@ -8908,101 +10386,197 @@
   "moods": [
     {
       "id": "mood_bright_fashion",
-      "prompt": "bright polished fashion mood"
+      "prompt": "bright polished fashion mood",
+      "menu_label": "Bright fashion",
+      "menu_group": "Editorial"
     },
     {
       "id": "mood_warm_intimate",
-      "prompt": "warm intimate atmosphere"
+      "prompt": "warm intimate atmosphere",
+      "menu_label": "Warm intimate",
+      "menu_group": "Romantic"
     },
     {
       "id": "mood_luxurious",
-      "prompt": "luxurious sophisticated atmosphere"
+      "prompt": "luxurious sophisticated atmosphere",
+      "menu_label": "Luxury mood",
+      "menu_group": "Editorial"
     },
     {
       "id": "mood_moody",
-      "prompt": "moody cinematic atmosphere"
+      "prompt": "moody cinematic atmosphere",
+      "menu_label": "Cinematic mood",
+      "menu_group": "Editorial"
     },
     {
       "id": "mood_cozy_morning",
-      "prompt": "cozy unhurried private-morning atmosphere"
+      "prompt": "cozy unhurried private-morning atmosphere",
+      "menu_label": "Cozy morning",
+      "menu_group": "Everyday"
     },
     {
       "id": "mood_romantic",
-      "prompt": "soft romantic and deeply intimate atmosphere"
+      "prompt": "soft romantic and deeply intimate atmosphere",
+      "menu_label": "Soft romantic",
+      "menu_group": "Romantic"
     },
     {
       "id": "mood_playful",
-      "prompt": "playful flirtatious editorial mood"
+      "prompt": "playful flirtatious editorial mood",
+      "menu_label": "Playful flirt",
+      "menu_group": "Romantic"
     },
     {
       "id": "mood_sensual",
-      "prompt": "confident sensual adults-only magazine atmosphere"
+      "prompt": "confident sensual adults-only magazine atmosphere",
+      "menu_label": "Sensual magazine",
+      "menu_group": "Editorial"
     },
     {
       "id": "mood_fetish_luxury",
-      "prompt": "dark polished luxury-fetish atmosphere"
+      "prompt": "dark polished luxury-fetish atmosphere",
+      "menu_label": "Fetish luxury",
+      "menu_group": "Editorial"
     },
     {
       "id": "mood_summer_private",
-      "prompt": "warm secluded summer-retreat atmosphere"
+      "prompt": "warm secluded summer-retreat atmosphere",
+      "menu_label": "Private summer",
+      "menu_group": "Everyday"
+    },
+    {
+      "id": "mood_everyday_relaxed",
+      "prompt": "relaxed ordinary day-at-home atmosphere",
+      "menu_label": "Relaxed home",
+      "menu_group": "Everyday"
+    },
+    {
+      "id": "mood_ordinary_afternoon",
+      "prompt": "quiet everyday afternoon at home",
+      "menu_label": "Quiet afternoon",
+      "menu_group": "Everyday"
+    },
+    {
+      "id": "mood_casual_private",
+      "prompt": "casual unposed private moment",
+      "menu_label": "Casual private",
+      "menu_group": "Everyday"
     }
   ],
   "photography_styles": [
     {
       "id": "photo_soft_window",
-      "prompt": "soft natural window light, 85mm portrait lens"
+      "prompt": "soft natural window light, 85mm portrait lens",
+      "menu_label": "Soft window",
+      "menu_group": "Amateur"
     },
     {
       "id": "photo_studio_beauty",
-      "prompt": "controlled beauty lighting, professional studio photograph"
+      "prompt": "controlled beauty lighting, professional studio photograph",
+      "menu_label": "Studio beauty",
+      "menu_group": "Studio"
     },
     {
       "id": "photo_cinematic",
-      "prompt": "cinematic directional lighting, shallow depth of field"
+      "prompt": "cinematic directional lighting, shallow depth of field",
+      "menu_label": "Cinematic light",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_boudoir",
-      "prompt": "soft boudoir lighting, flattering skin highlights"
+      "prompt": "soft boudoir lighting, flattering skin highlights",
+      "menu_label": "Soft boudoir",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_editorial",
-      "prompt": "high-end editorial fashion photography"
+      "prompt": "high-end editorial fashion photography",
+      "menu_label": "Fashion editorial",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_morning_lifestyle",
-      "prompt": "bright diffused morning window light, premium lifestyle editorial photography"
+      "prompt": "bright diffused morning window light, premium lifestyle editorial photography",
+      "menu_label": "Morning lifestyle",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_golden_hour",
-      "prompt": "warm private-garden golden-hour light, creamy background separation"
+      "prompt": "warm private-garden golden-hour light, creamy background separation",
+      "menu_label": "Golden hour",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_poolside",
-      "prompt": "crisp reflected pool light, luxury swimwear campaign photography"
+      "prompt": "crisp reflected pool light, luxury swimwear campaign photography",
+      "menu_label": "Pool campaign",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_lowkey_erotic",
-      "prompt": "low-key sculpting light with controlled highlights, premium erotic editorial"
+      "prompt": "low-key sculpting light with controlled highlights, premium erotic editorial",
+      "menu_label": "Low-key erotic",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_flash_magazine",
-      "prompt": "direct polished magazine flash, precise skin texture, bold high-fashion finish"
+      "prompt": "direct polished magazine flash, precise skin texture, bold high-fashion finish",
+      "menu_label": "Magazine flash",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_satin_boudoir",
-      "prompt": "warm bedside practical lights reflected across satin, premium boudoir photography"
+      "prompt": "warm bedside practical lights reflected across satin, premium boudoir photography",
+      "menu_label": "Satin boudoir",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_macro_intimate",
-      "prompt": "clinical-quality macro detail with soft flattering diffusion and precise anatomical focus"
+      "prompt": "clinical-quality macro detail with soft flattering diffusion and precise anatomical focus",
+      "menu_label": "Intimate macro",
+      "menu_group": "Explicit"
     },
     {
       "id": "photo_film_grain",
-      "prompt": "fine 35mm film grain, rich color separation, art-book editorial finish"
+      "prompt": "fine 35mm film grain, rich color separation, art-book editorial finish",
+      "menu_label": "Film grain",
+      "menu_group": "Editorial"
     },
     {
       "id": "photo_spa_soft",
-      "prompt": "humid diffused spa light, luminous skin highlights, luxury wellness campaign finish"
+      "prompt": "humid diffused spa light, luminous skin highlights, luxury wellness campaign finish",
+      "menu_label": "Soft spa",
+      "menu_group": "Editorial"
+    },
+    {
+      "id": "photo_amateur_home",
+      "prompt": "natural amateur-style home photo, ordinary room light, casual eye-level framing",
+      "menu_label": "Amateur home",
+      "menu_group": "Amateur"
+    },
+    {
+      "id": "photo_casual_handheld",
+      "prompt": "casual handheld home photograph, available ambient light, natural unpolished framing",
+      "menu_label": "Casual handheld",
+      "menu_group": "Amateur"
+    },
+    {
+      "id": "photo_simple_window",
+      "prompt": "simple apartment photo in natural window light, everyday realistic framing",
+      "menu_label": "Simple window",
+      "menu_group": "Amateur"
+    },
+    {
+      "id": "photo_explicit_home_clear",
+      "prompt": "clear close-range home photograph, even available room light, realistic intimate detail",
+      "menu_label": "Clear intimate",
+      "menu_group": "Explicit"
+    },
+    {
+      "id": "photo_explicit_handheld_close",
+      "prompt": "close handheld intimate photograph, soft natural indoor light, clear realistic detail",
+      "menu_label": "Handheld close-up",
+      "menu_group": "Explicit"
     }
   ]
 }
