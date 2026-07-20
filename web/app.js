@@ -8,6 +8,9 @@ const state = {
   director: null,
   directorShot: 1,
   directorOpenGroup: null,
+  directorCustomField: null,
+  previewJob: null,
+  previewJobTimer: null,
   job: null,
   jobTimer: null,
   outputs: [],
@@ -28,7 +31,8 @@ const storyboardActions = $('#storyboard-actions');
 const storyboardMeta = $('#storyboard-meta');
 const imageDialog = $('#image-dialog');
 const deleteDialog = $('#delete-dialog');
-const promptDialog = $('#prompt-dialog');
+const promptDialog = $("#prompt-dialog");
+const directorCustomDialog = $("#director-custom-dialog");
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -78,6 +82,7 @@ function applyTheme() {
   else document.documentElement.dataset.theme = state.theme;
   const icon = { system: '◐', light: '☀', dark: '☾' }[state.theme];
   $('#theme-icon').textContent = icon;
+  $('#theme-label').textContent = `${state.theme[0].toUpperCase()}${state.theme.slice(1)}`;
   $('#theme-button').title = `Theme: ${state.theme}`;
 }
 
@@ -232,7 +237,7 @@ function shotCard(shot) {
     <article class="shot-card" data-shot="${shot.number}">
       <div class="shot-top">
         <div class="shot-number"><i>${String(shot.number).padStart(2, '0')}</i> Shot ${shot.shot_index + 1}</div>
-        <span class="stage-badge ${explicit}">${escapeHtml(stage.replaceAll('_', ' '))}</span>
+        <span class="stage-badge ${explicit} ${shot.stage.manual ? 'manual' : ''}">${shot.stage.manual ? '<i>Manual</i>' : ''}${escapeHtml(stage.replaceAll('_', ' '))}</span>
       </div>
       <div class="shot-body">
         <div class="shot-set">Set ${shot.photoshoot_index + 1} · ${escapeHtml(shot.wardrobe)}</div>
@@ -244,6 +249,7 @@ function shotCard(shot) {
       <div class="shot-footer">
         <button data-action="inspect">Inspect prompt</button>
         <button class="direct" data-action="director">⌘ Director</button>
+        <button class="preview" data-action="preview">◉ Preview</button>
         <button class="reroll" data-action="reroll">↻ Reroll</button>
       </div>
     </article>`;
@@ -309,8 +315,15 @@ function updatePromptContent() {
 
 async function startGeneration() {
   if (!state.storyboard) return;
-  const button = $('#generate-button');
-  setBusy(button, true, 'Queueing…');
+  if (isRenderActive()) {
+    toast('Render already active', 'The current production is already in the render pipeline.');
+    return;
+  }
+  const buttons = $$('[data-render-action]');
+  buttons.forEach((button) => {
+    if (!button.dataset.idleLabel) button.dataset.idleLabel = button.innerHTML;
+    setBusy(button, true, 'Queueing…');
+  });
   try {
     state.job = await api('/api/jobs', {
       method: 'POST',
@@ -318,11 +331,13 @@ async function startGeneration() {
     });
     showJob();
     pollJob();
+    switchView('outputs');
     toast('Production queued', `${state.job.total} images sent to the render pipeline.`, 'success');
   } catch (error) {
     toast('Could not start generation', error.message, 'error');
   } finally {
-    setBusy(button, false);
+    buttons.forEach((button) => setBusy(button, false));
+    syncRenderControls();
   }
 }
 
@@ -336,12 +351,16 @@ function formatTime(seconds) {
 function showJob() {
   const job = state.job;
   if (!job) return;
+  syncRenderControls();
   $('#job-dock').classList.remove('hidden');
   $('#job-percent').textContent = `${job.progress || 0}%`;
   $('#job-progress').style.width = `${job.progress || 0}%`;
-  $('#job-detail').textContent = job.status === 'queued'
-    ? 'Preparing workflow…'
-    : `Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}`;
+  $('#job-detail').textContent = job.cancel_requested
+    ? 'Cancelling… current image will finish'
+    : (job.status === 'queued'
+      ? 'Preparing workflow…'
+      : `Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}`);
+  $('#cancel-job').disabled = Boolean(job.cancel_requested);
 }
 
 async function pollJob() {
@@ -364,6 +383,7 @@ async function pollJob() {
 
 function finishJob() {
   const job = state.job;
+  syncRenderControls();
   $('#job-dock').classList.add('hidden');
   if (job.status === 'completed') {
     toast('Production complete', `${job.outputs.length} output${job.outputs.length === 1 ? '' : 's'} saved.`, 'success');
@@ -383,6 +403,18 @@ function addOutputs(outputs) {
 
 function isRenderActive() {
   return state.job && ['queued', 'running'].includes(state.job.status);
+}
+
+function syncRenderControls() {
+  const active = Boolean(isRenderActive());
+  $$('[data-render-action]').forEach((button) => {
+    if (!button.dataset.idleLabel) {
+      button.dataset.idleLabel = button.dataset.label || button.innerHTML;
+    }
+    button.disabled = active;
+    button.innerHTML = active ? (state.job?.cancel_requested ? '◌ Cancelling…' : '◌ Rendering…') : button.dataset.idleLabel;
+    button.title = active ? 'A render job is already active' : 'Render the current storyboard';
+  });
 }
 
 function syncDeleteControls() {
@@ -638,21 +670,28 @@ function directorShotButton(shot) {
   return `<button class="director-shot ${active}" data-director-shot="${shot.number}">
     <i>${String(shot.number).padStart(2, '0')}</i>
     <span><strong>Set ${shot.photoshoot_index + 1} · Shot ${shot.shot_index + 1}</strong><span>${escapeHtml(shot.action.prompt)}</span></span>
-    <em>${escapeHtml(stage.replaceAll('_', ' '))}</em>
+    <em class="${shot.stage.manual ? 'manual' : ''}" title="${shot.stage.manual ? 'Stage selected manually' : 'Automatic stage'}">${shot.stage.manual ? 'M · ' : ''}${escapeHtml(stage.replaceAll('_', ' '))}</em>
   </button>`;
 }
 
 function directorField(field) {
   const current = field.options.find((option) => option.id === field.value);
-  const optionHtml = field.options.map((option) => {
+  const customOption = field.custom
+    ? `<option value="__director_custom__" selected>${escapeHtml(field.custom)}</option>`
+    : '';
+  const optionHtml = customOption + field.options.map((option) => {
     const suffix = option.default ? ' · Default' : '';
-    return `<option value="${escapeHtml(option.id)}" ${option.id === field.value ? 'selected' : ''} title="${escapeHtml(option.prompt)}">${escapeHtml(option.label + suffix)}</option>`;
+    const label = option.label ? `${option.label[0].toUpperCase()}${option.label.slice(1)}` : '';
+    return `<option value="${escapeHtml(option.id)}" ${!field.custom && option.id === field.value ? 'selected' : ''} title="${escapeHtml(option.prompt)}">${escapeHtml(label + suffix)}</option>`;
   }).join('');
-  const search = [field.label, ...field.options.map((option) => `${option.label} ${option.prompt}`)].join(' ').toLowerCase();
+  const fieldNote = field.key === 'shot.stage'
+    ? `${field.compatibility?.poses ?? 0} poses · ${field.compatibility?.actions ?? 0} actions · ${field.compatibility?.expressions ?? 0} expressions`
+    : (current?.default ? '<span class="default-mark">Database default</span>' : escapeHtml(current?.prompt || current?.label || ''));
+  const search = [field.label, field.custom, ...field.options.map((option) => `${option.label} ${option.prompt}`)].join(" ").toLowerCase();
   return `<div class="director-field" data-director-search="${escapeHtml(search)}">
     <div class="director-field-head"><label for="director-${escapeHtml(field.key)}">${escapeHtml(field.label)}</label><span class="director-scope">${field.scope === 'set' ? 'Entire set' : 'This shot'}</span></div>
     <select id="director-${escapeHtml(field.key)}" data-director-field="${escapeHtml(field.key)}">${optionHtml}</select>
-    <p class="director-field-note">${current?.default ? '<span class="default-mark">Database default</span>' : escapeHtml(current?.prompt || current?.label || '')}</p>
+    <div class="director-field-footer"><p class="director-field-note">${field.custom ? '' : fieldNote}</p><button type="button" class="director-custom-button ${field.custom ? "active" : ""}" data-director-custom="${escapeHtml(field.key)}">${field.custom ? "Edit custom" : "+ Custom"}</button></div>
   </div>`;
 }
 
@@ -755,17 +794,68 @@ async function remixDirector(target, button) {
   }
 }
 
+function directorFieldByKey(key) {
+  return state.director?.groups.flatMap((group) => group.fields).find((field) => field.key === key);
+}
+
+function openDirectorCustom(key) {
+  const field = directorFieldByKey(key);
+  if (!field) return;
+  state.directorCustomField = key;
+  $("#director-custom-title").textContent = field.label;
+  $("#director-custom-scope").textContent = field.scope === "set"
+    ? "Overrides this field across the entire set."
+    : "Overrides this field only for this shot.";
+  $("#director-custom-value").value = field.custom || "";
+  $("#director-custom-clear").disabled = !field.custom;
+  directorCustomDialog.showModal();
+  $("#director-custom-value").focus();
+}
+
+async function saveDirectorCustom(clear = false) {
+  const field = directorFieldByKey(state.directorCustomField);
+  if (!field || !state.storyboard) return;
+  const value = clear ? "" : $("#director-custom-value").value.trim();
+  const button = clear ? $("#director-custom-clear") : $("#director-custom-apply");
+  setBusy(button, true, clear ? "Clearing…" : "Applying…");
+  try {
+    state.director = await api(`/api/storyboards/${state.storyboard.id}/director`, {
+      method: "POST",
+      body: JSON.stringify({ shot: state.directorShot, field: field.key, custom_value: value }),
+    });
+    state.storyboard = await api(`/api/storyboards/${state.storyboard.id}`);
+    directorCustomDialog.close();
+    renderStoryboard();
+    renderDirector();
+    toast(value ? "Custom direction applied" : "Custom direction cleared", value ? (field.scope === "set" ? "The complete set was updated." : "This shot was updated.") : "The database preset is active again.", "success");
+  } catch (error) {
+    toast("Could not apply custom value", error.message, "error");
+  } finally {
+    setBusy(button, false);
+  }
+}
+
 async function applyDirectorChange(select) {
   if (!state.storyboard || !state.director) return;
   const field = select.dataset.directorField;
   const card = select.closest('.director-field');
-  const previous = state.director.groups.flatMap((group) => group.fields).find((item) => item.key === field)?.value;
+  const activeField = directorFieldByKey(field);
+  const previous = activeField?.custom ? '__director_custom__' : activeField?.value;
+  if (select.value === '__director_custom__') {
+    openDirectorCustom(field);
+    return;
+  }
   select.disabled = true;
   card.classList.add('changed');
   try {
     state.director = await api(`/api/storyboards/${state.storyboard.id}/director`, {
       method: 'POST',
-      body: JSON.stringify({ shot: state.directorShot, field, value: select.value }),
+      body: JSON.stringify({
+        shot: state.directorShot,
+        field,
+        value: select.value,
+        clear_custom: Boolean(activeField?.custom),
+      }),
     });
     state.storyboard = await api(`/api/storyboards/${state.storyboard.id}`);
     renderStoryboard();
@@ -777,6 +867,93 @@ async function applyDirectorChange(select) {
     select.disabled = false;
     toast('Choice is incompatible', error.message, 'error');
   }
+}
+
+async function closeShotPreview() {
+  clearTimeout(state.previewJobTimer);
+  const preview = state.previewJob;
+  state.previewJob = null;
+  $('#shot-preview-window').classList.add('hidden');
+  $('#shot-preview-image').removeAttribute('src');
+  if (!preview?.id) return;
+  try {
+    await api(`/api/previews/${preview.id}`, { method: 'DELETE' });
+  } catch (error) {
+    toast('Could not discard preview', error.message, 'error');
+  }
+}
+
+function openShotPreview(preview) {
+  const windowElement = $('#shot-preview-window');
+  $('#shot-preview-title').textContent = `Shot ${preview.shot} preview`;
+  $('#shot-preview-image').src = `${preview.image_url}?v=${Date.now()}`;
+  windowElement.classList.remove('hidden');
+}
+
+async function pollShotPreview(button) {
+  if (!state.previewJob) return;
+  try {
+    state.previewJob = await api(`/api/previews/${state.previewJob.id}`);
+    if (['queued', 'running'].includes(state.previewJob.status)) {
+      state.previewJobTimer = setTimeout(() => pollShotPreview(button), 1000);
+      return;
+    }
+    setBusy(button, false);
+    if (state.previewJob.status === 'completed') {
+      openShotPreview(state.previewJob);
+      toast('Shot preview ready', 'Temporary preview rendered without adding it to Outputs.', 'success');
+    } else {
+      const message = state.previewJob.error || 'Preview rendering failed';
+      const failedId = state.previewJob.id;
+      state.previewJob = null;
+      await api(`/api/previews/${failedId}`, { method: 'DELETE' });
+      toast('Preview failed', message, 'error');
+    }
+  } catch (error) {
+    toast('Preview status lost', error.message, 'error');
+    state.previewJobTimer = setTimeout(() => pollShotPreview(button), 3000);
+  }
+}
+
+async function startShotPreview(number, button) {
+  if (!state.storyboard) return;
+  if (!form.elements.fast.checked) {
+    toast('Fast test mode required', 'Enable Fast test mode in Studio before rendering a shot preview.', 'error');
+    return;
+  }
+  if (isRenderActive()) {
+    toast('Preview unavailable', 'Wait for the active storyboard render to finish or cancel it first.', 'error');
+    return;
+  }
+  if (state.previewJob && ['queued', 'running'].includes(state.previewJob.status)) {
+    toast('Preview already active', 'Wait for the current shot preview to finish.');
+    return;
+  }
+  if (state.previewJob) await closeShotPreview();
+  setBusy(button, true, 'Rendering…');
+  try {
+    state.previewJob = await api('/api/previews', {
+      method: 'POST',
+      body: JSON.stringify({
+        storyboard_id: state.storyboard.id,
+        shot: number,
+        fast: true,
+      }),
+    });
+    toast('Preview queued', `Rendering shot ${number} in Fast test mode.`);
+    pollShotPreview(button);
+  } catch (error) {
+    setBusy(button, false);
+    toast('Could not start preview', error.message, 'error');
+  }
+}
+
+function clampShotPreviewWindow() {
+  const preview = $('#shot-preview-window');
+  if (preview.classList.contains('hidden') || !preview.style.left) return;
+  const rect = preview.getBoundingClientRect();
+  preview.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8))}px`;
+  preview.style.top = `${Math.max(8, Math.min(rect.top, window.innerHeight - rect.height - 8))}px`;
 }
 
 function switchView(name) {
@@ -815,10 +992,15 @@ $('#reroll-all').addEventListener('click', resolveStoryboard);
 $('#export-storyboard').addEventListener('click', exportStoryboard);
 $('#import-storyboard').addEventListener('click', () => $('#storyboard-file').click());
 $('#storyboard-file').addEventListener('change', importStoryboard);
-$('#generate-button').addEventListener('click', startGeneration);
+$$('[data-render-action]').forEach((button) => button.addEventListener('click', startGeneration));
 $('#director-open-studio').addEventListener('click', () => switchView('studio'));
 $('#director-search').addEventListener('input', (event) => filterDirector(event.target.value));
 $('.director-quick-actions').addEventListener('click', (event) => {
+  const previewButton = event.target.closest('#director-preview-shot');
+  if (previewButton) {
+    startShotPreview(state.directorShot, previewButton);
+    return;
+  }
   const button = event.target.closest('[data-director-remix]');
   if (button) remixDirector(button.dataset.directorRemix, button);
 });
@@ -826,7 +1008,12 @@ $('#director-shot-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-director-shot]');
   if (button) loadDirector(Number(button.dataset.directorShot));
 });
-$('#director-groups').addEventListener('click', (event) => {
+$("#director-groups").addEventListener("click", (event) => {
+  const customButton = event.target.closest("[data-director-custom]");
+  if (customButton) {
+    openDirectorCustom(customButton.dataset.directorCustom);
+    return;
+  }
   const summary = event.target.closest('.director-group > summary');
   if (!summary) return;
   const selected = summary.parentElement;
@@ -847,7 +1034,7 @@ $('#cancel-job').addEventListener('click', async () => {
   if (!state.job) return;
   try {
     state.job = await api(`/api/jobs/${state.job.id}/cancel`, { method: 'POST', body: '{}' });
-    $('#job-detail').textContent = 'Cancellation requested · current image will finish';
+    showJob();
   } catch (error) { toast('Could not cancel', error.message, 'error'); }
 });
 
@@ -861,7 +1048,41 @@ shotGrid.addEventListener('click', (event) => {
     state.directorShot = number;
     switchView('director');
   }
+  if (button.dataset.action === 'preview') startShotPreview(number, button);
   if (button.dataset.action === 'reroll') rerollShot(number, button);
+});
+
+$('#shot-preview-close').addEventListener('click', closeShotPreview);
+$('#shot-preview-image').addEventListener('error', () => {
+  toast('Could not display preview', 'The temporary preview image is no longer available.', 'error');
+});
+let previewDrag = null;
+$('#shot-preview-drag-handle').addEventListener('pointerdown', (event) => {
+  if (event.target.closest('button')) return;
+  const preview = $('#shot-preview-window');
+  const rect = preview.getBoundingClientRect();
+  preview.style.left = `${rect.left}px`;
+  preview.style.top = `${rect.top}px`;
+  preview.style.right = 'auto';
+  preview.style.bottom = 'auto';
+  previewDrag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
+  event.currentTarget.setPointerCapture(event.pointerId);
+});
+$('#shot-preview-drag-handle').addEventListener('pointermove', (event) => {
+  if (!previewDrag) return;
+  const preview = $('#shot-preview-window');
+  const maxLeft = Math.max(8, window.innerWidth - preview.offsetWidth - 8);
+  const maxTop = Math.max(8, window.innerHeight - preview.offsetHeight - 8);
+  preview.style.left = `${Math.max(8, Math.min(maxLeft, previewDrag.left + event.clientX - previewDrag.x))}px`;
+  preview.style.top = `${Math.max(8, Math.min(maxTop, previewDrag.top + event.clientY - previewDrag.y))}px`;
+});
+$('#shot-preview-drag-handle').addEventListener('pointerup', () => { previewDrag = null; });
+$('#shot-preview-drag-handle').addEventListener('pointercancel', () => { previewDrag = null; });
+window.addEventListener('resize', clampShotPreviewWindow);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !$('#shot-preview-window').classList.contains('hidden')) {
+    closeShotPreview();
+  }
 });
 
 $$('.prompt-tabs button').forEach((button) => button.addEventListener('click', () => {
@@ -870,7 +1091,12 @@ $$('.prompt-tabs button').forEach((button) => button.addEventListener('click', (
   updatePromptContent();
 }));
 $('#delete-all-outputs').addEventListener('click', deleteAllOutputs);
-$('#delete-dialog-confirm').addEventListener('click', () => resolveDeletion(true));
+$("#director-custom-apply").addEventListener("click", () => saveDirectorCustom(false));
+$("#director-custom-clear").addEventListener("click", () => saveDirectorCustom(true));
+$$(".director-custom-close").forEach((button) => button.addEventListener("click", () => directorCustomDialog.close()));
+directorCustomDialog.addEventListener("cancel", () => { state.directorCustomField = null; });
+directorCustomDialog.addEventListener("close", () => { state.directorCustomField = null; });
+$("#delete-dialog-confirm").addEventListener('click', () => resolveDeletion(true));
 $$('.delete-dialog-cancel').forEach((button) => button.addEventListener('click', () => resolveDeletion(false)));
 deleteDialog.addEventListener('cancel', (event) => {
   event.preventDefault();

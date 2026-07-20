@@ -29,6 +29,10 @@
         <div class="status-row"><span><i class="status-dot" id="comfy-dot"></i>ComfyUI</span><strong id="comfy-status">Checking</strong></div>
         <div class="status-row"><span><i class="status-dot" id="workflow-dot"></i>Workflow</span><strong id="workflow-status">Checking</strong></div>
         <div class="status-row"><span>Catalog</span><strong id="catalog-status">—</strong></div>
+        <div class="system-theme-row">
+          <span>Appearance</span>
+          <button class="theme-button system-theme-button" id="theme-button" aria-label="Change color theme" title="Theme: system"><span id="theme-icon">◐</span><strong id="theme-label">System</strong></button>
+        </div>
       </section>
       <div class="sidebar-footer"><span>Local workspace</span><span class="version">v2.0</span></div>
     </aside>
@@ -43,7 +47,6 @@
           <button class="button ghost" id="import-storyboard"><span>⇧</span> Import storyboard</button>
           <input class="hidden" id="storyboard-file" type="file" accept="application/json,.json">
           <button class="button ghost" id="capture-button"><span>⌁</span> Capture workflow</button>
-          <button class="theme-button" id="theme-button" aria-label="Change color theme" title="Theme: system"><span id="theme-icon">◐</span></button>
         </div>
       </header>
 
@@ -107,8 +110,8 @@
               <div class="storyboard-actions hidden" id="storyboard-actions">
                 <span class="seed-pill" id="seed-pill">Seed —</span>
                 <button class="button ghost" id="export-storyboard">↓ Export</button>
-                <button class="button ghost" id="reroll-all">↻ Reroll all</button>
-                <button class="button primary" id="generate-button">Generate images</button>
+                <button class="button warning" id="reroll-all">↻ Reroll all</button>
+                <button class="button render" id="generate-button" data-render-action>▶ Render storyboard</button>
               </div>
             </div>
             <div class="storyboard-meta hidden" id="storyboard-meta"></div>
@@ -147,13 +150,17 @@
                 <h2 id="director-title">Director</h2>
                 <p id="director-subtitle">Select a shot to begin.</p>
                 <div class="director-quick-actions">
-                  <button data-director-remix="subject">Remix subject</button>
-                  <button data-director-remix="wardrobe">Remix wardrobe</button>
-                  <button data-director-remix="scene">Remix scene</button>
-                  <button data-director-remix="shot">Reroll shot</button>
+                  <button class="randomize" data-director-remix="subject">↻ Remix subject</button>
+                  <button class="randomize" data-director-remix="wardrobe">↻ Remix wardrobe</button>
+                  <button class="randomize" data-director-remix="scene">↻ Remix scene</button>
+                  <button class="randomize" data-director-remix="shot">↻ Reroll shot</button>
+                  <button class="preview-action" id="director-preview-shot">◉ Preview shot</button>
                 </div>
               </div>
-              <label class="director-search"><span>⌕</span><input id="director-search" type="search" placeholder="Find a setting or preset…"></label>
+              <div class="director-editor-tools">
+                <label class="director-search"><span>⌕</span><input id="director-search" type="search" placeholder="Find a setting or preset…"></label>
+                <button class="button render director-render" id="director-generate-button" data-render-action>▶ Render storyboard</button>
+              </div>
             </header>
             <div class="director-summary" id="director-summary"></div>
             <div class="director-loading hidden" id="director-loading"><div class="spinner"></div><strong>Checking compatible choices…</strong></div>
@@ -174,6 +181,15 @@
     <div class="job-icon"><div class="spinner small"></div></div>
     <div class="job-copy"><div><strong id="job-title">Rendering production</strong><span id="job-percent">0%</span></div><p id="job-detail">Preparing workflow…</p><div class="progress-track"><i id="job-progress"></i></div></div>
     <button class="button ghost danger" id="cancel-job">Cancel</button>
+  </section>
+
+  <section class="shot-preview-window hidden" id="shot-preview-window" role="dialog" aria-labelledby="shot-preview-title">
+    <header class="shot-preview-header" id="shot-preview-drag-handle">
+      <div><p class="eyebrow">Temporary Fast Preview</p><strong id="shot-preview-title">Shot preview</strong></div>
+      <button class="icon-button" id="shot-preview-close" aria-label="Close and delete preview">×</button>
+    </header>
+    <div class="shot-preview-canvas"><img id="shot-preview-image" src="" alt="Temporary rendered shot preview"></div>
+    <footer>Drag this window by its header. Closing permanently discards the temporary preview.</footer>
   </section>
 
   <dialog id="image-dialog" class="image-viewer">
@@ -212,6 +228,12 @@
       <pre id="prompt-content"></pre>
     </div>
     <div class="dialog-footer"><button class="button ghost" id="copy-prompt">Copy to clipboard</button><button class="button primary dialog-close">Done</button></div>
+  </dialog>
+
+  <dialog id="director-custom-dialog" class="small-dialog">
+    <div class="dialog-header"><div><p class="eyebrow">Local prompt override</p><h2 id="director-custom-title">Custom value</h2></div><button class="icon-button director-custom-close" aria-label="Close">×</button></div>
+    <div class="dialog-body director-custom-body"><p id="director-custom-scope">Overrides this field without changing the preset database.</p><label for="director-custom-value">Prompt value</label><textarea id="director-custom-value" maxlength="600" rows="6" placeholder="Describe exactly what the renderer should use for this field…"></textarea><small>Stored only with this storyboard. The selected compatible preset and its rules remain intact.</small></div>
+    <div class="dialog-footer"><button class="button ghost" id="director-custom-clear">Clear custom</button><button class="button ghost director-custom-close">Cancel</button><button class="button primary" id="director-custom-apply">Apply custom</button></div>
   </dialog>
 
   <dialog id="delete-dialog" class="small-dialog">

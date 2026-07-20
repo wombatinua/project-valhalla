@@ -5,7 +5,7 @@
     "output_dir": "./outputs",
     "human_defaults": {
       "pools": {
-        "age": ["adult_age_21", "adult_age_22"],
+        "age": ["age_21", "age_22"],
         "ethnic_appearance": ["appearance_slavic"],
         "skin_tone": ["skin_fair", "skin_porcelain", "skin_light_warm"],
         "face_shape": ["face_oval", "face_heart", "face_round", "face_square_soft"],
@@ -64,15 +64,15 @@
   "human_model_parts": {
     "age": [
       {
-        "id": "adult_age_21",
-        "prompt": "21-year-old adult woman",
+        "id": "age_21",
+        "prompt": "21-year-old woman",
         "tags": [
           "adult"
         ]
       },
       {
-        "id": "adult_age_22",
-        "prompt": "22-year-old adult woman",
+        "id": "age_22",
+        "prompt": "22-year-old woman",
         "tags": [
           "adult"
         ]
@@ -326,7 +326,7 @@
       },
       {
         "id": "face_round",
-        "prompt": "soft youthful round adult face",
+        "prompt": "soft youthful round face",
         "requires_any_tags": [
           "heritage_european",
           "heritage_slavic",
@@ -1203,7 +1203,7 @@
       },
       {
         "id": "height_petite",
-        "prompt": "petite adult stature"
+        "prompt": "petite stature"
       },
       {
         "id": "height_statuesque",
@@ -10430,7 +10430,7 @@
     },
     {
       "id": "mood_sensual",
-      "prompt": "confident sensual adults-only magazine atmosphere",
+      "prompt": "confident sensual adult magazine atmosphere",
       "menu_label": "Sensual magazine",
       "menu_group": "Editorial"
     },
@@ -10584,7 +10584,7 @@
   "prompt_defaults": {
     "positive_prefix": "(solo {age}:1.4), (single subject:1.4)",
     "positive_suffix": "complete intact body, two arms, two legs, two hands, two feet, correct hands and feet, coherent anatomy, realistic photography, natural skin texture, high detail",
-    "negative_prompt": "child, minor, underage, teen, young-looking, man, male, men, male body, male hands, penis, testicles, multiple people, duplicate person, twins, mirror, reflection, sex toy, vibrator, dildo, amputee, missing limb, missing arm, missing leg, detached limb, limb stump, prosthetic limb, extra limbs, extra arms, extra legs, duplicated limbs, fused limbs, malformed arms, malformed legs, bad hands, missing fingers, extra fingers, fused fingers, malformed fingers, bad feet, missing toes, extra toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
+    "negative_prompt": "man, male, men, male body, male hands, penis, testicles, multiple people, duplicate person, twins, mirror, reflection, sex toy, vibrator, dildo, amputee, missing limb, missing arm, missing leg, detached limb, limb stump, prosthetic limb, extra limbs, extra arms, extra legs, duplicated limbs, fused limbs, malformed arms, malformed legs, bad hands, missing fingers, extra fingers, fused fingers, malformed fingers, bad feet, missing toes, extra toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
     "covered_chest_negative": "bare breasts, exposed breasts, topless, visible nipples, exposed nipples, wardrobe malfunction",
     "cameltoe_prompt": "clearly visible natural cameltoe contour through the tight fabric",
     "xxx_plateau_prompts": {

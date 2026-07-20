@@ -1005,35 +1005,49 @@ def human_fragments(
     human: dict[str, Any],
     visibility: set[str],
     covered_chest: bool,
+    custom: dict[str, str],
 ) -> list[str]:
-    items: list[dict[str, Any]] = [human[key] for key in ALWAYS_HUMAN_PARTS]
-    items.extend(human.get("facial_accents", []))
-    fragments = [item["prompt"] for item in items if item.get("prompt")]
+    fragments = [
+        custom.get(f"human.{key}") or human[key].get("prompt", "")
+        for key in ALWAYS_HUMAN_PARTS
+    ]
+    facial_custom = custom.get("human.facial_accents")
+    if facial_custom:
+        fragments.append(facial_custom)
+    else:
+        fragments.extend(
+            item["prompt"] for item in human.get("facial_accents", [])
+            if item.get("prompt")
+        )
     if "breasts" in visibility or "nipples" in visibility:
         fragments.extend([
-            human["breast_size"]["prompt"],
-            human["breast_shape"]["prompt"],
+            custom.get("human.breast_size") or human["breast_size"]["prompt"],
+            custom.get("human.breast_shape") or human["breast_shape"]["prompt"],
         ])
     elif covered_chest:
-        fragments.extend(
-            item["covered_prompt"]
-            for item in (human["breast_size"], human["breast_shape"])
-            if item.get("covered_prompt")
-        )
+        for key in ("breast_size", "breast_shape"):
+            override = custom.get(f"human.{key}")
+            if override:
+                fragments.append(
+                    f"{override}, expressed through clothing only, chest fully covered by clothing"
+                )
+            elif human[key].get("covered_prompt"):
+                fragments.append(human[key]["covered_prompt"])
     if "nipples" in visibility:
         fragments.extend(
-            human[key]["prompt"]
+            custom.get(f"human.{key}") or human[key]["prompt"]
             for key in ("areola_size", "areola_color", "nipple_size", "nipple_shape")
         )
     if "pubic_area" in visibility:
-        fragments.append(human["pubic_hair"]["prompt"])
+        fragments.append(custom.get("human.pubic_hair") or human["pubic_hair"]["prompt"])
     if "genitals" in visibility:
-        fragments.append(human["genital_appearance"]["prompt"])
-    return fragments
+        fragments.append(custom.get("human.genital_appearance") or human["genital_appearance"]["prompt"])
+    return [fragment for fragment in fragments if fragment]
 
 
 def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, list[str]]:
     defaults = db["prompt_defaults"]
+    custom = scene.get("custom_values", {})
     stage = scene["stage"]
     stage_visibility = set(stage.get("body_visibility", []))
     covered_chest = not bool({"breasts", "nipples"} & stage_visibility)
@@ -1042,26 +1056,31 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     if plateau_kind == "provocative_rear":
         visibility -= {"breasts", "nipples"}
     xxx_prompt = defaults.get("xxx_plateau_prompts", {}).get(plateau_kind, "")
-    age_prompt = scene["human"]["age"]["prompt"]
+    age_prompt = custom.get("human.age") or scene["human"]["age"]["prompt"]
     positive_prefix = defaults.get("positive_prefix", "").replace("{age}", age_prompt)
     fragments = [positive_prefix]
     fragments.extend(
-        human_fragments(scene["human"], visibility, covered_chest)
+        human_fragments(scene["human"], visibility, covered_chest, custom)
     )
-    if xxx_prompt:
+    stage_custom = custom.get("shot.stage")
+    if stage_custom:
+        fragments.append(stage_custom)
+    elif xxx_prompt:
         fragments.append(xxx_prompt)
     visible_slots = set(stage.get("visible_slots", []))
     outfit = scene["outfit"]
+    if custom.get("outfit.template"):
+        fragments.append(custom["outfit.template"])
     reveals_cameltoe = False
     for slot in outfit["template"]["slots"]:
         if slot in visible_slots and slot in outfit["garments"]:
             garment = outfit["garments"][slot]
-            garment_parts = [outfit["colors"][slot]["prompt"]]
-            if slot in outfit.get("patterns", {}):
-                garment_parts.append(outfit["patterns"][slot]["prompt"])
-            if slot in outfit.get("textures", {}):
-                garment_parts.append(outfit["textures"][slot]["prompt"])
-            garment_parts.append(garment["prompt"])
+            garment_parts = [custom.get(f"outfit.colors.{slot}") or outfit["colors"][slot]["prompt"]]
+            if custom.get(f"outfit.patterns.{slot}") or slot in outfit.get("patterns", {}):
+                garment_parts.append(custom.get(f"outfit.patterns.{slot}") or outfit["patterns"][slot]["prompt"])
+            if custom.get(f"outfit.textures.{slot}") or slot in outfit.get("textures", {}):
+                garment_parts.append(custom.get(f"outfit.textures.{slot}") or outfit["textures"][slot]["prompt"])
+            garment_parts.append(custom.get(f"outfit.garments.{slot}") or garment["prompt"])
             fragments.append(" ".join(garment_parts))
             reveals_cameltoe = reveals_cameltoe or garment.get("reveals_cameltoe", False)
     if reveals_cameltoe:
@@ -1069,7 +1088,8 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     for key in ("pose", "action", "prop", "expression", "interior", "furniture", "mood", "photography_style"):
         item = scene.get(key)
         if item:
-            fragments.append(item["prompt"])
+            director_key = f"shot.{key}" if key in {"pose", "action", "expression"} else f"scene.{key}"
+            fragments.append(custom.get(director_key) or item["prompt"])
     fragments.extend(item["prompt"] for item in scene.get("dependencies", []))
     fragments.append(defaults.get("positive_suffix", ""))
     positive = ", ".join(fragment.strip(" ,") for fragment in fragments if fragment.strip(" ,"))
@@ -1440,6 +1460,63 @@ def generate_one(
     return prompt_id, saved
 
 
+def generate_preview_image(
+    db: dict[str, Any],
+    positive: str,
+    negative: str,
+    seed: int,
+    workflow_template: dict[str, Any],
+    mapping: dict[str, Any],
+) -> tuple[str, bytes, str]:
+    """Render one fast preview and keep its bytes out of the output directory."""
+    workflow = copy.deepcopy(workflow_template)
+    patch_workflow(workflow, mapping, positive, negative, seed)
+    workflow = prepare_fast_workflow(workflow, mapping)
+    for node in workflow.values():
+        if node.get("class_type") == "SaveImage":
+            node["class_type"] = "PreviewImage"
+            node.get("inputs", {}).pop("filename_prefix", None)
+    session, url, timeout = comfy_session(db)
+    try:
+        response = session.post(
+            f"{url}/prompt",
+            json={"prompt": workflow, "client_id": str(uuid.uuid4())},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as exc:
+        raise AppError(f"Could not queue ComfyUI preview workflow: {exc}") from exc
+    if payload.get("node_errors"):
+        raise AppError(
+            f"ComfyUI rejected preview workflow: "
+            f"{json.dumps(payload['node_errors'], ensure_ascii=False)}"
+        )
+    prompt_id = payload.get("prompt_id")
+    if not prompt_id:
+        raise AppError(f"ComfyUI response has no prompt_id: {payload}")
+    outputs = wait_for_outputs(session, url, prompt_id, db["settings"])
+    for node_output in outputs.values():
+        for image in node_output.get("images", []):
+            response = session.get(
+                f"{url}/view",
+                params={
+                    "filename": image["filename"],
+                    "subfolder": image.get("subfolder", ""),
+                    "type": image.get("type", "output"),
+                },
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            mime_type = (
+                response.headers.get("Content-Type", "").split(";", 1)[0]
+                or mimetypes.guess_type(image.get("filename", "preview.png"))[0]
+                or "image/png"
+            )
+            return prompt_id, response.content, mime_type
+    raise AppError(f"ComfyUI completed preview {prompt_id} but returned no images")
+
+
 def build_storyboard(
     args: argparse.Namespace,
     db: dict[str, Any],
@@ -1511,6 +1588,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 WEB_ROOT = Path(__file__).resolve().with_name("web")
 MAX_STORYBOARDS = 20
 MAX_JOBS = 40
+MAX_PREVIEWS = 8
 
 
 def _iso_now() -> str:
@@ -1605,6 +1683,7 @@ def serialize_shot(db: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
             "id": shot["stage"]["id"],
             "level": shot["stage"]["level"],
             "plateau_kind": shot["stage"].get("plateau_kind"),
+            "manual": bool(shot.get("stage_manual", False)),
         },
         "inference_seed": shot["inference_seed"],
         "subject": model_description(context["human"]),
@@ -1683,18 +1762,26 @@ DIRECTOR_LABELS = {
 
 def director_stage_options(shot: dict[str, Any], xxx_only: bool) -> list[dict[str, Any]]:
     template = shot["context"]["outfit"]["template"]
-    explicit = [
-        xxx_only_stage(template, index, 3, "photoshoot", random.Random(0))
-        for index in range(3)
-    ]
-    if xxx_only:
-        return explicit
-    safe = [
-        stage for stage in effective_photoshoot_stages(template)
-        if stage["level"] != "explicit"
-    ]
+    effective = effective_photoshoot_stages(template)
     unique: dict[str, dict[str, Any]] = {}
-    for stage in safe + explicit:
+    for stage in effective:
+        unique[stage["id"]] = stage
+    explicit_base = next(stage for stage in effective if stage["level"] == "explicit")
+    kinds = ["provocative_rear", "intimate_closeup", "masturbation"]
+    if "panties" in template.get("slots", {}):
+        kinds.insert(2, "panties_aside")
+    for kind in kinds:
+        stage = copy.deepcopy(explicit_base)
+        stage["id"] = f"{explicit_base['id']}_director_{kind}"
+        stage["plateau_kind"] = kind
+        stage["visible_slots"] = (
+            [
+                slot for slot in ("panties", "legwear", "footwear", "accessories")
+                if slot in template.get("slots", {})
+            ]
+            if kind == "panties_aside" else []
+        )
+        stage["body_visibility"] = ["breasts", "nipples", "pubic_area", "genitals"]
         unique[stage["id"]] = stage
     return list(unique.values())
 
@@ -1755,6 +1842,7 @@ class WebState:
         self.lock = threading.RLock()
         self.storyboards: dict[str, dict[str, Any]] = {}
         self.jobs: dict[str, dict[str, Any]] = {}
+        self.previews: dict[str, dict[str, Any]] = {}
 
     def trim(self, mapping: dict[str, Any], maximum: int) -> None:
         while len(mapping) > maximum:
@@ -1802,6 +1890,16 @@ class WebState:
         if record is None:
             raise AppError("Storyboard not found or expired")
         return record
+
+
+    @staticmethod
+    def _apply_director_customs(shot: dict[str, Any], scene: dict[str, Any], context: dict[str, Any]) -> None:
+        merged = dict(context.get("custom_values", {}))
+        merged.update(shot.get("custom_values", {}))
+        if merged:
+            scene["custom_values"] = merged
+        else:
+            scene.pop("custom_values", None)
 
     def director_payload(self, storyboard_id: str, number: int = 1) -> dict[str, Any]:
         record = self.get_storyboard(storyboard_id)
@@ -1959,25 +2057,6 @@ class WebState:
 
         direction_fields = []
         stages = director_stage_options(shot, record["args"].xxx_only)
-        level_rank = {"covered": 0, "lingerie": 1, "topless": 2, "nude": 3, "explicit": 4}
-        if record["args"].mode == "photoshoot":
-            same_set = [
-                item for item in record["shots"]
-                if item["photoshoot_index"] == shot["photoshoot_index"]
-            ]
-            current_position = same_set.index(shot)
-            minimum = (
-                level_rank[same_set[current_position - 1]["stage"]["level"]]
-                if current_position > 0 else 0
-            )
-            maximum = (
-                level_rank[same_set[current_position + 1]["stage"]["level"]]
-                if current_position + 1 < len(same_set) else 4
-            )
-            stages = [
-                item for item in stages
-                if minimum <= level_rank[item["level"]] <= maximum
-            ]
         direction_fields.append({
             "key": "shot.stage", "label": "Stage / content", "scope": "shot",
             "value": shot["stage"]["id"],
@@ -2011,7 +2090,18 @@ class WebState:
                 "value": current_item["id"],
                 "options": [director_option(item, current_item["id"]) for item in compatible],
             })
+        direction_by_key = {field["key"]: field for field in direction_fields}
+        direction_by_key["shot.stage"]["compatibility"] = {
+            "poses": len(direction_by_key["shot.pose"]["options"]),
+            "actions": len(direction_by_key["shot.action"]["options"]),
+            "expressions": len(direction_by_key["shot.expression"]["options"]),
+        }
         groups.append({"id": "direction", "label": "Shot direction", "fields": direction_fields})
+        custom_values = dict(context.get("custom_values", {}))
+        custom_values.update(shot.get("custom_values", {}))
+        for group in groups:
+            for director_field in group["fields"]:
+                director_field["custom"] = custom_values.get(director_field["key"], "")
         return {
             "storyboard_id": storyboard_id,
             "shot": number,
@@ -2053,6 +2143,7 @@ class WebState:
                     )
                 )
             scene = record["composer"].resolve_scene(context, stage)
+            self._apply_director_customs(old, scene, context)
             if preserve_photography:
                 scene["photography_style"] = context["photography_style"]
                 scene["dependencies"] = record["composer"].resolve_dependencies(scene)
@@ -2062,6 +2153,8 @@ class WebState:
             record["shots"][index]["context"] = context
             record["shots"][index]["stage"] = stage
             record["shots"][index]["scene"] = scene
+            if recalculate_stages:
+                record["shots"][index]["stage_manual"] = False
 
     def update_director(self, storyboard_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         record = self.get_storyboard(storyboard_id)
@@ -2083,6 +2176,46 @@ class WebState:
         context = copy.deepcopy(shot["context"])
         recalculate_stages = False
         preserve_photography = False
+        clear_custom = payload.get("clear_custom") is True
+        if clear_custom and not field.startswith("shot."):
+            context.setdefault("custom_values", {}).pop(field, None)
+
+        if "custom_value" in payload:
+            custom_value = payload.get("custom_value")
+            if not isinstance(custom_value, str):
+                raise AppError("Custom value must be text")
+            custom_value = custom_value.strip()
+            if len(custom_value) > 600:
+                raise AppError("Custom value cannot exceed 600 characters")
+            parts = field.split(".")
+            valid = (
+                (len(parts) == 2 and parts[0] == "human" and parts[1] in db["human_model_parts"])
+                or field == "outfit.template"
+                or (
+                    len(parts) == 3 and parts[0] == "outfit"
+                    and parts[1] in {"garments", "colors", "patterns", "textures"}
+                    and parts[2] in context["outfit"]["template"]["slots"]
+                )
+                or field in {"scene.interior", "scene.furniture", "scene.mood", "scene.photography_style"}
+                or field in {"shot.stage", "shot.pose", "shot.action", "shot.expression"}
+            )
+            if not valid:
+                raise AppError("Unknown Director field")
+            if not field.startswith("shot."):
+                custom_values = context.setdefault("custom_values", {})
+                if custom_value:
+                    custom_values[field] = custom_value
+                else:
+                    custom_values.pop(field, None)
+                self._replace_director_context(record, position, context)
+            else:
+                custom_values = shot.setdefault("custom_values", {})
+                if custom_value:
+                    custom_values[field] = custom_value
+                else:
+                    custom_values.pop(field, None)
+                self._apply_director_customs(shot, shot["scene"], shot["context"])
+            return self.director_payload(storyboard_id, number)
 
         if field.startswith("remix."):
             target = field.split(".", 1)[1]
@@ -2090,6 +2223,7 @@ class WebState:
                 shot["scene"] = record["composer"].resolve_scene(
                     context, shot["stage"]
                 )
+                self._apply_director_customs(shot, shot["scene"], context)
                 return self.director_payload(storyboard_id, number)
             if target == "subject":
                 context["human"] = record["composer"].choose_human(
@@ -2268,27 +2402,12 @@ class WebState:
                 stage = next((item for item in stages if item["id"] == value), None)
                 if stage is None:
                     raise AppError("Unknown stage")
-                if record["args"].mode == "photoshoot":
-                    level_rank = {
-                        "covered": 0, "lingerie": 1, "topless": 2,
-                        "nude": 3, "explicit": 4,
-                    }
-                    same_set = [
-                        item for item in record["shots"]
-                        if item["photoshoot_index"] == shot["photoshoot_index"]
-                    ]
-                    current_position = same_set.index(shot)
-                    rank = level_rank[stage["level"]]
-                    if (
-                        current_position > 0
-                        and rank < level_rank[same_set[current_position - 1]["stage"]["level"]]
-                    ) or (
-                        current_position + 1 < len(same_set)
-                        and rank > level_rank[same_set[current_position + 1]["stage"]["level"]]
-                    ):
-                        raise AppError("Stage change would reverse photoshoot progression")
                 scene = record["composer"].resolve_scene(context, stage)
                 shot["stage"], shot["scene"] = stage, scene
+                shot["stage_manual"] = True
+                if clear_custom:
+                    shot.setdefault("custom_values", {}).pop(field, None)
+                self._apply_director_customs(shot, shot["scene"], context)
             elif key in {"pose", "action", "expression"}:
                 if value not in index:
                     raise AppError("Unknown direction")
@@ -2296,6 +2415,9 @@ class WebState:
                     context, shot["stage"], {key: value}
                 )
                 shot["scene"] = scene
+                if clear_custom:
+                    shot.setdefault("custom_values", {}).pop(field, None)
+                self._apply_director_customs(shot, shot["scene"], context)
             else:
                 raise AppError("Unknown shot field")
             return self.director_payload(storyboard_id, number)
@@ -2324,8 +2446,10 @@ class WebState:
                 "s": shot["shot_index"],
                 "seed": shot["inference_seed"],
                 "stage": encode_database_refs(shot["stage"], index),
+                "stage_manual": bool(shot.get("stage_manual", False)),
                 "context": encode_database_refs(context, index),
                 "scene": encode_database_refs(scene_delta, index),
+                "custom": shot.get("custom_values", {}),
             })
         return {
             "format": STORYBOARD_FORMAT,
@@ -2382,6 +2506,12 @@ class WebState:
                 raise AppError(f"Storyboard shot {position} is incomplete")
             scene = dict(context)
             scene.update(scene_delta)
+            custom_values = compact.get("custom", {})
+            if not isinstance(custom_values, dict) or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in custom_values.items()
+            ):
+                raise AppError(f"Storyboard shot {position} has invalid custom values")
             shot = {
                 "number": _safe_int(compact.get("n"), "Shot number", 1, 10_000),
                 "photoshoot_index": _safe_int(
@@ -2395,8 +2525,11 @@ class WebState:
                 ),
                 "context": context,
                 "stage": stage,
+                "stage_manual": bool(compact.get("stage_manual", False)),
                 "scene": scene,
+                "custom_values": custom_values,
             }
+            self._apply_director_customs(shot, scene, context)
             if shot["number"] != position:
                 raise AppError("Storyboard shot numbers must be consecutive")
             serialize_shot(db, shot)
@@ -2424,6 +2557,7 @@ class WebState:
         with self.lock:
             shot = shots[number - 1]
             shot["scene"] = record["composer"].resolve_scene(shot["context"], shot["stage"])
+            self._apply_director_customs(shot, shot["scene"], shot["context"])
             if record["args"].inference_seed is None:
                 shot["inference_seed"] = secrets.randbelow(2**63)
             return serialize_shot(record["db"], shot)
@@ -2450,13 +2584,127 @@ class WebState:
             "cancel_requested": False,
         }
         with self.lock:
+            if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
+                raise AppError("Another render job is already active")
+            if any(preview["status"] in {"queued", "running"} for preview in self.previews.values()):
+                raise AppError("Wait for the active shot preview to finish")
             self.jobs[job_id] = job
             self.trim(self.jobs, MAX_JOBS)
         threading.Thread(target=self._run_job, args=(job_id,), daemon=True).start()
         return self.job_payload(job)
 
+    def create_preview(
+        self, storyboard_id: str, number: int, fast: bool
+    ) -> dict[str, Any]:
+        if not fast:
+            raise AppError("Shot Preview requires Fast test mode")
+        record = self.get_storyboard(storyboard_id)
+        if not 1 <= number <= len(record["shots"]):
+            raise AppError("Shot number is out of range")
+        shot = record["shots"][number - 1]
+        positive, negative, _ = compile_scene(record["db"], shot["scene"])
+        preview_id = uuid.uuid4().hex
+        preview = {
+            "id": preview_id,
+            "storyboard_id": storyboard_id,
+            "shot": number,
+            "status": "queued",
+            "created_at": _iso_now(),
+            "finished_at": None,
+            "prompt_id": None,
+            "image_bytes": None,
+            "mime_type": None,
+            "error": None,
+            "db": record["db"],
+            "positive": positive,
+            "negative": negative,
+            "seed": shot["inference_seed"],
+        }
+        with self.lock:
+            if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
+                raise AppError("Shot Preview is unavailable while a render job is active")
+            if any(item["status"] in {"queued", "running"} for item in self.previews.values()):
+                raise AppError("Another shot preview is already rendering")
+            self.previews[preview_id] = preview
+            self.trim(self.previews, MAX_PREVIEWS)
+        threading.Thread(
+            target=self._run_preview, args=(preview_id,), daemon=True
+        ).start()
+        return self.preview_payload(preview)
+
+    def preview_payload(self, preview: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": preview["id"],
+            "storyboard_id": preview["storyboard_id"],
+            "shot": preview["shot"],
+            "status": preview["status"],
+            "created_at": preview["created_at"],
+            "finished_at": preview["finished_at"],
+            "prompt_id": preview["prompt_id"],
+            "image_url": (
+                f"/api/previews/{preview['id']}/image"
+                if preview["status"] == "completed" else None
+            ),
+            "error": preview["error"],
+        }
+
+    def get_preview(self, preview_id: str) -> dict[str, Any]:
+        with self.lock:
+            preview = self.previews.get(preview_id)
+            if preview is None:
+                raise AppError("Shot preview not found or expired")
+            return self.preview_payload(preview)
+
+    def preview_image(self, preview_id: str) -> tuple[bytes, str]:
+        with self.lock:
+            preview = self.previews.get(preview_id)
+            if preview is None:
+                raise AppError("Shot preview not found or expired")
+            if preview["status"] != "completed" or preview["image_bytes"] is None:
+                raise AppError("Shot preview image is not ready")
+            return preview["image_bytes"], preview["mime_type"] or "image/png"
+
+    def delete_preview(self, preview_id: str) -> dict[str, Any]:
+        with self.lock:
+            preview = self.previews.get(preview_id)
+            if preview is None:
+                return {"deleted": False}
+            if preview["status"] in {"queued", "running"}:
+                raise AppError("A rendering preview cannot be closed yet")
+            self.previews.pop(preview_id, None)
+        return {"deleted": True}
+
+    def _run_preview(self, preview_id: str) -> None:
+        with self.lock:
+            preview = self.previews[preview_id]
+            preview["status"] = "running"
+        try:
+            db = preview["db"]
+            _, db_path = load_database()
+            workflow, mapping = load_workflow_runtime(db, db_path, True)
+            prompt_id, image_bytes, mime_type = generate_preview_image(
+                db,
+                preview["positive"],
+                preview["negative"],
+                preview["seed"],
+                workflow,
+                mapping,
+            )
+            with self.lock:
+                preview["prompt_id"] = prompt_id
+                preview["image_bytes"] = image_bytes
+                preview["mime_type"] = mime_type
+                preview["status"] = "completed"
+        except Exception as exc:
+            with self.lock:
+                preview["status"] = "failed"
+                preview["error"] = str(exc)
+        finally:
+            with self.lock:
+                preview["finished_at"] = _iso_now()
+
     def job_payload(self, job: dict[str, Any]) -> dict[str, Any]:
-        return {key: value for key, value in job.items() if key != "cancel_requested"}
+        return dict(job)
 
     def get_job(self, job_id: str) -> dict[str, Any]:
         with self.lock:
@@ -2697,6 +2945,10 @@ class ValhallaHandler(BaseHTTPRequestHandler):
                 self.send_json(WEB_STATE.jobs_payload())
             elif path.startswith("/api/jobs/"):
                 self.send_json(WEB_STATE.get_job(path.split("/")[3]))
+            elif path.endswith("/image") and path.startswith("/api/previews/"):
+                self.serve_preview_image(path.split("/")[3])
+            elif path.startswith("/api/previews/"):
+                self.send_json(WEB_STATE.get_preview(path.split("/")[3]))
             elif path == "/api/outputs":
                 self.send_json({"outputs": list_output_images()})
             elif path.startswith("/api/outputs/"):
@@ -2731,6 +2983,16 @@ class ValhallaHandler(BaseHTTPRequestHandler):
                     WEB_STATE.create_job(str(payload.get("storyboard_id", "")), bool(payload.get("fast", False))),
                     HTTPStatus.ACCEPTED,
                 )
+            elif path == "/api/previews":
+                payload = self.read_json()
+                self.send_json(
+                    WEB_STATE.create_preview(
+                        str(payload.get("storyboard_id", "")),
+                        _safe_int(payload.get("shot"), "Shot", 1, 10_000),
+                        bool(payload.get("fast", False)),
+                    ),
+                    HTTPStatus.ACCEPTED,
+                )
             elif path.endswith("/cancel") and path.startswith("/api/jobs/"):
                 self.send_json(WEB_STATE.cancel_job(path.split("/")[3]))
             elif path == "/api/workflow/capture":
@@ -2753,6 +3015,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             elif path.startswith("/api/outputs/"):
                 name = unquote(path.removeprefix("/api/outputs/"))
                 self.send_json(delete_output_image(name))
+            elif path.startswith("/api/previews/"):
+                self.send_json(WEB_STATE.delete_preview(path.split("/")[3]))
             else:
                 self.send_json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
         except AppError as exc:
@@ -2795,6 +3059,16 @@ class ValhallaHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "private, max-age=3600")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def serve_preview_image(self, preview_id: str) -> None:
+        body, content_type = WEB_STATE.preview_image(preview_id)
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 

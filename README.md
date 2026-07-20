@@ -34,9 +34,10 @@ The UI includes:
 - deterministic prompt seeds and optional fixed inference seeds;
 - production and fast-test render profiles;
 - automatic recovery of the active storyboard, settings, render progress, ETA, outputs, and polling after a browser reload;
-- storyboard cards with one-shot reroll, prompt inspection, and compact JSON export/import tied to the exact semantic database version;
+- storyboard cards with one-shot reroll, prompt inspection, temporary Fast Preview, and compact JSON export/import tied to the exact semantic database version;
 - a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render-style, stage, pose, action, and expression controls plus constrained SET/shot remixes;
 - cancellable background render jobs;
+- shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
 - a persistent output gallery with full-screen preview, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, previous/next navigation, swipe, downloads, individual deletion, and confirmed bulk deletion;
 - safe or forced workflow capture from the latest successful ComfyUI run.
 
@@ -97,6 +98,10 @@ The Web UI is served from `/`. All application endpoints are under `/api`.
 | `GET` | `/api/jobs` | Discover the active render job and recover browser state after reload |
 | `GET` | `/api/jobs/{id}` | Read render progress, ETA, errors, and outputs |
 | `POST` | `/api/jobs/{id}/cancel` | Request cancellation between images |
+| `POST` | `/api/previews` | Start a temporary Fast Preview for one storyboard shot |
+| `GET` | `/api/previews/{id}` | Read temporary preview status |
+| `GET` | `/api/previews/{id}/image` | Read the completed in-memory preview image |
+| `DELETE` | `/api/previews/{id}` | Discard the temporary preview and its in-memory bytes |
 | `POST` | `/api/workflow/capture` | Capture the latest successful ComfyUI workflow |
 | `GET` | `/api/outputs` | List generated image files in the output directory |
 | `GET` | `/api/outputs/{filename}` | View or download a generated output |
@@ -135,7 +140,7 @@ The compact storyboard format stores catalog references by ID and includes a sem
 
 Resolve or import a storyboard, then open **Director** in the sidebar. The editor is organized in production order: identity, face, hair, body and anatomy, styling, wardrobe, scene and treatment, then shot direction. Every enabled database preset is available through its relevant control. Current selections remain selected, curated database-pool values carry a **Default** marker, and the global search locates fields by both setting and preset text.
 
-Subject, wardrobe, location, mood, and render-style changes apply to the complete photoshoot SET; in Random mode they affect only that independent shot. Stage, pose, action, and expression affect the selected shot. Changing a foundational choice automatically repairs dependent traits, furniture, clothing, or composition when necessary. Optional outfit slots can be added or removed. Incompatible records are excluded, photoshoot stage edits cannot reverse progression, and all updates are rejected while that storyboard is rendering.
+Subject, wardrobe, location, mood, and render-style changes apply to the complete photoshoot SET; in Random mode they affect only that independent shot. Stage, pose, action, and expression affect the selected shot. Director exposes every stage compatible with the active outfit recipe, including safe, terminal, and explicit variants, even when the storyboard began in Full XXX mode. A manually selected stage may intentionally depart from automatic progression and immediately rebuilds the compatible pose, action, and expression choices. Changing a foundational choice automatically repairs dependent traits, furniture, clothing, or composition when necessary. Optional outfit slots can be added or removed. Incompatible records remain excluded, and all updates are rejected while that storyboard is rendering.
 
 Quick actions provide constrained remixes for the subject, current wardrobe recipe, complete scene/treatment, or selected shot. Director edits remain part of the in-memory storyboard and are preserved by compact JSON export.
 
@@ -149,7 +154,7 @@ Safe capture refuses to overwrite an existing `workflow.json`. Enable **Replace 
 
 ## Fast test
 
-Fast test patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. It is intended for rapid prompt and composition checks. Production mode runs the complete captured workflow.
+Fast test patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. It is intended for rapid prompt and composition checks. With Fast test enabled, any Studio shot—or the selected Director shot—can be rendered alone through **Preview**. Preview output nodes use ComfyUI temporary previews, Project Valhalla keeps the returned image only in memory, and closing the draggable preview window discards it without adding anything to the output gallery. Production mode runs the complete captured workflow.
 
 ## Database
 
