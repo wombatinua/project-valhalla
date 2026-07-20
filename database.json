@@ -1311,79 +1311,97 @@
     "breast_size": [
       {
         "id": "breasts_small",
-        "prompt": "small breasts"
+        "prompt": "small breasts",
+        "covered_prompt": "(small-busted clothed silhouette:1.15), chest fully covered by clothing"
       },
       {
         "id": "breasts_medium",
-        "prompt": "medium-sized breasts"
+        "prompt": "medium-sized breasts",
+        "covered_prompt": "(medium-busted clothed silhouette:1.15), chest fully covered by clothing"
       },
       {
         "id": "breasts_large",
-        "prompt": "large breasts"
+        "prompt": "large breasts",
+        "covered_prompt": "(large-busted clothed silhouette:1.2), clearly substantial upper-body volume beneath clothing, chest fully covered by clothing"
       },
       {
         "id": "breasts_full",
-        "prompt": "full heavy breasts"
+        "prompt": "full heavy breasts",
+        "covered_prompt": "(full heavy-busted clothed silhouette:1.2), substantial natural upper-body volume beneath clothing, chest fully covered by clothing"
       },
       {
         "id": "breasts_very_small",
-        "prompt": "very small natural breasts"
+        "prompt": "very small natural breasts",
+        "covered_prompt": "(very small-busted clothed silhouette:1.15), chest fully covered by clothing"
       },
       {
         "id": "breasts_small_full",
-        "prompt": "small full breasts"
+        "prompt": "small full breasts",
+        "covered_prompt": "(small full-busted clothed silhouette:1.15), chest fully covered by clothing"
       },
       {
         "id": "breasts_medium_full",
-        "prompt": "full medium-sized breasts"
+        "prompt": "full medium-sized breasts",
+        "covered_prompt": "(full medium-busted clothed silhouette:1.15), chest fully covered by clothing"
       },
       {
         "id": "breasts_very_large",
-        "prompt": "very large natural breasts"
+        "prompt": "very large natural breasts",
+        "covered_prompt": "(very large-busted clothed silhouette:1.22), pronounced natural upper-body volume beneath clothing, chest fully covered by clothing"
       },
       {
         "id": "breasts_extremely_large",
         "prompt": "extremely large heavy natural breasts",
+        "covered_prompt": "(extremely large heavy-busted clothed silhouette:1.25), strongly pronounced upper-body volume beneath clothing, chest fully covered by clothing",
         "weight": 0.35
       },
       {
         "id": "breasts_asymmetric_subtle",
         "prompt": "naturally full breasts with subtle realistic asymmetry",
+        "covered_prompt": "(naturally full-busted clothed silhouette:1.18), subtle realistic asymmetry beneath clothing, chest fully covered by clothing",
         "weight": 0.6
       }
     ],
     "breast_shape": [
       {
         "id": "breasts_round",
-        "prompt": "round natural breast shape"
+        "prompt": "round natural breast shape",
+        "covered_prompt": "rounded bust contour beneath clothing"
       },
       {
         "id": "breasts_teardrop",
-        "prompt": "natural teardrop breast shape"
+        "prompt": "natural teardrop breast shape",
+        "covered_prompt": "natural teardrop bust contour beneath clothing"
       },
       {
         "id": "breasts_perky",
-        "prompt": "firm uplifted breast shape"
+        "prompt": "firm uplifted breast shape",
+        "covered_prompt": "firm uplifted bust contour beneath clothing"
       },
       {
         "id": "breasts_bell",
-        "prompt": "natural bell-shaped breasts"
+        "prompt": "natural bell-shaped breasts",
+        "covered_prompt": "natural bell-shaped bust contour beneath clothing"
       },
       {
         "id": "breasts_wide_set",
-        "prompt": "naturally wide-set breasts"
+        "prompt": "naturally wide-set breasts",
+        "covered_prompt": "naturally wide-set bust contour beneath clothing"
       },
       {
         "id": "breasts_close_set",
-        "prompt": "naturally close-set breasts"
+        "prompt": "naturally close-set breasts",
+        "covered_prompt": "naturally close-set bust contour beneath clothing"
       },
       {
         "id": "breasts_soft_heavy",
-        "prompt": "soft naturally hanging breast shape"
+        "prompt": "soft naturally hanging breast shape",
+        "covered_prompt": "soft naturally low-set bust contour beneath clothing"
       },
       {
         "id": "breasts_shallow",
-        "prompt": "shallow gently sloped breast shape"
+        "prompt": "shallow gently sloped breast shape",
+        "covered_prompt": "shallow gently sloped bust contour beneath clothing"
       }
     ],
     "areola_size": [
@@ -10567,6 +10585,7 @@
     "positive_prefix": "(solo {age}:1.4), (single subject:1.4)",
     "positive_suffix": "complete intact body, two arms, two legs, two hands, two feet, correct hands and feet, coherent anatomy, realistic photography, natural skin texture, high detail",
     "negative_prompt": "child, minor, underage, teen, young-looking, man, male, men, male body, male hands, penis, testicles, multiple people, duplicate person, twins, mirror, reflection, sex toy, vibrator, dildo, amputee, missing limb, missing arm, missing leg, detached limb, limb stump, prosthetic limb, extra limbs, extra arms, extra legs, duplicated limbs, fused limbs, malformed arms, malformed legs, bad hands, missing fingers, extra fingers, fused fingers, malformed fingers, bad feet, missing toes, extra toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
+    "covered_chest_negative": "bare breasts, exposed breasts, topless, visible nipples, exposed nipples, wardrobe malfunction",
     "cameltoe_prompt": "clearly visible natural cameltoe contour through the tight fabric",
     "xxx_plateau_prompts": {
       "provocative_rear": "(anatomically coherent rear-facing nude pose:1.5), back, shoulders, torso, pelvis and buttocks all facing away from the camera in one consistent direction, only the head and neck may turn to look back, exposed buttocks and genitals from behind, uncensored",

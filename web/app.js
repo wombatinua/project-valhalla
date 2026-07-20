@@ -5,6 +5,9 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 const state = {
   storyboard: null,
+  director: null,
+  directorShot: 1,
+  directorOpenGroup: null,
   job: null,
   jobTimer: null,
   outputs: [],
@@ -240,6 +243,7 @@ function shotCard(shot) {
       </div>
       <div class="shot-footer">
         <button data-action="inspect">Inspect prompt</button>
+        <button class="direct" data-action="director">⌘ Director</button>
         <button class="reroll" data-action="reroll">↻ Reroll</button>
       </div>
     </article>`;
@@ -248,6 +252,10 @@ function shotCard(shot) {
 function renderStoryboard() {
   const board = state.storyboard;
   if (!board) return;
+  if (state.director?.storyboard_id !== board.id) {
+    state.director = null;
+    state.directorOpenGroup = null;
+  }
   shotGrid.innerHTML = board.shots.map(shotCard).join('');
   $('#seed-pill').textContent = `Seed ${board.config.prompt_seed}`;
   const sets = board.config.mode === 'photoshoot' ? board.config.photoshoots : 'Independent';
@@ -624,10 +632,160 @@ $('.image-stage').addEventListener('pointerup', (event) => {
   if (Math.abs(distance) > 55) movePreview(distance > 0 ? -1 : 1);
 });
 
+function directorShotButton(shot) {
+  const active = shot.number === state.directorShot ? 'active' : '';
+  const stage = shot.stage.plateau_kind || shot.stage.level;
+  return `<button class="director-shot ${active}" data-director-shot="${shot.number}">
+    <i>${String(shot.number).padStart(2, '0')}</i>
+    <span><strong>Set ${shot.photoshoot_index + 1} · Shot ${shot.shot_index + 1}</strong><span>${escapeHtml(shot.action.prompt)}</span></span>
+    <em>${escapeHtml(stage.replaceAll('_', ' '))}</em>
+  </button>`;
+}
+
+function directorField(field) {
+  const current = field.options.find((option) => option.id === field.value);
+  const optionHtml = field.options.map((option) => {
+    const suffix = option.default ? ' · Default' : '';
+    return `<option value="${escapeHtml(option.id)}" ${option.id === field.value ? 'selected' : ''} title="${escapeHtml(option.prompt)}">${escapeHtml(option.label + suffix)}</option>`;
+  }).join('');
+  const search = [field.label, ...field.options.map((option) => `${option.label} ${option.prompt}`)].join(' ').toLowerCase();
+  return `<div class="director-field" data-director-search="${escapeHtml(search)}">
+    <div class="director-field-head"><label for="director-${escapeHtml(field.key)}">${escapeHtml(field.label)}</label><span class="director-scope">${field.scope === 'set' ? 'Entire set' : 'This shot'}</span></div>
+    <select id="director-${escapeHtml(field.key)}" data-director-field="${escapeHtml(field.key)}">${optionHtml}</select>
+    <p class="director-field-note">${current?.default ? '<span class="default-mark">Database default</span>' : escapeHtml(current?.prompt || current?.label || '')}</p>
+  </div>`;
+}
+
+function renderDirector() {
+  const workspace = $('#director-workspace');
+  const empty = $('#director-empty');
+  if (!state.storyboard || !state.director) {
+    workspace.classList.add('hidden');
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  workspace.classList.remove('hidden');
+  $('#director-shot-list').innerHTML = state.storyboard.shots.map(directorShotButton).join('');
+  const sets = new Set(state.storyboard.shots.map((shot) => shot.photoshoot_index)).size;
+  $('#director-set-count').textContent = `${sets} set${sets === 1 ? '' : 's'}`;
+  const data = state.director;
+  const shot = data.summary;
+  $('#director-title').textContent = `Set ${shot.photoshoot_index + 1} · Shot ${shot.shot_index + 1}`;
+  $('#director-subtitle').textContent = 'SET changes propagate across the photoshoot; direction changes affect this shot only.';
+  $('#director-summary').innerHTML = [
+    ['Subject', shot.subject], ['Wardrobe', shot.wardrobe],
+    ['Location', shot.location], ['Treatment', shot.photography],
+  ].map(([label, value]) => `<div class="director-summary-${label.toLowerCase()}"><span>${label}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+  const icons = { identity: 'ID', face: '◉', hair: '≈', body: '◇', styling: '✦', wardrobe: '◫', scene: '⌂', direction: '↗' };
+  $('#director-groups').innerHTML = data.groups.map((group) => `
+    <details class="director-group" data-director-group="${escapeHtml(group.id)}" ${state.directorOpenGroup === group.id ? 'open' : ''}>
+      <summary><span class="director-group-title"><i>${icons[group.id] || '•'}</i>${escapeHtml(group.label)}</span><small>${group.fields.length} settings · ${group.id === 'direction' ? 'shot' : 'set'}</small></summary>
+      <div class="director-fields">${group.fields.map(directorField).join('')}</div>
+    </details>
+  `).join('');
+  filterDirector($('#director-search').value);
+}
+
+function filterDirector(query) {
+  const normalized = String(query || '').trim().toLowerCase();
+  let visible = 0;
+  $$('.director-field').forEach((field) => {
+    const show = !normalized || field.dataset.directorSearch.includes(normalized);
+    field.classList.toggle('hidden', !show);
+    if (show) visible += 1;
+  });
+  $$('[data-director-group]').forEach((group) => {
+    const show = Boolean($('.director-field:not(.hidden)', group));
+    group.classList.toggle('hidden', !show);
+    if (normalized && show) group.open = true;
+  });
+  let none = $('.director-no-results');
+  if (!visible && normalized) {
+    if (!none) {
+      none = document.createElement('div');
+      none.className = 'director-no-results';
+      $('#director-groups').append(none);
+    }
+    none.textContent = `No settings or presets match “${query}”.`;
+  } else {
+    none?.remove();
+  }
+}
+
+async function loadDirector(number = state.directorShot) {
+  if (!state.storyboard) {
+    state.director = null;
+    renderDirector();
+    return;
+  }
+  state.directorShot = Math.min(Math.max(1, number), state.storyboard.total);
+  $('#director-loading').classList.remove('hidden');
+  $('#director-groups').classList.add('hidden');
+  try {
+    state.director = await api(`/api/storyboards/${state.storyboard.id}/director?shot=${state.directorShot}`);
+    renderDirector();
+  } catch (error) {
+    state.director = null;
+    renderDirector();
+    toast('Director unavailable', error.message, 'error');
+  } finally {
+    $('#director-loading').classList.add('hidden');
+    $('#director-groups').classList.remove('hidden');
+  }
+}
+
+async function remixDirector(target, button) {
+  if (!state.storyboard || !state.director) return;
+  const buttons = $$('[data-director-remix]');
+  buttons.forEach((item) => { item.disabled = true; });
+  try {
+    state.director = await api(`/api/storyboards/${state.storyboard.id}/director`, {
+      method: 'POST',
+      body: JSON.stringify({ shot: state.directorShot, field: `remix.${target}`, value: '' }),
+    });
+    state.storyboard = await api(`/api/storyboards/${state.storyboard.id}`);
+    renderStoryboard();
+    renderDirector();
+    toast('Remix complete', target === 'shot' ? 'This shot was redirected.' : `The set’s ${target} was refreshed.`, 'success');
+  } catch (error) {
+    toast('Could not remix', error.message, 'error');
+  } finally {
+    buttons.forEach((item) => { item.disabled = false; });
+  }
+}
+
+async function applyDirectorChange(select) {
+  if (!state.storyboard || !state.director) return;
+  const field = select.dataset.directorField;
+  const card = select.closest('.director-field');
+  const previous = state.director.groups.flatMap((group) => group.fields).find((item) => item.key === field)?.value;
+  select.disabled = true;
+  card.classList.add('changed');
+  try {
+    state.director = await api(`/api/storyboards/${state.storyboard.id}/director`, {
+      method: 'POST',
+      body: JSON.stringify({ shot: state.directorShot, field, value: select.value }),
+    });
+    state.storyboard = await api(`/api/storyboards/${state.storyboard.id}`);
+    renderStoryboard();
+    renderDirector();
+    toast('Direction applied', field.startsWith('shot.') ? 'This shot was updated.' : 'The complete set was updated.', 'success');
+  } catch (error) {
+    select.value = previous ?? '';
+    card.classList.remove('changed');
+    select.disabled = false;
+    toast('Choice is incompatible', error.message, 'error');
+  }
+}
+
 function switchView(name) {
   $$('.view').forEach((view) => view.classList.toggle('active', view.id === `${name}-view`));
   $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.view === name));
-  $('#view-title').textContent = name === 'studio' ? 'Production Studio' : 'Output Gallery';
+  $('#view-title').textContent = {
+    studio: 'Production Studio', director: 'Director’s Desk', outputs: 'Output Gallery',
+  }[name] || 'Project Valhalla';
+  if (name === 'director') loadDirector();
 }
 
 async function captureWorkflow() {
@@ -658,6 +816,33 @@ $('#export-storyboard').addEventListener('click', exportStoryboard);
 $('#import-storyboard').addEventListener('click', () => $('#storyboard-file').click());
 $('#storyboard-file').addEventListener('change', importStoryboard);
 $('#generate-button').addEventListener('click', startGeneration);
+$('#director-open-studio').addEventListener('click', () => switchView('studio'));
+$('#director-search').addEventListener('input', (event) => filterDirector(event.target.value));
+$('.director-quick-actions').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-director-remix]');
+  if (button) remixDirector(button.dataset.directorRemix, button);
+});
+$('#director-shot-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-director-shot]');
+  if (button) loadDirector(Number(button.dataset.directorShot));
+});
+$('#director-groups').addEventListener('click', (event) => {
+  const summary = event.target.closest('.director-group > summary');
+  if (!summary) return;
+  const selected = summary.parentElement;
+  if (selected.open) {
+    state.directorOpenGroup = null;
+    return;
+  }
+  state.directorOpenGroup = selected.dataset.directorGroup;
+  $$('.director-group', $('#director-groups')).forEach((group) => {
+    if (group !== selected) group.open = false;
+  });
+});
+$('#director-groups').addEventListener('change', (event) => {
+  const select = event.target.closest('[data-director-field]');
+  if (select) applyDirectorChange(select);
+});
 $('#cancel-job').addEventListener('click', async () => {
   if (!state.job) return;
   try {
@@ -672,6 +857,10 @@ shotGrid.addEventListener('click', (event) => {
   const number = Number(button.closest('.shot-card').dataset.shot);
   const shot = state.storyboard.shots.find((item) => item.number === number);
   if (button.dataset.action === 'inspect') openPrompt(shot);
+  if (button.dataset.action === 'director') {
+    state.directorShot = number;
+    switchView('director');
+  }
   if (button.dataset.action === 'reroll') rerollShot(number, button);
 });
 

@@ -35,6 +35,7 @@ The UI includes:
 - production and fast-test render profiles;
 - automatic recovery of the active storyboard, settings, render progress, ETA, outputs, and polling after a browser reload;
 - storyboard cards with one-shot reroll, prompt inspection, and compact JSON export/import tied to the exact semantic database version;
+- a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render-style, stage, pose, action, and expression controls plus constrained SET/shot remixes;
 - cancellable background render jobs;
 - a persistent output gallery with full-screen preview, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, previous/next navigation, swipe, downloads, individual deletion, and confirmed bulk deletion;
 - safe or forced workflow capture from the latest successful ComfyUI run.
@@ -88,6 +89,8 @@ The Web UI is served from `/`. All application endpoints are under `/api`.
 | `POST` | `/api/storyboards` | Validate configuration and resolve a complete storyboard |
 | `GET` | `/api/storyboards/{id}` | Retrieve a resolved storyboard |
 | `GET` | `/api/storyboards/{id}/export` | Export a compact, database-bound storyboard JSON |
+| `GET` | `/api/storyboards/{id}/director?shot={number}` | Read current and compatible Director controls |
+| `POST` | `/api/storyboards/{id}/director` | Apply one validated SET- or shot-level direction |
 | `POST` | `/api/storyboards/import` | Validate and restore a complete exported storyboard |
 | `POST` | `/api/storyboards/{id}/shots/{number}/reroll` | Resolve a new compatible composition for one shot |
 | `POST` | `/api/jobs` | Start a background render job for a storyboard |
@@ -127,6 +130,16 @@ The prompt seed controls all compositional decisions. Leaving it empty creates a
 The inference seed is sent to ComfyUI. Leaving it empty produces a different seed for every image. Entering a value deliberately reuses the same literal seed for the complete run.
 
 The compact storyboard format stores catalog references by ID and includes a semantic SHA-256 fingerprint of the complete database. Import succeeds only against the matching database content; reordering JSON keys does not break compatibility, but changing catalog data does. Imported storyboards remain fully reviewable, rerollable, and renderable.
+
+## Director’s Desk
+
+Resolve or import a storyboard, then open **Director** in the sidebar. The editor is organized in production order: identity, face, hair, body and anatomy, styling, wardrobe, scene and treatment, then shot direction. Every enabled database preset is available through its relevant control. Current selections remain selected, curated database-pool values carry a **Default** marker, and the global search locates fields by both setting and preset text.
+
+Subject, wardrobe, location, mood, and render-style changes apply to the complete photoshoot SET; in Random mode they affect only that independent shot. Stage, pose, action, and expression affect the selected shot. Changing a foundational choice automatically repairs dependent traits, furniture, clothing, or composition when necessary. Optional outfit slots can be added or removed. Incompatible records are excluded, photoshoot stage edits cannot reverse progression, and all updates are rejected while that storyboard is rendering.
+
+Quick actions provide constrained remixes for the subject, current wardrobe recipe, complete scene/treatment, or selected shot. Director edits remain part of the in-memory storyboard and are preserved by compact JSON export.
+
+Breast size and shape presets define a separate `covered_prompt` for clothing and lingerie stages. These prompts describe only the clothed bust silhouette and are paired with `prompt_defaults.covered_chest_negative`, which rejects bare breasts and visible nipples while the stage marks the chest as covered. Topless/nude stages continue to use the anatomical prompt instead. Areola, nipple, pubic-hair, and genital details remain strictly visibility-gated because they should not affect a covered silhouette.
 
 ## Workflow capture
 

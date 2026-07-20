@@ -93,6 +93,13 @@ def validate_item(item: Any, context: str) -> None:
         not isinstance(item["menu_group"], str) or not item["menu_group"].strip()
     ):
         raise AppError(f"{context}.{item['id']}: menu_group must be a non-empty string")
+    if "covered_prompt" in item and (
+        not isinstance(item["covered_prompt"], str)
+        or not item["covered_prompt"].strip()
+    ):
+        raise AppError(
+            f"{context}.{item['id']}: covered_prompt must be a non-empty string"
+        )
     if "reveals_cameltoe" in item and not isinstance(item["reveals_cameltoe"], bool):
         raise AppError(f"{context}.{item['id']}: reveals_cameltoe must be true or false")
     for field in ("requires_environment_tags", "excludes_environment_tags"):
@@ -994,32 +1001,55 @@ ALWAYS_HUMAN_PARTS = (
     "manicure",
 )
 
-def human_fragments(human: dict[str, Any], visibility: set[str]) -> list[str]:
+def human_fragments(
+    human: dict[str, Any],
+    visibility: set[str],
+    covered_chest: bool,
+) -> list[str]:
     items: list[dict[str, Any]] = [human[key] for key in ALWAYS_HUMAN_PARTS]
     items.extend(human.get("facial_accents", []))
+    fragments = [item["prompt"] for item in items if item.get("prompt")]
     if "breasts" in visibility or "nipples" in visibility:
-        items.extend([human["breast_size"], human["breast_shape"]])
+        fragments.extend([
+            human["breast_size"]["prompt"],
+            human["breast_shape"]["prompt"],
+        ])
+    elif covered_chest:
+        fragments.extend(
+            item["covered_prompt"]
+            for item in (human["breast_size"], human["breast_shape"])
+            if item.get("covered_prompt")
+        )
     if "nipples" in visibility:
-        items.extend([human["areola_size"], human["areola_color"], human["nipple_size"], human["nipple_shape"]])
+        fragments.extend(
+            human[key]["prompt"]
+            for key in ("areola_size", "areola_color", "nipple_size", "nipple_shape")
+        )
     if "pubic_area" in visibility:
-        items.append(human["pubic_hair"])
+        fragments.append(human["pubic_hair"]["prompt"])
     if "genitals" in visibility:
-        items.append(human["genital_appearance"])
-    return [item["prompt"] for item in items if item.get("prompt")]
+        fragments.append(human["genital_appearance"]["prompt"])
+    return fragments
 
 
 def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, list[str]]:
     defaults = db["prompt_defaults"]
     stage = scene["stage"]
-    visibility = set(stage.get("body_visibility", []))
+    stage_visibility = set(stage.get("body_visibility", []))
+    covered_chest = not bool({"breasts", "nipples"} & stage_visibility)
+    visibility = set(stage_visibility)
     plateau_kind = stage.get("plateau_kind")
     if plateau_kind == "provocative_rear":
         visibility -= {"breasts", "nipples"}
     xxx_prompt = defaults.get("xxx_plateau_prompts", {}).get(plateau_kind, "")
     age_prompt = scene["human"]["age"]["prompt"]
     positive_prefix = defaults.get("positive_prefix", "").replace("{age}", age_prompt)
-    fragments = [xxx_prompt, positive_prefix]
-    fragments.extend(human_fragments(scene["human"], visibility))
+    fragments = [positive_prefix]
+    fragments.extend(
+        human_fragments(scene["human"], visibility, covered_chest)
+    )
+    if xxx_prompt:
+        fragments.append(xxx_prompt)
     visible_slots = set(stage.get("visible_slots", []))
     outfit = scene["outfit"]
     reveals_cameltoe = False
@@ -1044,6 +1074,8 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     fragments.append(defaults.get("positive_suffix", ""))
     positive = ", ".join(fragment.strip(" ,") for fragment in fragments if fragment.strip(" ,"))
     negative = defaults.get("negative_prompt", "")
+    if covered_chest and defaults.get("covered_chest_negative"):
+        negative = f"{negative}, {defaults['covered_chest_negative']}"
     if plateau_kind and defaults.get("xxx_negative_additions"):
         negative = f"{negative}, {defaults['xxx_negative_additions']}"
     kind_negative = defaults.get("xxx_plateau_negative_additions", {}).get(
@@ -1075,6 +1107,14 @@ def model_signature(human: dict[str, Any]) -> str:
         else:
             parts.append(value["id"])
     return "+".join(parts)
+
+
+def model_description(human: dict[str, Any]) -> str:
+    keys = (
+        "age", "ethnic_appearance", "skin_tone", "hair_length", "hair_style",
+        "hair_color", "height", "body_frame", "breast_size",
+    )
+    return " · ".join(human[key]["prompt"] for key in keys)
 
 
 def photoshoot_signature(context: dict[str, Any]) -> tuple[Any, ...]:
@@ -1466,7 +1506,7 @@ import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 WEB_ROOT = Path(__file__).resolve().with_name("web")
 MAX_STORYBOARDS = 20
@@ -1567,7 +1607,7 @@ def serialize_shot(db: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
             "plateau_kind": shot["stage"].get("plateau_kind"),
         },
         "inference_seed": shot["inference_seed"],
-        "subject": model_signature(context["human"]),
+        "subject": model_description(context["human"]),
         "wardrobe": template.get("menu_label", template["id"]),
         "outfit": _outfit_summary(context["outfit"]),
         "location": context["interior"]["prompt"],
@@ -1616,6 +1656,98 @@ def decode_database_refs(value: Any, index: dict[str, dict[str, Any]]) -> Any:
     if isinstance(value, list):
         return [decode_database_refs(item, index) for item in value]
     return value
+
+
+DIRECTOR_HUMAN_GROUPS = (
+    ("Identity", ("age", "ethnic_appearance", "skin_tone")),
+    ("Face", ("face_shape", "eye_shape", "eye_color", "eyebrows", "nose", "lips", "cheekbones", "jawline", "facial_accents")),
+    ("Hair", ("hair_texture", "hair_length", "hair_style", "hair_color")),
+    ("Body", ("height", "body_frame", "waist", "hips", "breast_size", "breast_shape", "areola_size", "areola_color", "nipple_size", "nipple_shape", "pubic_hair", "genital_appearance")),
+    ("Styling", ("makeup", "manicure")),
+)
+
+DIRECTOR_LABELS = {
+    "age": "Age", "ethnic_appearance": "Nationality / appearance", "skin_tone": "Skin tone",
+    "face_shape": "Face shape", "eye_shape": "Eye shape", "eye_color": "Eye color",
+    "eyebrows": "Eyebrows", "nose": "Nose", "lips": "Lips", "cheekbones": "Cheekbones",
+    "jawline": "Jawline", "facial_accents": "Facial detail", "hair_texture": "Hair texture",
+    "hair_length": "Hair length", "hair_style": "Hair style", "hair_color": "Hair color",
+    "height": "Height", "body_frame": "Body type", "waist": "Waist", "hips": "Hips",
+    "breast_size": "Breast size", "breast_shape": "Breast shape",
+    "areola_size": "Areola size", "areola_color": "Areola color",
+    "nipple_size": "Nipple size", "nipple_shape": "Nipple shape",
+    "pubic_hair": "Pubic hair", "genital_appearance": "Vulva appearance",
+    "makeup": "Makeup", "manicure": "Manicure",
+}
+
+
+def director_stage_options(shot: dict[str, Any], xxx_only: bool) -> list[dict[str, Any]]:
+    template = shot["context"]["outfit"]["template"]
+    explicit = [
+        xxx_only_stage(template, index, 3, "photoshoot", random.Random(0))
+        for index in range(3)
+    ]
+    if xxx_only:
+        return explicit
+    safe = [
+        stage for stage in effective_photoshoot_stages(template)
+        if stage["level"] != "explicit"
+    ]
+    unique: dict[str, dict[str, Any]] = {}
+    for stage in safe + explicit:
+        unique[stage["id"]] = stage
+    return list(unique.values())
+
+
+def director_option(item: dict[str, Any], current: str | None, defaults: set[str] | None = None) -> dict[str, Any]:
+    return {
+        "id": item["id"],
+        "label": item.get("menu_label", item.get("prompt", item["id"])),
+        "prompt": item.get("prompt", ""),
+        "current": item["id"] == current,
+        "default": item["id"] in (defaults or set()),
+    }
+
+
+def director_required_overrides(
+    db: dict[str, Any], category: str, item: dict[str, Any]
+) -> dict[str, dict[str, Any]]:
+    category_by_id = {
+        candidate["id"]: candidate_category
+        for candidate_category, values in db["human_model_parts"].items()
+        for candidate in values
+    }
+    enabled = [
+        candidate
+        for values in db["human_model_parts"].values()
+        for candidate in values
+        if not candidate.get("disabled", False)
+    ]
+    selected = {category: item}
+    for _ in range(len(HUMAN_SELECTION_ORDER) * 3):
+        available = set().union(*(tags(candidate) for candidate in selected.values()))
+        missing_groups: list[set[str]] = []
+        for candidate in selected.values():
+            required = set(candidate.get("requires_tags", [])) - available
+            missing_groups.extend({tag} for tag in required)
+            required_any = set(candidate.get("requires_any_tags", []))
+            if required_any and not required_any & available:
+                missing_groups.append(required_any)
+        if not missing_groups:
+            return selected
+        requirement = missing_groups[0]
+        providers = [
+            candidate for candidate in enabled
+            if tags(candidate) & requirement
+            and category_by_id[candidate["id"]] != category
+        ]
+        if not providers:
+            raise AppError(
+                f"No human trait provides required tags {sorted(requirement)}"
+            )
+        provider = providers[0]
+        selected[category_by_id[provider["id"]]] = provider
+    raise AppError(f"Could not resolve prerequisites for {item['id']}")
 
 
 class WebState:
@@ -1670,6 +1802,510 @@ class WebState:
         if record is None:
             raise AppError("Storyboard not found or expired")
         return record
+
+    def director_payload(self, storyboard_id: str, number: int = 1) -> dict[str, Any]:
+        record = self.get_storyboard(storyboard_id)
+        if not 1 <= number <= len(record["shots"]):
+            raise AppError("Shot number is out of range")
+        shot = record["shots"][number - 1]
+        db = record["db"]
+        context = shot["context"]
+        human_defaults = db["settings"].get("human_defaults", {}).get("pools", {})
+        groups = []
+        for group_name, categories in DIRECTOR_HUMAN_GROUPS:
+            fields = []
+            for category in categories:
+                values = [
+                    item for item in db["human_model_parts"][category]
+                    if not item.get("disabled", False)
+                ]
+                selected = context["human"][category]
+                if isinstance(selected, list):
+                    current = selected[0]["id"] if selected else ""
+                    options = [{
+                        "id": "", "label": "None", "prompt": "",
+                        "current": not selected, "default": False,
+                    }]
+                else:
+                    current = selected["id"]
+                    options = []
+                options.extend(
+                    director_option(item, current, set(human_defaults.get(category, [])))
+                    for item in values
+                )
+                fields.append({
+                    "key": f"human.{category}",
+                    "label": DIRECTOR_LABELS[category],
+                    "scope": "set",
+                    "value": current,
+                    "options": options,
+                })
+            groups.append({"id": group_name.lower(), "label": group_name, "fields": fields})
+
+        template = context["outfit"]["template"]
+        wardrobe_fields = [{
+            "key": "outfit.template",
+            "label": "Outfit recipe",
+            "scope": "set",
+            "value": template["id"],
+            "options": [
+                director_option(
+                    item, template["id"],
+                    {
+                        candidate["id"] for candidate in db["outfit_templates"]
+                        if candidate["wardrobe_category"] in set(
+                            db["settings"]["scene_defaults"]["wardrobe_categories"]
+                        )
+                    },
+                )
+                for item in db["outfit_templates"] if not item.get("disabled", False)
+            ],
+        }]
+        for slot, rule in template["slots"].items():
+            garment = context["outfit"]["garments"].get(slot)
+            candidates = [
+                item for item in db["garments"][rule["catalog"]]
+                if not item.get("disabled", False)
+                and set(rule.get("required_tags", [])).issubset(tags(item))
+                and (
+                    not rule.get("required_any_tags")
+                    or set(rule["required_any_tags"]) & tags(item)
+                )
+                and not set(rule.get("excludes_tags", [])) & tags(item)
+                and set(item.get("requires_environment_tags", [])).issubset(tags(context["interior"]))
+                and not set(item.get("excludes_environment_tags", [])) & tags(context["interior"])
+            ]
+            garment_options = [
+                director_option(item, garment["id"] if garment else None)
+                for item in candidates
+            ]
+            if not rule.get("required", False):
+                garment_options.insert(0, {
+                    "id": "", "label": "None", "prompt": "",
+                    "current": garment is None, "default": garment is None,
+                })
+            wardrobe_fields.append({
+                "key": f"outfit.garments.{slot}",
+                "label": slot.replace("_", " ").title(),
+                "scope": "set",
+                "value": garment["id"] if garment else "",
+                "options": garment_options,
+            })
+            if not garment:
+                continue
+            color = context["outfit"]["colors"][slot]
+            allowed_colors = set(garment.get("allowed_colors") or [item["id"] for item in db["colors"]])
+            wardrobe_fields.append({
+                "key": f"outfit.colors.{slot}",
+                "label": f"{slot.replace('_', ' ').title()} color",
+                "scope": "set",
+                "value": color["id"],
+                "options": [
+                    director_option(item, color["id"]) for item in db["colors"]
+                    if item["id"] in allowed_colors and not item.get("disabled", False)
+                ],
+            })
+            for section, key, label in (
+                ("patterns", "patterns", "Pattern"),
+                ("fabric_textures", "textures", "Texture"),
+            ):
+                current_item = context["outfit"].get(key, {}).get(slot)
+                modifiers = [
+                    item for item in db[section]
+                    if not item.get("disabled", False)
+                    and garment["id"] in item["allowed_garment_ids"]
+                ]
+                wardrobe_fields.append({
+                    "key": f"outfit.{key}.{slot}",
+                    "label": f"{slot.replace('_', ' ').title()} {label.lower()}",
+                    "scope": "set",
+                    "value": current_item["id"] if current_item else "",
+                    "options": [{
+                        "id": "", "label": "None / plain", "prompt": "",
+                        "current": current_item is None, "default": True,
+                    }] + [
+                        director_option(item, current_item["id"] if current_item else None)
+                        for item in modifiers
+                    ],
+                })
+        groups.append({"id": "wardrobe", "label": "Wardrobe", "fields": wardrobe_fields})
+
+        scene_defaults = db["settings"]["scene_defaults"].get("pools", {})
+        scene_fields = []
+        for key, section, label in (
+            ("interior", "interiors", "Location"),
+            ("furniture", "furniture", "Surface"),
+            ("mood", "moods", "Mood"),
+            ("photography_style", "photography_styles", "Render style"),
+        ):
+            current_item = context[key]
+            values = [item for item in db[section] if not item.get("disabled", False)]
+            if key == "furniture":
+                values = [
+                    item for item in values
+                    if compatible_with_requirements(item, tags(context["interior"]))
+                ]
+            scene_fields.append({
+                "key": f"scene.{key}",
+                "label": label,
+                "scope": "set",
+                "value": current_item["id"],
+                "options": [
+                    director_option(item, current_item["id"], set(scene_defaults.get(section, [])))
+                    for item in values
+                ],
+            })
+        groups.append({"id": "scene", "label": "Scene & treatment", "fields": scene_fields})
+
+        direction_fields = []
+        stages = director_stage_options(shot, record["args"].xxx_only)
+        level_rank = {"covered": 0, "lingerie": 1, "topless": 2, "nude": 3, "explicit": 4}
+        if record["args"].mode == "photoshoot":
+            same_set = [
+                item for item in record["shots"]
+                if item["photoshoot_index"] == shot["photoshoot_index"]
+            ]
+            current_position = same_set.index(shot)
+            minimum = (
+                level_rank[same_set[current_position - 1]["stage"]["level"]]
+                if current_position > 0 else 0
+            )
+            maximum = (
+                level_rank[same_set[current_position + 1]["stage"]["level"]]
+                if current_position + 1 < len(same_set) else 4
+            )
+            stages = [
+                item for item in stages
+                if minimum <= level_rank[item["level"]] <= maximum
+            ]
+        direction_fields.append({
+            "key": "shot.stage", "label": "Stage / content", "scope": "shot",
+            "value": shot["stage"]["id"],
+            "options": [
+                {
+                    "id": item["id"],
+                    "label": (item.get("plateau_kind") or item["level"]).replace("_", " ").title(),
+                    "prompt": item["level"], "current": item["id"] == shot["stage"]["id"],
+                    "default": item["id"] == shot["stage"]["id"],
+                } for item in stages
+            ],
+        })
+        for key, section, label in (
+            ("pose", "poses", "Pose"),
+            ("action", "actions", "Action"),
+            ("expression", "expressions", "Expression"),
+        ):
+            current_item = shot["scene"][key]
+            compatible = []
+            for item in db[section]:
+                if item.get("disabled", False):
+                    continue
+                trial = Composer(db, random.Random(0))
+                try:
+                    trial.resolve_scene(context, shot["stage"], {key: item["id"]})
+                except AppError:
+                    continue
+                compatible.append(item)
+            direction_fields.append({
+                "key": f"shot.{key}", "label": label, "scope": "shot",
+                "value": current_item["id"],
+                "options": [director_option(item, current_item["id"]) for item in compatible],
+            })
+        groups.append({"id": "direction", "label": "Shot direction", "fields": direction_fields})
+        return {
+            "storyboard_id": storyboard_id,
+            "shot": number,
+            "total": len(record["shots"]),
+            "photoshoot_index": shot["photoshoot_index"],
+            "shot_index": shot["shot_index"],
+            "summary": serialize_shot(db, shot),
+            "groups": groups,
+        }
+
+    def _replace_director_context(
+        self,
+        record: dict[str, Any],
+        shot_position: int,
+        context: dict[str, Any],
+        recalculate_stages: bool = False,
+        preserve_photography: bool = False,
+    ) -> None:
+        args = record["args"]
+        db = record["db"]
+        source = record["shots"][shot_position]
+        indices = [shot_position] if args.mode == "random" else [
+            index for index, shot in enumerate(record["shots"])
+            if shot["photoshoot_index"] == source["photoshoot_index"]
+        ]
+        progression = db["settings"].get("photoshoot_progression", {})
+        nsfw = float(progression.get("nsfw_final_percent", 50) if args.nsfw_percent is None else args.nsfw_percent)
+        plateau = float(progression.get("explicit_plateau_percent", 30) if args.plateau_percent is None else args.plateau_percent)
+        replacements = []
+        for index in indices:
+            old = record["shots"][index]
+            stage = old["stage"]
+            if recalculate_stages:
+                stage = (
+                    xxx_only_stage(context["outfit"]["template"], old["shot_index"], args.count, args.mode, record["rng"])
+                    if args.xxx_only else stage_for_index(
+                        context["outfit"]["template"], old["shot_index"], args.count,
+                        args.mode, record["rng"], nsfw, plateau,
+                    )
+                )
+            scene = record["composer"].resolve_scene(context, stage)
+            if preserve_photography:
+                scene["photography_style"] = context["photography_style"]
+                scene["dependencies"] = record["composer"].resolve_dependencies(scene)
+                record["composer"].validate_scene_rules(scene)
+            replacements.append((index, stage, scene))
+        for index, stage, scene in replacements:
+            record["shots"][index]["context"] = context
+            record["shots"][index]["stage"] = stage
+            record["shots"][index]["scene"] = scene
+
+    def update_director(self, storyboard_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        record = self.get_storyboard(storyboard_id)
+        with self.lock:
+            active = any(
+                job["storyboard_id"] == storyboard_id
+                and job["status"] in {"queued", "running"}
+                for job in self.jobs.values()
+            )
+        if active:
+            raise AppError("Director editing is unavailable while this storyboard is rendering")
+        number = _safe_int(payload.get("shot"), "Shot", 1, len(record["shots"]))
+        field = str(payload.get("field", ""))
+        value = str(payload.get("value", ""))
+        position = number - 1
+        shot = record["shots"][position]
+        db = record["db"]
+        index = {item["id"]: item for item in iter_content_items(db)}
+        context = copy.deepcopy(shot["context"])
+        recalculate_stages = False
+        preserve_photography = False
+
+        if field.startswith("remix."):
+            target = field.split(".", 1)[1]
+            if target == "shot":
+                shot["scene"] = record["composer"].resolve_scene(
+                    context, shot["stage"]
+                )
+                return self.director_payload(storyboard_id, number)
+            if target == "subject":
+                context["human"] = record["composer"].choose_human(
+                    use_default_ethnicity=False, use_human_defaults=False
+                )
+            elif target == "wardrobe":
+                context["outfit"] = record["composer"].choose_outfit(
+                    context["outfit"]["template"], context["interior"]
+                )
+            elif target == "scene":
+                interiors = [
+                    item for item in db["interiors"]
+                    if not item.get("disabled", False)
+                ]
+                context["interior"] = weighted_choice(record["rng"], interiors)
+                furniture = [
+                    item for item in db["furniture"]
+                    if not item.get("disabled", False)
+                    and compatible_with_requirements(item, tags(context["interior"]))
+                ]
+                context["furniture"] = weighted_choice(record["rng"], furniture)
+                context["mood"] = weighted_choice(
+                    record["rng"],
+                    [item for item in db["moods"] if not item.get("disabled", False)],
+                )
+                context["photography_style"] = weighted_choice(
+                    record["rng"],
+                    [
+                        item for item in db["photography_styles"]
+                        if not item.get("disabled", False)
+                    ],
+                )
+                try:
+                    record["composer"].validate_outfit_environment(
+                        context["outfit"], context["interior"]
+                    )
+                except AppError:
+                    context["outfit"] = record["composer"].choose_outfit(
+                        context["outfit"]["template"], context["interior"]
+                    )
+                preserve_photography = True
+            else:
+                raise AppError("Unknown remix action")
+        elif field.startswith("human."):
+            category = field.split(".", 1)[1]
+            if category not in db["human_model_parts"]:
+                raise AppError("Unknown human trait")
+            if category == "facial_accents":
+                if value:
+                    item = index.get(value)
+                    if item not in db["human_model_parts"][category]:
+                        raise AppError("Unknown facial detail")
+                    context["human"][category] = [item]
+                else:
+                    context["human"][category] = []
+            else:
+                item = index.get(value)
+                if item not in db["human_model_parts"][category]:
+                    raise AppError("Unknown human trait value")
+                overrides = {
+                    key: selected for key, selected in context["human"].items()
+                    if key != "facial_accents" and isinstance(selected, dict)
+                }
+                overrides[category] = item
+                try:
+                    human = record["composer"].choose_human(
+                        overrides, use_human_defaults=False
+                    )
+                except AppError:
+                    required_overrides = director_required_overrides(
+                        db, category, item
+                    )
+                    human = record["composer"].choose_human(
+                        required_overrides, use_human_defaults=False
+                    )
+                human["facial_accents"] = [
+                    accent for accent in context["human"].get("facial_accents", [])
+                    if compatible_with_requirements(
+                        accent, set().union(*(tags(part) for part in human.values() if isinstance(part, dict)))
+                    )
+                ]
+                context["human"] = human
+        elif field == "outfit.template":
+            template = index.get(value)
+            if template not in db["outfit_templates"]:
+                raise AppError("Unknown outfit recipe")
+            context["outfit"] = record["composer"].choose_outfit(template, context["interior"])
+            recalculate_stages = True
+        elif field.startswith("outfit."):
+            _, section, slot = field.split(".", 2)
+            outfit = context["outfit"]
+            if slot not in outfit["template"]["slots"]:
+                raise AppError("This outfit does not define that slot")
+            if section == "garments":
+                rule = outfit["template"]["slots"][slot]
+                if not value:
+                    if rule.get("required", False):
+                        raise AppError("A required garment cannot be removed")
+                    outfit["garments"].pop(slot, None)
+                    outfit["colors"].pop(slot, None)
+                    outfit.get("patterns", {}).pop(slot, None)
+                    outfit.get("textures", {}).pop(slot, None)
+                else:
+                    garment = index.get(value)
+                    required_tags = set(rule.get("required_tags", []))
+                    required_any = set(rule.get("required_any_tags", []))
+                    excluded_tags = set(rule.get("excludes_tags", []))
+                    if (
+                        garment not in db["garments"][rule["catalog"]]
+                        or not required_tags.issubset(tags(garment))
+                        or (required_any and not required_any & tags(garment))
+                        or excluded_tags & tags(garment)
+                    ):
+                        raise AppError("Garment is incompatible with this outfit slot")
+                    outfit["garments"][slot] = garment
+                    allowed = [
+                        color for color in db["colors"]
+                        if color["id"] in set(
+                            garment.get("allowed_colors")
+                            or [item["id"] for item in db["colors"]]
+                        )
+                    ]
+                    if outfit["colors"].get(slot) not in allowed:
+                        outfit["colors"][slot] = allowed[0]
+                    for modifier_key in ("patterns", "textures"):
+                        modifier = outfit.get(modifier_key, {}).get(slot)
+                        if modifier and garment["id"] not in modifier["allowed_garment_ids"]:
+                            outfit[modifier_key].pop(slot, None)
+            elif section == "colors":
+                color = index.get(value)
+                garment = outfit["garments"][slot]
+                allowed_ids = set(garment.get("allowed_colors") or [item["id"] for item in db["colors"]])
+                if color not in db["colors"] or color["id"] not in allowed_ids:
+                    raise AppError("Color is incompatible with this garment")
+                outfit["colors"][slot] = color
+            elif section in {"patterns", "textures"}:
+                source = "patterns" if section == "patterns" else "fabric_textures"
+                if not value:
+                    outfit.setdefault(section, {}).pop(slot, None)
+                else:
+                    modifier = index.get(value)
+                    if modifier not in db[source] or outfit["garments"][slot]["id"] not in modifier["allowed_garment_ids"]:
+                        raise AppError("Modifier is incompatible with this garment")
+                    outfit.setdefault(section, {})[slot] = modifier
+            else:
+                raise AppError("Unknown wardrobe field")
+            record["composer"].validate_outfit_environment(outfit, context["interior"])
+        elif field.startswith("scene."):
+            key = field.split(".", 1)[1]
+            sections = {
+                "interior": "interiors", "furniture": "furniture",
+                "mood": "moods", "photography_style": "photography_styles",
+            }
+            if key not in sections or index.get(value) not in db[sections[key]]:
+                raise AppError("Unknown scene selection")
+            context[key] = index[value]
+            if key == "interior":
+                furniture = [
+                    item for item in db["furniture"]
+                    if not item.get("disabled", False)
+                    and compatible_with_requirements(item, tags(context["interior"]))
+                ]
+                if context["furniture"] not in furniture:
+                    context["furniture"] = weighted_choice(record["rng"], furniture)
+                try:
+                    record["composer"].validate_outfit_environment(context["outfit"], context["interior"])
+                except AppError:
+                    context["outfit"] = record["composer"].choose_outfit(
+                        context["outfit"]["template"], context["interior"]
+                    )
+            preserve_photography = key == "photography_style"
+        elif field.startswith("shot."):
+            key = field.split(".", 1)[1]
+            if key == "stage":
+                stages = director_stage_options(shot, record["args"].xxx_only)
+                stage = next((item for item in stages if item["id"] == value), None)
+                if stage is None:
+                    raise AppError("Unknown stage")
+                if record["args"].mode == "photoshoot":
+                    level_rank = {
+                        "covered": 0, "lingerie": 1, "topless": 2,
+                        "nude": 3, "explicit": 4,
+                    }
+                    same_set = [
+                        item for item in record["shots"]
+                        if item["photoshoot_index"] == shot["photoshoot_index"]
+                    ]
+                    current_position = same_set.index(shot)
+                    rank = level_rank[stage["level"]]
+                    if (
+                        current_position > 0
+                        and rank < level_rank[same_set[current_position - 1]["stage"]["level"]]
+                    ) or (
+                        current_position + 1 < len(same_set)
+                        and rank > level_rank[same_set[current_position + 1]["stage"]["level"]]
+                    ):
+                        raise AppError("Stage change would reverse photoshoot progression")
+                scene = record["composer"].resolve_scene(context, stage)
+                shot["stage"], shot["scene"] = stage, scene
+            elif key in {"pose", "action", "expression"}:
+                if value not in index:
+                    raise AppError("Unknown direction")
+                scene = record["composer"].resolve_scene(
+                    context, shot["stage"], {key: value}
+                )
+                shot["scene"] = scene
+            else:
+                raise AppError("Unknown shot field")
+            return self.director_payload(storyboard_id, number)
+        else:
+            raise AppError("Unknown Director field")
+
+        self._replace_director_context(
+            record, position, context, recalculate_stages, preserve_photography
+        )
+        return self.director_payload(storyboard_id, number)
 
     def export_storyboard(self, storyboard_id: str) -> dict[str, Any]:
         record = self.get_storyboard(storyboard_id)
@@ -2049,6 +2685,11 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             elif path.endswith("/export") and path.startswith("/api/storyboards/"):
                 storyboard_id = path.split("/")[3]
                 self.send_json(WEB_STATE.export_storyboard(storyboard_id))
+            elif path.endswith("/director") and path.startswith("/api/storyboards/"):
+                storyboard_id = path.split("/")[3]
+                query = parse_qs(urlparse(self.path).query)
+                shot = _safe_int(query.get("shot", ["1"])[0], "Shot", 1, 10_000)
+                self.send_json(WEB_STATE.director_payload(storyboard_id, shot))
             elif path.startswith("/api/storyboards/"):
                 storyboard_id = path.split("/")[3]
                 self.send_json(WEB_STATE.storyboard_payload(WEB_STATE.get_storyboard(storyboard_id)))
@@ -2078,6 +2719,9 @@ class ValhallaHandler(BaseHTTPRequestHandler):
                 self.send_json(WEB_STATE.create_storyboard(self.read_json()), HTTPStatus.CREATED)
             elif path == "/api/storyboards/import":
                 self.send_json(WEB_STATE.import_storyboard(self.read_json()), HTTPStatus.CREATED)
+            elif path.endswith("/director") and path.startswith("/api/storyboards/"):
+                storyboard_id = path.split("/")[3]
+                self.send_json(WEB_STATE.update_director(storyboard_id, self.read_json()))
             elif path.endswith("/reroll") and path.startswith("/api/storyboards/"):
                 parts = path.split("/")
                 self.send_json(WEB_STATE.reroll_shot(parts[3], _safe_int(parts[5], "Shot", 1, 10000)))

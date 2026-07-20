@@ -19,6 +19,7 @@
 
       <nav class="primary-nav" aria-label="Primary navigation">
         <button class="nav-item active" data-view="studio"><span class="nav-icon">✦</span><span>Studio</span></button>
+        <button class="nav-item" data-view="director"><span class="nav-icon">⌘</span><span>Director</span></button>
         <button class="nav-item" data-view="outputs"><span class="nav-icon">▦</span><span>Outputs</span><span class="nav-count" id="output-count">0</span></button>
       </nav>
 
@@ -120,6 +121,43 @@
               <div class="spinner"></div><h3>Directing your storyboard…</h3><p>Resolving compatible casting, styling, locations and poses.</p>
             </div>
             <div class="shot-grid hidden" id="shot-grid"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="director-view">
+        <div class="director-empty panel" id="director-empty">
+          <div class="director-empty-mark">⌘</div>
+          <h2>Resolve a storyboard first</h2>
+          <p>Director becomes available after Studio has assembled a valid storyboard.</p>
+          <button class="button primary" id="director-open-studio">Open Studio</button>
+        </div>
+        <div class="director-workspace hidden" id="director-workspace">
+          <aside class="director-rail panel">
+            <div class="director-rail-head">
+              <div><p class="eyebrow">Production navigator</p><h2>Shots</h2></div>
+              <span id="director-set-count">—</span>
+            </div>
+            <div class="director-shot-list" id="director-shot-list"></div>
+          </aside>
+          <section class="director-editor panel">
+            <header class="director-editor-head">
+              <div>
+                <p class="eyebrow">Live constrained editor</p>
+                <h2 id="director-title">Director</h2>
+                <p id="director-subtitle">Select a shot to begin.</p>
+                <div class="director-quick-actions">
+                  <button data-director-remix="subject">Remix subject</button>
+                  <button data-director-remix="wardrobe">Remix wardrobe</button>
+                  <button data-director-remix="scene">Remix scene</button>
+                  <button data-director-remix="shot">Reroll shot</button>
+                </div>
+              </div>
+              <label class="director-search"><span>⌕</span><input id="director-search" type="search" placeholder="Find a setting or preset…"></label>
+            </header>
+            <div class="director-summary" id="director-summary"></div>
+            <div class="director-loading hidden" id="director-loading"><div class="spinner"></div><strong>Checking compatible choices…</strong></div>
+            <div class="director-groups" id="director-groups"></div>
           </section>
         </div>
       </section>
