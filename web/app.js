@@ -30,7 +30,11 @@ const state = {
   seedResolveTimer: null,
   resolveVersion: 0,
   initialAutoResolved: false,
+  pendingStructural: false,
+  updateResolver: null,
   theme: sessionStorage.getItem('valhalla-theme') || 'system',
+  typeSize: ['small', 'normal', 'large'].includes(sessionStorage.getItem('valhalla-type-size'))
+    ? sessionStorage.getItem('valhalla-type-size') : 'normal',
 };
 
 const form = $('#run-form');
@@ -43,11 +47,17 @@ const imageDialog = $('#image-dialog');
 const deleteDialog = $('#delete-dialog');
 const promptDialog = $("#prompt-dialog");
 const directorCustomDialog = $("#director-custom-dialog");
+const updateStoryboardDialog = $('#update-storyboard-dialog');
 
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+
+function displayValue(value) {
+  const text = String(value ?? '');
+  return text.replace(/[A-Za-z]/, (letter) => letter.toUpperCase());
 }
 
 async function api(path, options = {}) {
@@ -103,6 +113,23 @@ function cycleTheme() {
   toast('Theme updated', `${state.theme[0].toUpperCase()}${state.theme.slice(1)} appearance`);
 }
 
+function applyTypeSize() {
+  document.documentElement.dataset.typeSize = state.typeSize;
+  $$('[data-type-size]').forEach((button) => {
+    const active = button.dataset.typeSize === state.typeSize;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function setTypeSize(size) {
+  if (!['small', 'normal', 'large'].includes(size)) return;
+  state.typeSize = size;
+  sessionStorage.setItem('valhalla-type-size', size);
+  applyTypeSize();
+  toast('Text size updated', `${size[0].toUpperCase()}${size.slice(1)}`);
+}
+
 async function refreshStatus(showToast = false) {
   const button = $('#refresh-status');
   button.textContent = '…';
@@ -123,20 +150,125 @@ async function refreshStatus(showToast = false) {
   }
 }
 
-function syncForm() {
+function syncForm(event) {
   const mode = form.elements.mode.value;
   const content = form.elements.content.value;
   const photoshoots = Math.max(1, Number(form.elements.photoshoots.value) || 1);
   const count = Math.max(1, Number(form.elements.count.value) || 1);
   const total = (mode === 'photoshoot' ? photoshoots : 1) * count;
   $('#photoshoots-field').classList.toggle('hidden', mode === 'random');
-  $('#progression-fields').classList.toggle('hidden', mode === 'random' || content === 'xxx');
+  const progressionDisabled = mode === 'random' || content === 'xxx';
+  $('#progression-fields').classList.toggle('hidden', progressionDisabled);
   $('#mode-help').textContent = mode === 'photoshoot'
     ? 'One consistent subject, wardrobe and set per photoshoot.'
     : 'Every image receives an independently assembled production context.';
-  $('#nsfw-output').textContent = `${form.elements.nsfw_percent.value}%`;
-  $('#plateau-output').textContent = `${form.elements.plateau_percent.value}%`;
+  $('#content-help').textContent = content === 'xxx'
+    ? 'Every frame starts at an explicit stage; progression sliders are not used.'
+    : (mode === 'photoshoot'
+      ? 'Begins clothed and progresses toward the configured NSFW ending.'
+      : 'Each independent frame receives a compatible stage selected from the full progression.');
+  const nsfw = Math.max(0, Math.min(100, Number(form.elements.nsfw_percent.value) || 0));
+  let plateau = Math.max(0, Math.min(100, Number(form.elements.plateau_percent.value) || 0));
+  if (event?.target?.name === 'nsfw_percent' && plateau > nsfw) {
+    plateau = nsfw;
+    form.elements.plateau_percent.value = String(plateau);
+  }
+  form.elements.plateau_percent.max = String(nsfw);
+  form.elements.plateau_percent.disabled = progressionDisabled || nsfw === 0;
+  $('#nsfw-output').textContent = `${nsfw}%`;
+  $('#plateau-output').textContent = `${plateau}%`;
+  const nsfwFrames = nsfw > 0 ? Math.ceil(count * nsfw / 100) : 0;
+  const plateauFrames = plateau > 0 ? Math.min(nsfwFrames, Math.ceil(count * plateau / 100)) : 0;
+  const perSet = mode === 'photoshoot' && photoshoots > 1 ? ' per set' : '';
+  $('#nsfw-help').textContent = nsfwFrames
+    ? `Final ${nsfwFrames} of ${count} frame${nsfwFrames === 1 ? '' : 's'}${perSet} may be topless, nude or explicit.`
+    : `0 of ${count} frames${perSet} · Covered and lingerie only.`;
+  $('#plateau-help').textContent = nsfw === 0
+    ? 'Disabled because the NSFW ending is 0%.'
+    : (plateauFrames
+      ? `Final ${plateauFrames} of ${count} frame${plateauFrames === 1 ? '' : 's'}${perSet} remain explicit.`
+      : 'No repeated explicit ending.');
   $('#planned-total').textContent = `${total} image${total === 1 ? '' : 's'}`;
+}
+
+function structuralConfigFromForm() {
+  const mode = form.elements.mode.value;
+  const xxxOnly = form.elements.content.value === 'xxx';
+  return {
+    mode,
+    count: Number(form.elements.count.value),
+    photoshoots: mode === 'photoshoot' ? Number(form.elements.photoshoots.value) : 1,
+    xxx_only: xxxOnly,
+    nsfw_percent: mode === 'photoshoot' && !xxxOnly ? Number(form.elements.nsfw_percent.value) : null,
+    plateau_percent: mode === 'photoshoot' && !xxxOnly ? Number(form.elements.plateau_percent.value) : null,
+    prompt_seed: form.elements.prompt_seed.value === '' ? null : String(form.elements.prompt_seed.value),
+  };
+}
+
+function structuralConfigFromBoard(board) {
+  if (!board) return null;
+  const config = board.config;
+  return {
+    mode: config.mode,
+    count: Number(config.count),
+    photoshoots: config.mode === 'photoshoot' ? Number(config.photoshoots) : 1,
+    xxx_only: Boolean(config.xxx_only),
+    nsfw_percent: config.mode === 'photoshoot' && !config.xxx_only ? Number(config.nsfw_percent) : null,
+    plateau_percent: config.mode === 'photoshoot' && !config.xxx_only ? Number(config.plateau_percent) : null,
+    prompt_seed: config.prompt_seed == null ? null : String(config.prompt_seed),
+  };
+}
+
+function configSummary(config) {
+  if (!config) return '';
+  const mode = config.mode === 'photoshoot' ? `${config.photoshoots} set${Number(config.photoshoots) === 1 ? '' : 's'}` : 'Independent shots';
+  const content = config.xxx_only ? 'Full XXX' : (config.nsfw_percent == null ? 'Progressive' : `NSFW ${config.nsfw_percent}% · Explicit ${config.plateau_percent}%`);
+  return `${mode} · ${config.count} shots · ${content} · Storyboard seed ${config.prompt_seed ?? 'automatic'}`;
+}
+
+function syncPendingState() {
+  const active = structuralConfigFromBoard(state.storyboard);
+  const pending = structuralConfigFromForm();
+  state.pendingStructural = Boolean(active && JSON.stringify(active) !== JSON.stringify(pending));
+  const changedKeys = active
+    ? Object.keys(pending).filter((key) => active[key] !== pending[key])
+    : [];
+  const changedLabels = {
+    mode: 'mode', count: 'shot count', photoshoots: 'set count',
+    xxx_only: 'content mode', nsfw_percent: 'NSFW ending',
+    plateau_percent: 'explicit plateau', prompt_seed: 'Storyboard seed',
+  };
+  $('#config-notice-copy').textContent = changedKeys.length
+    ? `Changed: ${changedKeys.map((key) => changedLabels[key]).join(', ')}. Update before rendering.`
+    : 'Update the storyboard before rendering.';
+  const pendingElements = {
+    mode: form.elements.mode[0].closest('fieldset'),
+    xxx_only: form.elements.content[0].closest('fieldset'),
+    count: form.elements.count.closest('.field'),
+    photoshoots: form.elements.photoshoots.closest('.field'),
+    nsfw_percent: $('#progression-fields'),
+    plateau_percent: $('#progression-fields'),
+    prompt_seed: form.elements.prompt_seed.closest('.field'),
+  };
+  Object.entries(pendingElements).forEach(([key, element]) => {
+    element?.classList.toggle('pending-change', changedKeys.includes(key));
+  });
+  const seedStatus = $('#storyboard-seed-status');
+  seedStatus.textContent = !state.storyboard ? 'Used on create' : (state.pendingStructural ? 'Requires update' : 'Active');
+  seedStatus.classList.toggle('pending', state.pendingStructural);
+  $('#config-notice').classList.toggle('hidden', !state.pendingStructural);
+  $('#resolve-button').innerHTML = state.storyboard
+    ? (state.pendingStructural ? '<span>↻</span> Update storyboard' : '<span>↻</span> Reroll storyboard')
+    : '<span>✦</span> Create storyboard';
+  const activeConfig = $('#active-config');
+  activeConfig.classList.toggle('hidden', !state.storyboard);
+  if (state.storyboard) {
+    const variation = state.storyboard.config.inference_strategy === 'random'
+      ? 'Fresh random variation per shot'
+      : `Variation seed ${state.storyboard.config.inference_seed} · ${state.storyboard.config.inference_strategy}`;
+    activeConfig.innerHTML = `<div><span>Active storyboard</span><strong>${escapeHtml(configSummary(active))}</strong></div><div><span>Image rendering</span><strong>${escapeHtml(variation)}</strong></div>${state.pendingStructural ? `<div class="pending"><span>Pending settings</span><strong>${escapeHtml(configSummary(pending))}</strong></div>` : ''}`;
+  }
+  syncRenderControls();
 }
 
 function restoreConfig(config, job) {
@@ -158,6 +290,7 @@ function restoreConfig(config, job) {
   sessionStorage.setItem('valhalla-render-mode', state.renderMode);
   syncRenderControls();
   syncForm();
+  syncPendingState();
 }
 
 function configPayload() {
@@ -199,26 +332,40 @@ async function resolveStoryboard(event, options = {}) {
       `${state.storyboard.total} compatible shots resolved${options.automatic ? ' and Director updated' : ''}.`,
       'success',
     );
+    return storyboard;
   } catch (error) {
     if (version !== state.resolveVersion) return;
-    emptyState.classList.remove('hidden');
+    if (state.storyboard) renderStoryboard();
+    else emptyState.classList.remove('hidden');
     toast('Could not resolve storyboard', error.message, 'error');
+    return null;
   } finally {
     if (version !== state.resolveVersion) return;
     loadingState.classList.add('hidden');
     setBusy(button, false);
+    syncPendingState();
   }
+}
+
+function confirmStoryboardUpdate() {
+  if (!state.storyboard?.director_edited) return Promise.resolve(true);
+  updateStoryboardDialog.showModal();
+  return new Promise((resolve) => { state.updateResolver = resolve; });
+}
+
+async function requestStoryboardUpdate(options = {}) {
+  if (state.storyboard && !(await confirmStoryboardUpdate())) return null;
+  return resolveStoryboard(null, options);
 }
 
 function scheduleSeedResolve(event) {
   if (!state.storyboard || isRenderActive()) return;
   const name = event.target?.name;
-  if (!['prompt_seed', 'inference_seed', 'inference_strategy'].includes(name)) return;
+  if (!['inference_seed', 'inference_strategy'].includes(name)) return;
+  $('#variation-seed-status').textContent = 'Applying…';
   clearTimeout(state.seedResolveTimer);
   state.seedResolveTimer = setTimeout(
-    () => name === 'prompt_seed'
-      ? resolveStoryboard(null, { automatic: true })
-      : applyVariationSettings(),
+    () => applyVariationSettings(),
     650,
   );
 }
@@ -255,10 +402,12 @@ async function applyVariationSettings() {
     state.director = null;
     form.elements.inference_seed.value = storyboard.config.inference_seed ?? '';
     renderStoryboard();
+    $('#variation-seed-status').textContent = 'Applied';
     toast('Image variations updated', 'Director custom values and shot directions were preserved.', 'success');
   } catch (error) {
     if (version !== state.resolveVersion) return;
     toast('Could not update image variations', error.message, 'error');
+    $('#variation-seed-status').textContent = 'Not applied';
   }
 }
 
@@ -318,14 +467,14 @@ function shotCard(shot) {
     <article class="shot-card" data-shot="${shot.number}">
       <div class="shot-top">
         <div class="shot-number"><i>${String(shot.number).padStart(2, '0')}</i> Shot ${shot.shot_index + 1}</div>
-        <span class="stage-badge ${explicit} ${shot.stage.manual ? 'manual' : ''}">${shot.stage.manual ? '<i>Manual</i>' : ''}${escapeHtml(stage.replaceAll('_', ' '))}</span>
+        <span class="stage-badge ${explicit} ${shot.stage.manual ? 'manual' : ''}">${shot.stage.manual ? '<i>Manual</i>' : ''}${escapeHtml(displayValue(stage.replaceAll('_', ' ')))}</span>
       </div>
       <div class="shot-body">
-        <div class="shot-set">Set ${shot.photoshoot_index + 1} · ${escapeHtml(shot.wardrobe)}</div>
-        <div class="shot-detail"><span>Pose</span><strong title="${escapeHtml(shot.pose.prompt)}">${escapeHtml(shot.pose.prompt)}</strong></div>
-        <div class="shot-detail"><span>Action</span><strong title="${escapeHtml(shot.action.prompt)}">${escapeHtml(shot.action.prompt)}</strong></div>
-        <div class="shot-detail"><span>Role</span><strong title="${escapeHtml(shot.editorial_role.prompt)}">${escapeHtml(shot.editorial_role.prompt)}</strong></div>
-        <div class="shot-detail"><span>Camera</span><strong title="${escapeHtml(shot.camera)}">${escapeHtml(shot.camera)}</strong></div>
+        <div class="shot-set" title="${escapeHtml(displayValue(shot.wardrobe))}">Set ${shot.photoshoot_index + 1} · ${escapeHtml(displayValue(shot.wardrobe))}</div>
+        <div class="shot-detail"><span>Pose</span><strong title="${escapeHtml(shot.pose.prompt)}">${escapeHtml(displayValue(shot.pose.prompt))}</strong></div>
+        <div class="shot-detail"><span>Action</span><strong title="${escapeHtml(shot.action.prompt)}">${escapeHtml(displayValue(shot.action.prompt))}</strong></div>
+        <div class="shot-detail"><span>Role</span><strong title="${escapeHtml(shot.editorial_role.prompt)}">${escapeHtml(displayValue(shot.editorial_role.prompt))}</strong></div>
+        <div class="shot-detail"><span>Camera</span><strong title="${escapeHtml(shot.camera)}">${escapeHtml(displayValue(shot.camera))}</strong></div>
         <div class="shot-detail"><span>Variation</span><strong title="Inference seed ${shot.inference_seed}">${shot.seed_manual ? 'Custom · ' : ''}${escapeHtml(shot.inference_seed)}</strong></div>
       </div>
       <div class="shot-footer">
@@ -347,13 +496,13 @@ function renderStoryboard() {
     state.directorOpenGroup = null;
   }
   shotGrid.innerHTML = board.shots.map(shotCard).join('');
-  $('#seed-pill').textContent = `Seed ${board.config.prompt_seed}`;
   const sets = board.config.mode === 'photoshoot' ? board.config.photoshoots : 'Independent';
   storyboardMeta.innerHTML = `<span>Mode <strong>${escapeHtml(board.config.mode)}</strong></span><span>Sets <strong>${sets}</strong></span><span>Shots <strong>${board.total}</strong></span><span>Diversity <strong>${board.diversity}%</strong></span><span>Content <strong>${board.config.xxx_only ? 'Full XXX' : 'Progressive'}</strong></span>`;
   emptyState.classList.add('hidden');
   storyboardActions.classList.remove('hidden');
   storyboardMeta.classList.remove('hidden');
   shotGrid.classList.remove('hidden');
+  syncPendingState();
 }
 
 function renderOneShot(shot) {
@@ -369,6 +518,7 @@ async function rerollShot(number, button) {
   setBusy(button, true, '…');
   try {
     const shot = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/reroll`, { method: 'POST', body: '{}' });
+    state.storyboard.director_edited = true;
     renderOneShot(shot);
     toast(`Shot ${number} redirected`, 'Composition and prompt were updated.', 'success');
   } catch (error) {
@@ -384,6 +534,7 @@ async function randomizeShotSeed(number, button) {
     const shot = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/seed`, {
       method: 'POST', body: '{}',
     });
+    state.storyboard.director_edited = true;
     renderOneShot(shot);
     if (state.director && state.directorShot === number) await loadDirector(number);
     toast('New image variation', `Shot ${number} now uses seed ${shot.inference_seed}.`, 'success');
@@ -420,6 +571,10 @@ async function startGeneration() {
     toast('Render already active', 'The current production is already in the render pipeline.');
     return;
   }
+  if (state.pendingStructural) {
+    const updated = await requestStoryboardUpdate();
+    if (!updated) return;
+  }
   const buttons = $$('[data-render-action]');
   buttons.forEach((button) => {
     if (!button.dataset.idleLabel) button.dataset.idleLabel = button.innerHTML;
@@ -444,6 +599,10 @@ async function startGeneration() {
 
 async function startShotRender(number, button) {
   if (!state.storyboard || isRenderActive()) return;
+  if (state.pendingStructural) {
+    const updated = await requestStoryboardUpdate();
+    if (!updated || number > updated.total) return;
+  }
   setBusy(button, true, 'Queueing…');
   try {
     state.job = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/render`, {
@@ -609,7 +768,10 @@ function setRenderMode(mode) {
 function syncRenderControls() {
   const active = Boolean(isRenderActive());
   const preview = state.renderMode === 'preview';
-  const idleLabel = preview ? '◉ Preview storyboard' : '▶ Render storyboard';
+  const baseLabel = preview ? '◉ Preview storyboard' : '▶ Render storyboard';
+  const idleLabel = state.pendingStructural
+    ? (preview ? '↻ Update & Preview' : '↻ Update & Render')
+    : baseLabel;
   $$('[data-render-control]').forEach((control) => {
     control.classList.toggle('preview', preview);
   });
@@ -626,6 +788,13 @@ function syncRenderControls() {
       ? 'A render job is already active'
       : `${idleLabel} using the ${preview ? 'faster draft' : 'full production'} workflow`;
   });
+  form.elements.inference_seed.disabled = active;
+  form.elements.inference_strategy.disabled = active;
+  $('#randomize-variation-seed').disabled = active;
+  if (active) $('#variation-seed-status').textContent = 'Locked while rendering';
+  else if ($('#variation-seed-status').textContent === 'Locked while rendering') {
+    $('#variation-seed-status').textContent = 'Applied';
+  }
 }
 
 function syncDeleteControls() {
@@ -953,24 +1122,23 @@ function directorShotButton(shot) {
   const stage = shot.stage.plateau_kind || shot.stage.level;
   return `<button class="director-shot ${active}" data-director-shot="${shot.number}">
     <i>${String(shot.number).padStart(2, '0')}</i>
-    <span><strong>Set ${shot.photoshoot_index + 1} · Shot ${shot.shot_index + 1}</strong><span>${escapeHtml(shot.action.prompt)}</span></span>
-    <em class="${shot.stage.manual ? 'manual' : ''}" title="${shot.stage.manual ? 'Stage selected manually' : 'Automatic stage'}">${shot.stage.manual ? 'M · ' : ''}${escapeHtml(stage.replaceAll('_', ' '))}</em>
+    <span><strong>Set ${shot.photoshoot_index + 1} · Shot ${shot.shot_index + 1}</strong><span title="${escapeHtml(displayValue(shot.action.prompt))}">${escapeHtml(displayValue(shot.action.prompt))}</span></span>
+    <em class="${shot.stage.manual ? 'manual' : ''}" title="${shot.stage.manual ? 'Stage selected manually' : 'Automatic stage'}">${shot.stage.manual ? 'M · ' : ''}${escapeHtml(displayValue(stage.replaceAll('_', ' ')))}</em>
   </button>`;
 }
 
 function directorField(field) {
-  const current = field.options.find((option) => option.id === field.value);
   const customOption = field.custom
-    ? `<option value="__director_custom__" selected>${escapeHtml(field.custom)}</option>`
+    ? `<option value="__director_custom__" selected>${escapeHtml(displayValue(field.custom))}</option>`
     : '';
   const optionHtml = customOption + field.options.map((option) => {
-    const suffix = option.default ? ' · Default' : '';
-    const label = option.label ? `${option.label[0].toUpperCase()}${option.label.slice(1)}` : '';
+    const suffix = option.default ? ' (default)' : '';
+    const label = displayValue(option.label);
     return `<option value="${escapeHtml(option.id)}" ${!field.custom && option.id === field.value ? 'selected' : ''} title="${escapeHtml(option.prompt)}">${escapeHtml(label + suffix)}</option>`;
   }).join('') + '<option value="__director_random__">Random</option>';
   const fieldNote = field.key === 'shot.stage'
     ? `${field.compatibility?.poses ?? 0} poses · ${field.compatibility?.actions ?? 0} actions · ${field.compatibility?.expressions ?? 0} expressions`
-    : (current?.default ? '<span class="default-mark">Database default</span>' : escapeHtml(current?.prompt || current?.label || ''));
+    : '';
   const search = [field.label, field.custom, ...field.options.map((option) => `${option.label} ${option.prompt}`)].join(" ").toLowerCase();
   return `<div class="director-field" data-director-search="${escapeHtml(search)}">
     <div class="director-field-head"><label for="director-${escapeHtml(field.key)}">${escapeHtml(field.label)}</label><span class="director-scope">${field.scope === 'set' ? 'Entire set' : 'This shot'}</span></div>
@@ -1000,7 +1168,10 @@ function renderDirector() {
     ['Subject', shot.subject], ['Wardrobe', shot.wardrobe],
     ['Location', shot.location], ['Treatment', shot.photography],
     ['Variation', `${shot.seed_manual ? 'Custom · ' : ''}${shot.inference_seed}`],
-  ].map(([label, value]) => `<div class="director-summary-${label.toLowerCase()}"><span>${label}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+  ].map(([label, value]) => {
+    const display = displayValue(value);
+    return `<div class="director-summary-${label.toLowerCase()}"><span>${label}</span><strong title="${escapeHtml(display)}">${escapeHtml(display)}</strong></div>`;
+  }).join('');
   const icons = { identity: 'ID', face: '◉', hair: '≈', body: '◇', styling: '✦', wardrobe: '◫', scene: '⌂', camera: '⌾', direction: '↗' };
   $('#director-groups').innerHTML = data.groups.map((group) => `
     <details class="director-group" data-director-group="${escapeHtml(group.id)}" ${state.directorOpenGroup === group.id ? 'open' : ''}>
@@ -1011,8 +1182,12 @@ function renderDirector() {
   filterDirector($('#director-search').value);
 }
 
-function filterDirector(query) {
+function filterDirector(query, { collapseEmpty = false } = {}) {
   const normalized = String(query || '').trim().toLowerCase();
+  if (!normalized && collapseEmpty) {
+    state.directorOpenGroup = null;
+    $$('[data-director-group]').forEach((group) => { group.open = false; });
+  }
   let visible = 0;
   $$('.director-field').forEach((field) => {
     const show = !normalized || field.dataset.directorSearch.includes(normalized);
@@ -1231,6 +1406,10 @@ async function startShotPreview(number, button) {
     toast('Preview already active', 'Wait for the current shot preview to finish.');
     return;
   }
+  if (state.pendingStructural) {
+    const updated = await requestStoryboardUpdate();
+    if (!updated || number > updated.total) return;
+  }
   setPreviewBusy(button, true);
   try {
     state.previewJob = await api('/api/previews', {
@@ -1286,20 +1465,28 @@ async function captureWorkflow() {
   }
 }
 
-form.addEventListener('submit', resolveStoryboard);
-form.addEventListener('input', syncForm);
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  await requestStoryboardUpdate();
+});
+form.addEventListener('input', (event) => {
+  syncForm(event);
+  syncPendingState();
+});
 form.addEventListener('input', scheduleSeedResolve);
 $('#theme-button').addEventListener('click', cycleTheme);
+$$('[data-type-size]').forEach((button) => button.addEventListener('click', () => setTypeSize(button.dataset.typeSize)));
 $('#refresh-status').addEventListener('click', () => refreshStatus(true));
 $('#reset-config').addEventListener('click', () => {
   form.reset();
   setRenderMode('production');
-  syncForm();
+  syncForm({ target: form.elements.nsfw_percent });
+  syncPendingState();
   toast('Setup reset', 'Default production settings restored.');
 });
 $('#randomize-storyboard-seed').addEventListener('click', () => randomizeSeedField('prompt_seed'));
 $('#randomize-variation-seed').addEventListener('click', () => randomizeSeedField('inference_seed'));
-$('#reroll-all').addEventListener('click', resolveStoryboard);
+$('#reroll-all').addEventListener('click', () => requestStoryboardUpdate());
 $('#export-storyboard').addEventListener('click', exportStoryboard);
 $('#import-storyboard').addEventListener('click', () => $('#storyboard-file').click());
 $('#storyboard-file').addEventListener('change', importStoryboard);
@@ -1308,7 +1495,9 @@ $$('[data-render-mode]').forEach((select) => select.addEventListener('change', (
 }));
 $$('[data-render-action]').forEach((button) => button.addEventListener('click', startGeneration));
 $('#director-open-studio').addEventListener('click', () => switchView('studio'));
-$('#director-search').addEventListener('input', (event) => filterDirector(event.target.value));
+$('#director-search').addEventListener('input', (event) => {
+  filterDirector(event.target.value, { collapseEmpty: true });
+});
 $('.director-quick-actions').addEventListener('click', (event) => {
   const previewButton = event.target.closest('#director-preview-shot');
   if (previewButton) {
@@ -1433,6 +1622,18 @@ deleteDialog.addEventListener('cancel', (event) => {
   event.preventDefault();
   resolveDeletion(false);
 });
+function resolveStoryboardUpdateConfirmation(value) {
+  if (updateStoryboardDialog.open) updateStoryboardDialog.close();
+  const resolve = state.updateResolver;
+  state.updateResolver = null;
+  resolve?.(value);
+}
+$('#update-storyboard-confirm').addEventListener('click', () => resolveStoryboardUpdateConfirmation(true));
+$$('.update-storyboard-cancel').forEach((button) => button.addEventListener('click', () => resolveStoryboardUpdateConfirmation(false)));
+updateStoryboardDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  resolveStoryboardUpdateConfirmation(false);
+});
 $$('.dialog-close').forEach((button) => button.addEventListener('click', () => promptDialog.close()));
 $('#copy-prompt').addEventListener('click', async () => {
   await navigator.clipboard.writeText($('#prompt-content').textContent);
@@ -1471,7 +1672,9 @@ $('#clear-logger').addEventListener('click', async () => {
 });
 
 applyTheme();
+applyTypeSize();
 syncForm();
+syncPendingState();
 syncRenderControls();
 syncPreviewScaleControls();
 refreshStatus();

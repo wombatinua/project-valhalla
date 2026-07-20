@@ -7,7 +7,7 @@ This file tracks agreed future work. Unchecked items are not implemented.
 - Keep one `app.py`, one manually editable `database.json`, one active local `workflow.json`, one `launcher.sh`, and static assets under `web/`.
 - Preserve compatibility with different checkpoint families through the captured workflow.
 - Do not add FaceID, IPAdapter, PuLID, reference-image, or architecture-specific identity pipelines.
-- Use adult women aged 21–22 only.
+- Use adult women aged 21–23 only.
 - Keep all scenes solo and locations private.
 - Do not add mirrors, sexual toys, male subjects, or partner interactions.
 
@@ -29,6 +29,10 @@ This file tracks agreed future work. Unchecked items are not implemented.
 - [x] Provide accessible browser-native controls for every production choice.
 - [x] Provide a responsive production dashboard with totals, advanced settings, and a clear path to Director.
 - [x] Group high-level Web UI actions into clear production sections.
+- [x] Distinguish active storyboard configuration from pending global setup changes.
+- [x] Prevent render and preview actions from using stale mode, count, progression, or Storyboard-seed settings.
+- [x] Show progression percentages as concrete frame counts and couple NSFW/explicit sliders safely.
+- [x] Apply Image variation settings immediately while confirming destructive rebuilds after manual shot edits.
 - [x] Provide draggable, resizable, memory-only Fast Preview windows with responsive viewport limits and automatic cleanup on close.
 - [x] Provide a persistent Render Logger tab with live frame counts, elapsed/remaining time, seeds, formatted prompts, errors, and generation events.
 - [x] Include Preview renders in Logger and keep the previous preview visible until its replacement finishes.

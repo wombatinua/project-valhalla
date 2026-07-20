@@ -2477,6 +2477,7 @@ class WebState:
             "composer": composer,
             "rng": rng,
             "shots": shots,
+            "director_edited": False,
         }
         with self.lock:
             self.storyboards[storyboard_id] = record
@@ -2498,6 +2499,7 @@ class WebState:
             "config": _args_dict(args),
             "total": len(record["shots"]),
             "diversity": round(changes * 100 / comparisons) if comparisons else 100,
+            "director_edited": bool(record.get("director_edited", False)),
             "shots": [serialize_shot(record["db"], shot) for shot in record["shots"]],
         }
 
@@ -2970,6 +2972,7 @@ class WebState:
             )
         if active:
             raise AppError("Director editing is unavailable while this storyboard is rendering")
+        record["director_edited"] = True
         number = _safe_int(payload.get("shot"), "Shot", 1, len(record["shots"]))
         field = str(payload.get("field", ""))
         value = str(payload.get("value", ""))
@@ -3387,6 +3390,7 @@ class WebState:
             "version": STORYBOARD_FORMAT_VERSION,
             "database": database_fingerprint(db),
             "created_at": record["created_at"],
+            "director_edited": bool(record.get("director_edited", False)),
             "config": _args_dict(record["args"]),
             "shots": shots,
         }
@@ -3474,6 +3478,7 @@ class WebState:
             "composer": composer,
             "rng": rng,
             "shots": shots,
+            "director_edited": bool(payload.get("director_edited", False)),
         }
         with self.lock:
             self.storyboards[storyboard_id] = record
@@ -3486,6 +3491,7 @@ class WebState:
         if not 1 <= number <= len(shots):
             raise AppError("Shot number is out of range")
         with self.lock:
+            record["director_edited"] = True
             shot = shots[number - 1]
             shot["scene"] = record["composer"].resolve_scene(shot["context"], shot["stage"])
             self._apply_director_customs(shot, shot["scene"], shot["context"])
@@ -3504,6 +3510,7 @@ class WebState:
                 for job in self.jobs.values()
             ):
                 raise AppError("Image variation cannot change while this storyboard is rendering")
+            record["director_edited"] = True
             shot = record["shots"][number - 1]
             previous = shot["inference_seed"]
             while shot["inference_seed"] == previous:

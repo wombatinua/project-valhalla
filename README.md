@@ -127,6 +127,8 @@ Random mode resolves a complete independent context for every shot. The photosho
 
 `NSFW ending` controls the percentage of final photoshoot frames assigned to topless, nude, and explicit stages. `Explicit plateau` controls how much of the complete run remains at the final explicit level. The plateau cannot exceed the NSFW ending.
 
+Global structure controls are compared with the active resolved storyboard. Changing mode, content, counts, progression, or the Storyboard seed creates an explicit **Pending settings** state; render and per-shot preview actions first update the storyboard instead of silently using stale frames. The active and pending configurations remain visible together. When manual Director or shot adjustments exist, rebuilding requires confirmation. The NSFW controls show both percentages and calculated frame counts, clamp Explicit plateau to NSFW ending, and disable the plateau at 0%. Image variation seed and strategy remain non-structural and apply immediately without rebuilding direction.
+
 ### Full XXX
 
 Full XXX begins at the explicit level from the first frame. Progressive percentage controls are disabled, while each shot still receives a rule-compatible explicit composition.

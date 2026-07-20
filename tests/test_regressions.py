@@ -385,6 +385,20 @@ class DirectorRegressionTests(unittest.TestCase):
             progression = [levels[shot["scene"]["stage"]["level"]] for shot in shots]
             self.assertEqual(progression, sorted(progression), (seed, progression))
 
+    def test_zero_nsfw_and_plateau_never_resolve_nude_stages(self):
+        for seed in range(20):
+            state, storyboard_id = self.make_storyboard(
+                count=20,
+                prompt_seed=seed,
+                nsfw_percent=0,
+                plateau_percent=0,
+            )
+            levels = {
+                shot["scene"]["stage"]["level"]
+                for shot in state.get_storyboard(storyboard_id)["shots"]
+            }
+            self.assertTrue(levels.issubset({"covered", "lingerie"}), (seed, levels))
+
     def test_compiler_preserves_stage_and_visible_garments(self):
         anchors = {
             "covered": "opaque upper-body clothing fully covering both breasts",
@@ -745,6 +759,58 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_typography_presets_use_relative_scale_with_normal_default(self):
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+
+        for size in ("small", "normal", "large"):
+            self.assertIn(f'data-type-size="{size}"', html)
+            self.assertIn(f':root[data-type-size="{size}"]', css)
+        self.assertIn(": 'normal'", js)
+        self.assertIn("valhalla-type-size", js)
+        self.assertIn("font-size: 0.75rem", css)
+
+    def test_entity_values_are_capitalized_without_bold_emphasis(self):
+        root = Path(__file__).resolve().parents[1]
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("function displayValue(value)", js)
+        self.assertIn("escapeHtml(displayValue(shot.pose.prompt))", js)
+        self.assertIn("const display = displayValue(value)", js)
+        self.assertIn('strong title="${escapeHtml(display)}"', js)
+        self.assertIn(".shot-detail strong { overflow: hidden; color: var(--text); font-weight: 450;", css)
+        self.assertIn(".director-summary strong { margin-top: 3px; font-size: 0.75rem; font-weight: 450;", css)
+
+    def test_clearing_director_search_collapses_all_groups(self):
+        root = Path(__file__).resolve().parents[1]
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("filterDirector(query, { collapseEmpty = false } = {})", js)
+        self.assertIn("if (!normalized && collapseEmpty)", js)
+        self.assertIn("state.directorOpenGroup = null", js)
+        self.assertIn("filterDirector(event.target.value, { collapseEmpty: true })", js)
+
+    def test_director_marks_defaults_only_inside_dropdown(self):
+        root = Path(__file__).resolve().parents[1]
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("option.default ? ' (default)' : ''", js)
+        self.assertNotIn("Database default", js)
+        self.assertNotIn("escapeHtml(current?.prompt || current?.label || '')", js)
+
+    def test_dropdowns_and_render_split_share_unified_control_geometry(self):
+        root = Path(__file__).resolve().parents[1]
+        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn(".field input, .field select, .director-field select", css)
+        self.assertIn(".render-choice { display: inline-grid;", css)
+        self.assertIn("overflow: hidden; border: 1px solid", css)
+        self.assertIn(".render-choice:focus-within", css)
+        self.assertIn(".render-choice:hover .button.render", css)
+
     def test_storyboard_render_mode_uses_synchronized_split_buttons(self):
         root = Path(__file__).resolve().parents[1]
         html = (root / "web" / "index.html").read_text(encoding="utf-8")
@@ -756,6 +822,40 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("state.renderMode === 'preview'", javascript)
         self.assertNotIn("retry_count", html)
         self.assertNotIn("retry_count", javascript)
+
+    def test_global_settings_have_pending_update_and_slider_guardrails(self):
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        javascript = (root / "web" / "app.js").read_text(encoding="utf-8")
+        for marker in (
+            'id="config-notice"', 'id="active-config"',
+            'id="nsfw-help"', 'id="plateau-help"',
+            'id="update-storyboard-dialog"',
+        ):
+            self.assertIn(marker, html)
+        self.assertIn("state.pendingStructural", javascript)
+        self.assertIn("Update & Render", javascript)
+        self.assertIn("form.elements.plateau_percent.max = String(nsfw)", javascript)
+        self.assertIn("form.elements.plateau_percent.disabled", javascript)
+        self.assertIn("if (state.pendingStructural)", javascript)
+
+
+class StoryboardEditStateTests(unittest.TestCase):
+    def test_director_edit_flag_survives_export_import(self):
+        state = app.WebState()
+        board = state.create_storyboard({
+            "mode": "photoshoot", "count": 4, "photoshoots": 1,
+            "prompt_seed": 123, "inference_seed": 456,
+        })
+        self.assertFalse(board["director_edited"])
+        updated = state.update_director(
+            board["id"],
+            {"shot": 1, "field": "shot.intensity", "value": "sensual"},
+        )
+        self.assertTrue(updated["summary"] is not None)
+        self.assertTrue(state.storyboard_payload(state.get_storyboard(board["id"]))["director_edited"])
+        imported = state.import_storyboard(state.export_storyboard(board["id"]))
+        self.assertTrue(imported["director_edited"])
 
 
 class RenderLifecycleRegressionTests(unittest.TestCase):

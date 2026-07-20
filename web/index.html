@@ -34,6 +34,14 @@
           <span>Appearance</span>
           <button class="theme-button system-theme-button" id="theme-button" aria-label="Change color theme" title="Theme: system"><span id="theme-icon">◐</span><strong id="theme-label">System</strong></button>
         </div>
+        <div class="system-type-row">
+          <span>Text size</span>
+          <div class="type-size-control" role="group" aria-label="Text size">
+            <button type="button" data-type-size="small" aria-label="Small text" title="Small">S</button>
+            <button type="button" data-type-size="normal" aria-label="Normal text" title="Normal">M</button>
+            <button type="button" data-type-size="large" aria-label="Large text" title="Large">L</button>
+          </div>
+        </div>
       </section>
       <div class="sidebar-footer"><span>Local workspace</span><span class="version">v2.0</span></div>
     </aside>
@@ -60,6 +68,7 @@
             </div>
 
             <form id="run-form">
+              <p class="setup-section-title">Storyboard structure</p>
               <fieldset>
                 <legend>Mode</legend>
                 <div class="segmented" role="radiogroup" aria-label="Production mode">
@@ -75,6 +84,7 @@
                   <label><input type="radio" name="content" value="progressive" checked><span>Progressive</span></label>
                   <label><input type="radio" name="content" value="xxx"><span>Full XXX</span></label>
                 </div>
+                <p class="field-help" id="content-help">Begins clothed and progresses toward the configured NSFW ending.</p>
               </fieldset>
 
               <div class="field-grid two">
@@ -82,26 +92,34 @@
                 <label class="field"><span>Shots per set</span><input type="number" name="count" min="1" max="200" value="12"></label>
               </div>
 
+              <label class="field seed-field structural-seed"><span><strong>Storyboard seed <em>optional</em><i class="seed-status" id="storyboard-seed-status">Active</i></strong><small>Rebuilds subject, wardrobe, scene and shot direction.</small></span><div class="seed-input"><input type="number" name="prompt_seed" min="0" placeholder="Create one automatically"><button type="button" id="randomize-storyboard-seed" title="Generate a new storyboard seed" aria-label="Generate a new storyboard seed">↻</button></div></label>
+
               <div class="range-section" id="progression-fields">
                 <div class="range-heading"><label for="nsfw-percent">NSFW ending</label><output id="nsfw-output">50%</output></div>
                 <input type="range" id="nsfw-percent" name="nsfw_percent" min="0" max="100" step="1" value="50">
+                <p class="range-help" id="nsfw-help">Final 6 of 12 frames may be topless, nude or explicit.</p>
                 <div class="range-heading"><label for="plateau-percent">Explicit plateau</label><output id="plateau-output">30%</output></div>
                 <input type="range" id="plateau-percent" name="plateau_percent" min="0" max="100" step="1" value="30">
+                <p class="range-help" id="plateau-help">Final 4 of 12 frames remain explicit.</p>
               </div>
 
               <details class="advanced">
-                <summary><span>Advanced options</span><span class="chevron">⌄</span></summary>
+                <summary><span>Image rendering</span><span class="chevron">⌄</span></summary>
                 <div class="advanced-content">
-                  <label class="field seed-field"><span><strong>Storyboard seed <em>optional</em></strong><small>Controls subject, wardrobe, scene and direction.</small></span><div class="seed-input"><input type="number" name="prompt_seed" min="0" placeholder="Create one automatically"><button type="button" id="randomize-storyboard-seed" title="Generate a new storyboard seed" aria-label="Generate a new storyboard seed">↻</button></div></label>
-                  <label class="field seed-field"><span><strong>Image variation seed <em>optional</em></strong><small>Controls rendered pixels without changing the direction.</small></span><div class="seed-input"><input type="number" name="inference_seed" min="0" placeholder="Create one automatically"><button type="button" id="randomize-variation-seed" title="Generate a new image variation seed" aria-label="Generate a new image variation seed">↻</button></div></label>
+                  <label class="field seed-field"><span><strong>Image variation seed <em>optional</em><i class="seed-status immediate" id="variation-seed-status">Applies automatically</i></strong><small>Changes rendered pixels only. Director settings stay unchanged.</small></span><div class="seed-input"><input type="number" name="inference_seed" min="0" placeholder="Create one automatically"><button type="button" id="randomize-variation-seed" title="Generate new image variations" aria-label="Generate new image variations">↻</button></div></label>
                   <label class="field"><span>Variation mode</span><select name="inference_strategy"><option value="sequence" selected>Unique and repeatable per shot</option><option value="fixed">Same variation for every shot</option><option value="random">Fresh random variation per shot</option></select></label>
                 </div>
               </details>
 
+              <div class="config-notice hidden" id="config-notice" role="status">
+                <div><strong>Storyboard settings changed</strong><span id="config-notice-copy">Update the storyboard before rendering.</span></div>
+                <span class="pending-badge">Pending</span>
+              </div>
+
               <div class="batch-summary">
                 <span>Planned output</span><strong id="planned-total">12 images</strong>
               </div>
-              <button class="button primary full" type="submit" id="resolve-button"><span>✦</span> Resolve storyboard</button>
+              <button class="button primary full" type="submit" id="resolve-button"><span>✦</span> Create storyboard</button>
             </form>
           </aside>
 
@@ -109,7 +127,6 @@
             <div class="storyboard-header">
               <div><p class="eyebrow">Director’s desk</p><h2>Storyboard</h2></div>
               <div class="storyboard-actions hidden" id="storyboard-actions">
-                <span class="seed-pill" id="seed-pill">Seed —</span>
                 <button class="button ghost" id="export-storyboard">↓ Export</button>
                 <button class="button warning" id="reroll-all">↻ Reroll all</button>
                 <div class="render-choice" data-render-control>
@@ -119,6 +136,7 @@
               </div>
             </div>
             <div class="storyboard-meta hidden" id="storyboard-meta"></div>
+            <div class="active-config hidden" id="active-config"></div>
             <div class="empty-state" id="empty-state">
               <div class="empty-visual"><span></span><span></span><span></span></div>
               <h3>Your production starts here</h3>
@@ -273,6 +291,12 @@
     <div class="dialog-header"><div><p class="eyebrow">Permanent action</p><h2 id="delete-dialog-title">Delete image?</h2></div><button class="icon-button delete-dialog-cancel" aria-label="Cancel deletion">×</button></div>
     <div class="dialog-body"><p id="delete-dialog-message">This file will be permanently removed from the output folder.</p></div>
     <div class="dialog-footer"><button class="button ghost delete-dialog-cancel">Cancel</button><button class="button destructive" id="delete-dialog-confirm">Delete</button></div>
+  </dialog>
+
+  <dialog id="update-storyboard-dialog" class="small-dialog">
+    <div class="dialog-header"><div><p class="eyebrow">Storyboard structure</p><h2>Replace Director adjustments?</h2></div><button class="icon-button update-storyboard-cancel" aria-label="Cancel update">×</button></div>
+    <div class="dialog-body"><p>These global changes rebuild the storyboard and replace manual Director or shot adjustments. Global image variation settings are preserved.</p></div>
+    <div class="dialog-footer"><button class="button ghost update-storyboard-cancel">Cancel</button><button class="button warning" id="update-storyboard-confirm">Update storyboard</button></div>
   </dialog>
 
   <dialog id="capture-dialog" class="small-dialog">
