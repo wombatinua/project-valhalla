@@ -21,6 +21,7 @@
         <button class="nav-item active" data-view="studio"><span class="nav-icon">✦</span><span>Studio</span></button>
         <button class="nav-item" data-view="director"><span class="nav-icon">⌘</span><span>Director</span></button>
         <button class="nav-item" data-view="outputs"><span class="nav-icon">▦</span><span>Outputs</span><span class="nav-count" id="output-count">0</span></button>
+        <button class="nav-item" data-view="logger"><span class="nav-icon">≡</span><span>Logger</span><span class="nav-count" id="log-count">0</span></button>
       </nav>
 
       <div class="sidebar-spacer"></div>
@@ -91,9 +92,12 @@
               <details class="advanced">
                 <summary><span>Advanced options</span><span class="chevron">⌄</span></summary>
                 <div class="advanced-content">
-                  <label class="field"><span>Prompt seed <em>optional</em></span><input type="number" name="prompt_seed" min="0" placeholder="Random"></label>
-                  <label class="field"><span>Inference seed <em>optional</em></span><input type="number" name="inference_seed" min="0" placeholder="Random per image"></label>
-                  <label class="switch-row"><span><strong>Fast test</strong><small>Bypass refinement stages</small></span><input type="checkbox" name="fast"><i></i></label>
+                  <label class="field seed-field"><span><strong>Storyboard seed <em>optional</em></strong><small>Controls subject, wardrobe, scene and direction.</small></span><div class="seed-input"><input type="number" name="prompt_seed" min="0" placeholder="Create one automatically"><button type="button" id="randomize-storyboard-seed" title="Generate a new storyboard seed" aria-label="Generate a new storyboard seed">↻</button></div></label>
+                  <label class="field seed-field"><span><strong>Image variation seed <em>optional</em></strong><small>Controls rendered pixels without changing the direction.</small></span><div class="seed-input"><input type="number" name="inference_seed" min="0" placeholder="Create one automatically"><button type="button" id="randomize-variation-seed" title="Generate a new image variation seed" aria-label="Generate a new image variation seed">↻</button></div></label>
+                  <label class="field"><span>Variation mode</span><select name="inference_strategy"><option value="sequence" selected>Unique and repeatable per shot</option><option value="fixed">Same variation for every shot</option><option value="random">Fresh random variation per shot</option></select></label>
+                  <label class="field"><span>Prompt detail</span><select name="prompt_profile"><option value="compact">Compact</option><option value="balanced" selected>Balanced</option><option value="detailed">Detailed</option></select></label>
+                  <label class="field"><span>Render retries</span><select name="retry_count"><option value="0">None</option><option value="1">1 retry</option><option value="2" selected>2 retries</option><option value="3">3 retries</option></select></label>
+                  <label class="switch-row"><span><strong>Preview render</strong><small>Faster draft workflow for production renders</small></span><input type="checkbox" name="fast"><i></i></label>
                 </div>
               </details>
 
@@ -150,11 +154,13 @@
                 <h2 id="director-title">Director</h2>
                 <p id="director-subtitle">Select a shot to begin.</p>
                 <div class="director-quick-actions">
+                  <button class="randomize" data-director-remix="shot">↻ Reroll shot</button>
+                  <button class="variation-action" id="director-randomize-seed">⤨ New variation</button>
+                  <button class="preview-action" id="director-preview-shot">◉ Preview shot</button>
+                  <span class="director-action-divider" aria-hidden="true"></span>
                   <button class="randomize" data-director-remix="subject">↻ Remix subject</button>
                   <button class="randomize" data-director-remix="wardrobe">↻ Remix wardrobe</button>
                   <button class="randomize" data-director-remix="scene">↻ Remix scene</button>
-                  <button class="randomize" data-director-remix="shot">↻ Reroll shot</button>
-                  <button class="preview-action" id="director-preview-shot">◉ Preview shot</button>
                 </div>
               </div>
               <div class="director-editor-tools">
@@ -174,6 +180,27 @@
         <div class="output-grid" id="output-grid"></div>
         <div class="empty-state compact" id="outputs-empty"><div class="output-placeholder">▦</div><h3>No outputs yet</h3><p>Generated images will appear here as soon as each render completes.</p></div>
       </section>
+
+      <section class="view" id="logger-view">
+        <header class="logger-header">
+          <div><p class="eyebrow">Production telemetry</p><h2>Render logger</h2></div>
+          <div class="logger-header-actions"><span class="logger-status idle" id="logger-status">Idle</span><button class="button ghost danger" id="clear-logger">Clear logs</button></div>
+        </header>
+        <div class="logger-empty panel" id="logger-empty"><div class="logger-empty-mark">≡</div><h3>No render activity yet</h3><p>Prompts, frame timing, progress, retries and errors will appear here.</p></div>
+        <div class="logger-workspace hidden" id="logger-workspace">
+          <section class="logger-metrics panel">
+            <div><span>Progress</span><strong id="logger-progress">0 / 0</strong><small id="logger-percent">0%</small></div>
+            <div><span>Elapsed</span><strong id="logger-elapsed">—</strong><small>Generation time</small></div>
+            <div><span>Remaining</span><strong id="logger-eta">—</strong><small>Estimated</small></div>
+            <div><span>Current shot</span><strong id="logger-shot">—</strong><small id="logger-seed">Seed —</small></div>
+          </section>
+          <section class="logger-prompt-grid">
+            <article class="logger-prompt panel"><header><span class="prompt-dot positive"></span><strong>Positive prompt</strong><button data-copy-log="positive">Copy</button></header><pre id="logger-positive">Waiting for a frame…</pre></article>
+            <article class="logger-prompt panel"><header><span class="prompt-dot negative"></span><strong>Negative prompt</strong><button data-copy-log="negative">Copy</button></header><pre id="logger-negative">Waiting for a frame…</pre></article>
+          </section>
+          <section class="logger-events panel"><header><div><p class="eyebrow">Timeline</p><h3>Generation events</h3></div><span id="logger-job-id">—</span></header><div id="logger-event-list"></div></section>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -185,11 +212,14 @@
 
   <section class="shot-preview-window hidden" id="shot-preview-window" role="dialog" aria-labelledby="shot-preview-title">
     <header class="shot-preview-header" id="shot-preview-drag-handle">
-      <div><p class="eyebrow">Temporary Fast Preview</p><strong id="shot-preview-title">Shot preview</strong></div>
-      <button class="icon-button" id="shot-preview-close" aria-label="Close and delete preview">×</button>
+      <div><p class="eyebrow">Temporary Preview Render</p><strong id="shot-preview-title">Shot preview</strong></div>
+      <div class="shot-preview-actions">
+        <button class="icon-button" id="shot-preview-refresh" aria-label="Render this shot preview again" title="Render preview again"><span>↻</span></button>
+        <button class="icon-button" id="shot-preview-close" aria-label="Close and delete preview">×</button>
+      </div>
     </header>
     <div class="shot-preview-canvas"><img id="shot-preview-image" src="" alt="Temporary rendered shot preview"></div>
-    <footer>Drag this window by its header. Closing permanently discards the temporary preview.</footer>
+    <footer>Drag by the header · Resize from the lower-right corner · Closing discards the preview.</footer>
   </section>
 
   <dialog id="image-dialog" class="image-viewer">

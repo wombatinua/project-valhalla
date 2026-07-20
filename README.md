@@ -17,12 +17,14 @@ There is no terminal wizard and no `fzf` dependency. The terminal is used only f
 
 The Production Studio is designed around a review-before-render workflow:
 
-1. Configure the production mode, content direction, batch size, progression, and seeds.
+1. Configure the production mode, content direction, batch size, progression, prompt profile, retry policy, and seed strategy.
 2. Select **Resolve storyboard** to assemble every compatible shot without using the GPU.
 3. Review stage, pose, action, expression, set, and surface for every shot.
 4. Inspect positive and negative prompts or reroll individual compositions.
 5. Select **Generate images** when the storyboard is ready.
 6. Follow live progress and ETA while outputs appear in the gallery.
+
+When the application opens without a recoverable storyboard, Studio performs one automatic resolve using the visible defaults. Manual Resolve remains available for deliberate rerolls and configuration changes.
 
 The UI includes:
 
@@ -31,12 +33,13 @@ The UI includes:
 - a session theme switcher for System, Light, and Dark modes;
 - live ComfyUI, workflow, and catalog status;
 - progressive and full-XXX production controls;
-- deterministic prompt seeds and optional fixed inference seeds;
-- production and fast-test render profiles;
+- deterministic prompt seeds plus random, fixed, and stable per-frame inference-seed strategies;
+- production and Preview render profiles;
 - automatic recovery of the active storyboard, settings, render progress, ETA, outputs, and polling after a browser reload;
-- storyboard cards with one-shot reroll, prompt inspection, temporary Fast Preview, and compact JSON export/import tied to the exact semantic database version;
-- a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render-style, stage, pose, action, and expression controls plus constrained SET/shot remixes;
-- cancellable background render jobs;
+- editorially planned storyboard cards with camera grammar, roles, diversity scoring, one-shot reroll/render, prompt inspection, temporary Fast Preview, and compact JSON export/import tied to the exact semantic database version;
+- a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render style, stage, pose/action, surface, editorial role, shot size, angle, framing, focus, and explicit-recipe controls;
+- cancellable background render jobs with configurable technical retries and strategy-aware retry seeds;
+- a reload-safe Render Logger with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological retry/error/completion timeline, and safe history clearing that leaves outputs and the displayed preview intact;
 - shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
 - a persistent output gallery with full-screen preview, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, previous/next navigation, swipe, downloads, individual deletion, and confirmed bulk deletion;
 - safe or forced workflow capture from the latest successful ComfyUI run.
@@ -130,17 +133,25 @@ Full XXX begins at the explicit level from the first frame. Progressive percenta
 
 ## Seeds
 
-The prompt seed controls all compositional decisions. Leaving it empty creates a new random seed; entering a value reproduces the same resolved storyboard.
+The UI calls the prompt seed **Storyboard seed** because it controls all compositional decisions. Leaving it empty creates a new seed and immediately writes the effective value back into the field; entering a value reproduces the same resolved storyboard.
 
-The inference seed is sent to ComfyUI. Leaving it empty produces a different seed for every image. Entering a value deliberately reuses the same literal seed for the complete run.
+Each global seed field has its own `↻` action. Refreshing Storyboard seed resolves a new direction; refreshing Image variation seed recalculates only frame variations and preserves Director edits.
+
+The UI calls the inference seed **Image variation seed** because it changes rendered pixels without changing the direction. **Unique and repeatable per shot** derives a stable, distinct seed for every set/shot from the entered base seed. **Same variation for every shot** deliberately reuses one literal seed. **Fresh random variation per shot** creates independent seeds. Studio and Director provide **New variation** for changing only one shot’s inference seed; its prompt, composition and Director settings remain intact. The chosen strategy and every effective frame seed are stored in storyboard export.
+
+After a storyboard exists, changing the Storyboard seed automatically resolves a replacement after a short typing delay because it controls the direction. Changing the Image variation seed or its mode updates only frame seeds in place: scenes, prompts, manually selected directions, and custom Director values remain intact. Studio cards and Director are refreshed together.
+
+Prompt detail offers compact, balanced, and detailed compiler profiles. The compiler keeps the subject constraint first, promotes camera and direction, removes exact duplicate fragments, applies an approximate token budget, and reports prompt-lint warnings without silently changing Director choices.
 
 The compact storyboard format stores catalog references by ID and includes a semantic SHA-256 fingerprint of the complete database. Import succeeds only against the matching database content; reordering JSON keys does not break compatibility, but changing catalog data does. Imported storyboards remain fully reviewable, rerollable, and renderable.
 
 ## Director’s Desk
 
-Resolve or import a storyboard, then open **Director** in the sidebar. The editor is organized in production order: identity, face, hair, body and anatomy, styling, wardrobe, scene and treatment, then shot direction. Every enabled database preset is available through its relevant control. Current selections remain selected, curated database-pool values carry a **Default** marker, and the global search locates fields by both setting and preset text.
+Resolve or import a storyboard, then open **Director** in the sidebar. The editor is organized in production order: identity, face, hair, body and anatomy, styling, wardrobe, scene and treatment, camera and editorial intent, then shot direction. Every compatible database preset is available through its relevant control. Current selections remain selected, curated database-pool values carry a **Default** marker, and the global search locates fields by both setting and preset text.
 
-Subject, wardrobe, location, mood, and render-style changes apply to the complete photoshoot SET; in Random mode they affect only that independent shot. Stage, pose, action, and expression affect the selected shot. Director exposes every stage compatible with the active outfit recipe, including safe, terminal, and explicit variants, even when the storyboard began in Full XXX mode. A manually selected stage may intentionally depart from automatic progression and immediately rebuilds the compatible pose, action, and expression choices. Changing a foundational choice automatically repairs dependent traits, furniture, clothing, or composition when necessary. Optional outfit slots can be added or removed. Incompatible records remain excluded, and all updates are rejected while that storyboard is rendering.
+Subject, wardrobe, location, mood, and render-style changes apply to the complete photoshoot SET; in Random mode they affect only that independent shot. Stage, surface, camera, editorial role, explicit recipe, pose, action, and expression affect the selected shot. Director exposes every stage compatible with the active outfit recipe, including safe, terminal, and explicit variants. A manually selected stage may intentionally depart from automatic progression and immediately rebuilds all compatible shot controls. Incompatible records remain excluded, and all updates are rejected while that storyboard is rendering.
+
+The planner keeps the model, wardrobe, location, mood, and treatment coherent per set while varying compatible surfaces and compositions. It assigns every shot an editorial role and resolves shot size, angle, framing, and focus against stage, pose, action, and surface. Exact garment-state differences are added as transition instructions only when a present garment disappears. Explicit stages use concrete database recipes with constrained pose/action/camera grammar.
 
 Quick actions provide constrained remixes for the subject, current wardrobe recipe, complete scene/treatment, or selected shot. Director edits remain part of the in-memory storyboard and are preserved by compact JSON export.
 
@@ -152,13 +163,17 @@ First complete a representative workflow successfully in ComfyUI. Then choose **
 
 Safe capture refuses to overwrite an existing `workflow.json`. Enable **Replace existing workflow** only when the active template should be replaced. Capture detects positive and negative prompt inputs, inference seed targets, and the fast-test sampler/output mapping before saving.
 
-## Fast test
+## Preview render
 
-Fast test patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. It is intended for rapid prompt and composition checks. With Fast test enabled, any Studio shot—or the selected Director shot—can be rendered alone through **Preview**. Preview output nodes use ComfyUI temporary previews, Project Valhalla keeps the returned image only in memory, and closing the draggable preview window discards it without adding anything to the output gallery. Production mode runs the complete captured workflow.
+Preview render patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. The Studio toggle selects this faster draft workflow for production renders. Individual **Preview** buttons in Studio and Director always use the preview workflow and require no toggle. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logger. Closing the draggable preview window discards its temporary image without adding anything to Outputs.
 
 ## Database
 
-`database.json` contains 901 selectable production records covering adult-model traits, garments, modifiers, outfit templates, private locations, surfaces, poses, actions, expressions, moods, and photography treatments.
+`database.json` contains 3,312 selectable production records covering adult-model traits, garments, modifiers, outfit templates, private locations, surfaces, poses, actions, expressions, moods, camera grammar, explicit recipes, and photography treatments. The expansion especially strengthens ordinary apartments and minimal sets, simple everyday clothes and footwear, and adult solo erotic/explicit direction while retaining all compatibility tags and stage rules.
+
+`tools/expand_database.py` is the idempotent catalog-expansion source. It adds the curated records, creates two weighted production variants for every selectable record, extends color/modifier/default-pool relationships, and preserves template stage uniqueness. It is safe to rerun and must always be followed by database validation and a resolver dry-run.
+
+Catalog wording is optimized for the captured Lumina2 workflow’s Qwen text encoder and remains broadly suitable for modern natural-language image conditioning: short concrete visual phrases, common garment/interior/anatomy/photography vocabulary, no internal taxonomy jargon, no duplicate prompt fragments, and no catalog fragment longer than 48 words. Database validation enforces these constraints. Compact, Balanced, and Detailed compiler profiles all apply their configured approximate token budgets; essential subject, camera, pose, action, and stage semantics are retained first.
 
 The catalog follows the order in which a scene is assembled, so related material stays easy to find:
 

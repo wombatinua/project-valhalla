@@ -29,18 +29,32 @@ This file tracks agreed future work. Unchecked items are not implemented.
 - [x] Provide accessible browser-native controls for every production choice.
 - [x] Provide a responsive production dashboard with totals, advanced settings, and a clear path to Director.
 - [x] Group high-level Web UI actions into clear production sections.
+- [x] Provide draggable, resizable, memory-only Fast Preview windows with responsive viewport limits and automatic cleanup on close.
+- [x] Provide a persistent Render Logger tab with live frame counts, elapsed/remaining time, seeds, formatted prompts, retries, errors, and generation events.
+- [x] Include Preview renders in Logger and keep the previous preview visible until its replacement finishes.
+- [x] Allow the visible preview to be rendered again directly from its popup header.
+- [x] Make preview refresh follow the currently open Director shot, spin only its glyph, and clear Logger history without deleting outputs or displayed preview data.
+- [x] Automatically re-resolve the storyboard and refresh Director after Studio seed or seed-strategy changes.
+- [x] Automatically resolve one default storyboard when the application opens with no recoverable storyboard.
+- [x] Present seeds as Storyboard and Image Variation concepts, expose generated values, and randomize one shot’s inference seed without changing its direction.
+- [x] Recalculate storyboard image-variation seeds in place without resetting custom Director fields or resolved scenes.
+- [x] Provide independent one-click regeneration controls for Storyboard and Image Variation seeds.
+- [x] Order Studio and Director frame actions by edit, inspect, vary, preview, and render workflow.
 - [x] Support `disabled: true` across selectable database records.
 - [x] Remove mirrors, sexual toys, and non-functional identity-consistency prompt procedures.
 - [x] Maintain README documentation alongside implementation.
+- [x] Expand the complete production catalog beyond 3,300 selectable records while preserving tags, dependencies, stage rules, pools, and Director performance.
+- [x] Triple interiors, surfaces, garments, footwear, poses, actions, camera grammar, expressions, treatments, and adult solo explicit recipes, with extra emphasis on ordinary apartments and simple sets.
+- [x] Normalize catalog prompts for Lumina2/Qwen and general image-model conditioning, reject duplicate/internal/overlong fragments, and enforce budgets for every compiler profile.
 
 ## P0 — Storyboard editorial planning
 
-- [ ] Plan shot size, camera angle, framing, pose family, action family, and expression intensity across the complete series.
-- [ ] Build a deliberate editorial arc: establishing → medium → reveal → nude → explicit plateau.
+- [x] Plan shot size, camera angle, framing, pose family, action family, and expression intensity across the complete series.
+- [x] Build a deliberate editorial arc: establishing → medium → reveal → nude → explicit plateau.
 - [ ] Plan `xxx-only` as a complete explicit storyboard rather than independent explicit frames.
-- [ ] Pass planned storyboard choices into the resolver without random replacement.
-- [ ] Give every frame an explainable role in the series.
-- [ ] Prevent unjustified duplicate compositions in adjacent frames.
+- [x] Pass planned storyboard choices into the resolver without random replacement.
+- [x] Give every frame an explainable role in the series.
+- [x] Prevent unjustified duplicate compositions in adjacent frames.
 
 Ready when:
 
@@ -51,11 +65,11 @@ Ready when:
 
 ## P0 — Camera grammar
 
-- [ ] Add `shot_sizes`, `camera_angles`, `framings`, and `focus_targets` to `database.json`.
-- [ ] Support full body, three-quarter, medium, portrait, torso close-up, breast close-up, intimate macro, and rear close-up.
-- [ ] Support eye-level, low, high, overhead, rear, and over-the-shoulder angles.
-- [ ] Support centered, diagonal editorial, symmetrical, tight-crop, and environmental framing.
-- [ ] Resolve camera grammar against pose, action, furniture, visibility, and exposure stage.
+- [x] Add `shot_sizes`, `camera_angles`, `framings`, and `focus_targets` to `database.json`.
+- [x] Support full body, three-quarter, medium, portrait, torso close-up, breast close-up, intimate macro, and rear close-up.
+- [x] Support eye-level, low, high, overhead, rear, and over-the-shoulder angles.
+- [x] Support centered, diagonal editorial, symmetrical, tight-crop, and environmental framing.
+- [x] Resolve camera grammar against pose, action, furniture, visibility, and exposure stage.
 - [ ] Reject combinations such as intimate macro with full-body framing.
 - [ ] Require rear angles for rear-display recipes and suitable close-ups for intimate actions.
 
@@ -68,11 +82,11 @@ Ready when:
 ## P0 — Weighted shuffle bags and diversity
 
 - [ ] Replace independent weighted selection for major shot categories with weighted shuffle bags.
-- [ ] Avoid repeating pose, action, expression, shot size, or angle before the compatible pool is exhausted.
+- [x] Avoid repeating pose, action, expression, shot size, or angle before the compatible pool is exhausted.
 - [ ] Keep separate bags for each photoshoot and stage family.
 - [ ] Permit reuse after exhaustion while preventing identical adjacent shots.
-- [ ] Calculate a storyboard diversity score.
-- [ ] Penalize repeated pose family, action family, camera angle, shot size, and surface.
+- [x] Calculate a storyboard diversity score.
+- [x] Penalize repeated pose family, action family, camera angle, shot size, and surface.
 - [ ] Do not penalize intentionally fixed model, outfit, location, palette, or lighting.
 
 Ready when:
@@ -83,13 +97,13 @@ Ready when:
 
 ## P0 — Deterministic inference-seed sequence
 
-- [ ] Preserve current fixed and random-per-image strategies.
-- [ ] Add a deterministic-sequence strategy.
-- [ ] Derive each frame seed from a base seed, photoshoot index, and shot index using a stable hash algorithm.
-- [ ] Do not use Python `hash()`, which changes between processes.
+- [x] Preserve current fixed and random-per-image strategies.
+- [x] Add a deterministic-sequence strategy.
+- [x] Derive each frame seed from a base seed, photoshoot index, and shot index using a stable hash algorithm.
+- [x] Do not use Python `hash()`, which changes between processes.
 - [ ] Print the base seed and effective frame seed.
-- [ ] Add strategy selection to the launcher Advanced menu.
-- [ ] Preserve literal seed reuse in fixed mode.
+- [x] Add strategy selection to the launcher Advanced menu.
+- [x] Preserve literal seed reuse in fixed mode.
 
 Ready when:
 
@@ -101,13 +115,13 @@ Ready when:
 
 - [ ] Order prompts by diffusion priority: solo/adult constraint → camera → pose/action → visible anatomy → human traits → visible garments → location → expression → lighting/quality.
 - [ ] Keep each human trait in one prompt block only.
-- [ ] Add `compact`, `balanced`, and `detailed` prompt profiles.
-- [ ] Give each profile an approximate token budget.
-- [ ] Trim low-priority fragments without removing adult, pose, or action constraints.
+- [x] Add `compact`, `balanced`, and `detailed` prompt profiles.
+- [x] Give each profile an approximate token budget.
+- [x] Trim low-priority fragments without removing adult, pose, or action constraints.
 - [ ] Make negative prompts stage-specific.
 - [ ] Remove irrelevant negatives from fashion stages.
 - [ ] Strengthen coverage and censorship negatives only for explicit stages.
-- [ ] Add linting for duplicate subjects, conflicting framing, contradictory clothing, and repeated fragments.
+- [x] Add linting for duplicate subjects, conflicting framing, contradictory clothing, and repeated fragments.
 
 Ready when:
 
@@ -135,7 +149,7 @@ Ready when:
 ## P1 — Dynamic location surfaces
 
 - [ ] Fix interior, palette, mood, time of day, and lighting family per photoshoot.
-- [ ] Allow different compatible surfaces within the same interior.
+- [x] Allow different compatible surfaces within the same interior.
 - [ ] Add zones such as bed, bed edge, wall, vanity, window, rug, sofa, chair, pool edge, and garden surface.
 - [ ] Match poses and shot sizes to surface capabilities.
 - [ ] Preserve recognizable room identity while changing surfaces.
@@ -148,12 +162,12 @@ Ready when:
 
 ## P1 — Exact garment transitions
 
-- [ ] Compare visible garment slots with the previous stage.
-- [ ] Calculate exactly which slots were removed or revealed.
+- [x] Compare visible garment slots with the previous stage.
+- [x] Calculate exactly which slots were removed or revealed.
 - [ ] Select an undressing action matching the actual garment type.
 - [ ] Add actions for zippers, buttons, straps, bra hooks, skirts, dresses, panties, stockings, and footwear.
 - [ ] Support intentionally retained stockings, heels, garters, and accessories.
-- [ ] Never describe removing a garment that is absent or already removed.
+- [x] Never describe removing a garment that is absent or already removed.
 - [ ] Never restore removed clothing during progressive photoshoots.
 
 Ready when:
@@ -165,10 +179,10 @@ Ready when:
 ## P1 — Explicit plateau recipes
 
 - [ ] Replace the three broad plateau kinds with a catalog of concrete recipes.
-- [ ] Add rear standing, rear all-fours, bent-over, legs-up, legs-wide, intimate macro, breast-focus, hands-only stimulation, and climax recipes.
-- [ ] Define pose tags, action tags, camera grammar, visibility, furniture, and expression intensity for every recipe.
-- [ ] Add configurable recipe weights to `database.json`.
-- [ ] Allow individual recipe families to be disabled.
+- [x] Add rear standing, rear all-fours, bent-over, legs-up, legs-wide, intimate macro, breast-focus, hands-only stimulation, and climax recipes.
+- [x] Define pose tags, action tags, camera grammar, visibility, furniture, and expression intensity for every recipe.
+- [x] Add configurable recipe weights to `database.json`.
+- [x] Allow individual recipe families to be disabled.
 - [ ] Distribute active recipe families across the plateau before repeating them.
 - [ ] Use weighted shuffle bags in `random --xxx-only`.
 
@@ -181,7 +195,7 @@ Ready when:
 
 ## P1 — Intensity scale
 
-- [ ] Add a shared `fashion`, `sensual`, `erotic`, `nude`, `explicit`, and `peak` scale.
+- [x] Add a shared `fashion`, `sensual`, `erotic`, `nude`, `explicit`, and `peak` scale.
 - [ ] Assign intensity to poses, actions, expressions, camera framing, and lighting.
 - [ ] Reject incompatible intensity jumps.
 - [ ] Increase intensity smoothly in progressive photoshoots.
@@ -238,11 +252,11 @@ Ready when:
 
 ## P2 — Retry policy and frame regeneration
 
-- [ ] Add configurable retry counts for HTTP, ComfyUI, and missing-output failures.
-- [ ] Retry the same resolved prompt with a new inference seed when the selected strategy permits it.
-- [ ] Never alter the storyboard during a technical retry.
-- [ ] Add regeneration of one frame from printed metadata.
-- [ ] Stop the batch after retries are exhausted.
+- [x] Add configurable retry counts for HTTP, ComfyUI, and missing-output failures.
+- [x] Retry the same resolved prompt with a new inference seed when the selected strategy permits it.
+- [x] Never alter the storyboard during a technical retry.
+- [x] Add regeneration of one frame from printed metadata.
+- [x] Stop the batch after retries are exhausted.
 - [ ] Do not add an image-quality detector or external vision model in this phase.
 
 Ready when:

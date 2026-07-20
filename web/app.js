@@ -10,6 +10,7 @@ const state = {
   directorOpenGroup: null,
   directorCustomField: null,
   previewJob: null,
+  previewDisplayed: null,
   previewJobTimer: null,
   job: null,
   jobTimer: null,
@@ -20,6 +21,9 @@ const state = {
   deleteResolver: null,
   promptShot: null,
   promptTab: 'positive',
+  seedResolveTimer: null,
+  resolveVersion: 0,
+  initialAutoResolved: false,
   theme: sessionStorage.getItem('valhalla-theme') || 'system',
 };
 
@@ -138,6 +142,9 @@ function restoreConfig(config, job) {
   form.elements.photoshoots.value = config.photoshoots;
   form.elements.prompt_seed.value = config.prompt_seed ?? '';
   form.elements.inference_seed.value = config.inference_seed ?? '';
+  form.elements.inference_strategy.value = config.inference_strategy || 'sequence';
+  form.elements.prompt_profile.value = config.prompt_profile || 'balanced';
+  form.elements.retry_count.value = config.retry_count ?? 2;
   if (config.nsfw_percent != null) form.elements.nsfw_percent.value = config.nsfw_percent;
   if (config.plateau_percent != null) form.elements.plateau_percent.value = config.plateau_percent;
   form.elements.fast.checked = Boolean(job.fast);
@@ -155,12 +162,17 @@ function configPayload() {
     plateau_percent: Number(value('plateau_percent')),
     prompt_seed: value('prompt_seed') === '' ? null : value('prompt_seed'),
     inference_seed: value('inference_seed') === '' ? null : value('inference_seed'),
+    inference_strategy: value('inference_strategy'),
+    prompt_profile: value('prompt_profile'),
+    retry_count: Number(value('retry_count')),
     fast: form.elements.fast.checked,
   };
 }
 
-async function resolveStoryboard(event) {
+async function resolveStoryboard(event, options = {}) {
   if (event?.preventDefault) event.preventDefault();
+  clearTimeout(state.seedResolveTimer);
+  const version = ++state.resolveVersion;
   const button = $('#resolve-button');
   setBusy(button, true, 'Resolving…');
   emptyState.classList.add('hidden');
@@ -169,15 +181,77 @@ async function resolveStoryboard(event) {
   storyboardMeta.classList.add('hidden');
   loadingState.classList.remove('hidden');
   try {
-    state.storyboard = await api('/api/storyboards', { method: 'POST', body: JSON.stringify(configPayload()) });
+    const storyboard = await api('/api/storyboards', { method: 'POST', body: JSON.stringify(configPayload()) });
+    if (version !== state.resolveVersion) return;
+    state.storyboard = storyboard;
+    form.elements.prompt_seed.value = storyboard.config.prompt_seed ?? '';
+    form.elements.inference_seed.value = storyboard.config.inference_seed ?? '';
     renderStoryboard();
-    toast('Storyboard ready', `${state.storyboard.total} compatible shots resolved.`, 'success');
+    toast(
+      options.automatic ? 'Seeds applied' : 'Storyboard ready',
+      `${state.storyboard.total} compatible shots resolved${options.automatic ? ' and Director updated' : ''}.`,
+      'success',
+    );
   } catch (error) {
+    if (version !== state.resolveVersion) return;
     emptyState.classList.remove('hidden');
     toast('Could not resolve storyboard', error.message, 'error');
   } finally {
+    if (version !== state.resolveVersion) return;
     loadingState.classList.add('hidden');
     setBusy(button, false);
+  }
+}
+
+function scheduleSeedResolve(event) {
+  if (!state.storyboard || isRenderActive()) return;
+  const name = event.target?.name;
+  if (!['prompt_seed', 'inference_seed', 'inference_strategy'].includes(name)) return;
+  clearTimeout(state.seedResolveTimer);
+  state.seedResolveTimer = setTimeout(
+    () => name === 'prompt_seed'
+      ? resolveStoryboard(null, { automatic: true })
+      : applyVariationSettings(),
+    650,
+  );
+}
+
+function generateUiSeed() {
+  const words = new Uint32Array(2);
+  crypto.getRandomValues(words);
+  return (words[0] & 0x1fffff) * 0x100000000 + words[1];
+}
+
+function randomizeSeedField(name) {
+  const input = form.elements[name];
+  const previous = input.value;
+  let next;
+  do { next = String(generateUiSeed()); } while (next === previous);
+  input.value = next;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+async function applyVariationSettings() {
+  if (!state.storyboard || isRenderActive()) return;
+  const version = ++state.resolveVersion;
+  const seed = form.elements.inference_seed.value;
+  try {
+    const storyboard = await api(`/api/storyboards/${state.storyboard.id}/seeds`, {
+      method: 'POST',
+      body: JSON.stringify({
+        inference_seed: seed === '' ? null : seed,
+        inference_strategy: form.elements.inference_strategy.value,
+      }),
+    });
+    if (version !== state.resolveVersion) return;
+    state.storyboard = storyboard;
+    state.director = null;
+    form.elements.inference_seed.value = storyboard.config.inference_seed ?? '';
+    renderStoryboard();
+    toast('Image variations updated', 'Director custom values and shot directions were preserved.', 'success');
+  } catch (error) {
+    if (version !== state.resolveVersion) return;
+    toast('Could not update image variations', error.message, 'error');
   }
 }
 
@@ -243,14 +317,17 @@ function shotCard(shot) {
         <div class="shot-set">Set ${shot.photoshoot_index + 1} · ${escapeHtml(shot.wardrobe)}</div>
         <div class="shot-detail"><span>Pose</span><strong title="${escapeHtml(shot.pose.prompt)}">${escapeHtml(shot.pose.prompt)}</strong></div>
         <div class="shot-detail"><span>Action</span><strong title="${escapeHtml(shot.action.prompt)}">${escapeHtml(shot.action.prompt)}</strong></div>
-        <div class="shot-detail"><span>Mood</span><strong title="${escapeHtml(shot.expression.prompt)}">${escapeHtml(shot.expression.prompt)}</strong></div>
-        <div class="shot-detail"><span>Surface</span><strong title="${escapeHtml(shot.surface)}">${escapeHtml(shot.surface)}</strong></div>
+        <div class="shot-detail"><span>Role</span><strong title="${escapeHtml(shot.editorial_role.prompt)}">${escapeHtml(shot.editorial_role.prompt)}</strong></div>
+        <div class="shot-detail"><span>Camera</span><strong title="${escapeHtml(shot.camera)}">${escapeHtml(shot.camera)}</strong></div>
+        <div class="shot-detail"><span>Variation</span><strong title="Inference seed ${shot.inference_seed}">${shot.seed_manual ? 'Custom · ' : ''}${escapeHtml(shot.inference_seed)}</strong></div>
       </div>
       <div class="shot-footer">
-        <button data-action="inspect">Inspect prompt</button>
         <button class="direct" data-action="director">⌘ Director</button>
-        <button class="preview" data-action="preview">◉ Preview</button>
         <button class="reroll" data-action="reroll">↻ Reroll</button>
+        <button data-action="inspect">≡ Prompt</button>
+        <button class="variation" data-action="variation">⤨ Variation</button>
+        <button class="preview" data-action="preview">◉ Preview</button>
+        <button class="render-one" data-action="render">▶ Render</button>
       </div>
     </article>`;
 }
@@ -265,7 +342,7 @@ function renderStoryboard() {
   shotGrid.innerHTML = board.shots.map(shotCard).join('');
   $('#seed-pill').textContent = `Seed ${board.config.prompt_seed}`;
   const sets = board.config.mode === 'photoshoot' ? board.config.photoshoots : 'Independent';
-  storyboardMeta.innerHTML = `<span>Mode <strong>${escapeHtml(board.config.mode)}</strong></span><span>Sets <strong>${sets}</strong></span><span>Shots <strong>${board.total}</strong></span><span>Content <strong>${board.config.xxx_only ? 'Full XXX' : 'Progressive'}</strong></span>`;
+  storyboardMeta.innerHTML = `<span>Mode <strong>${escapeHtml(board.config.mode)}</strong></span><span>Sets <strong>${sets}</strong></span><span>Shots <strong>${board.total}</strong></span><span>Diversity <strong>${board.diversity}%</strong></span><span>Content <strong>${board.config.xxx_only ? 'Full XXX' : 'Progressive'}</strong></span>`;
   emptyState.classList.add('hidden');
   storyboardActions.classList.remove('hidden');
   storyboardMeta.classList.remove('hidden');
@@ -290,6 +367,23 @@ async function rerollShot(number, button) {
   } catch (error) {
     setBusy(button, false);
     toast('Could not reroll shot', error.message, 'error');
+  }
+}
+
+async function randomizeShotSeed(number, button) {
+  if (!state.storyboard || isRenderActive()) return;
+  setBusy(button, true, '…');
+  try {
+    const shot = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/seed`, {
+      method: 'POST', body: '{}',
+    });
+    renderOneShot(shot);
+    if (state.director && state.directorShot === number) await loadDirector(number);
+    toast('New image variation', `Shot ${number} now uses seed ${shot.inference_seed}.`, 'success');
+  } catch (error) {
+    toast('Could not change variation', error.message, 'error');
+  } finally {
+    setBusy(button, false);
   }
 }
 
@@ -341,11 +435,100 @@ async function startGeneration() {
   }
 }
 
+async function startShotRender(number, button) {
+  if (!state.storyboard || isRenderActive()) return;
+  setBusy(button, true, 'Queueing…');
+  try {
+    state.job = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/render`, {
+      method: 'POST', body: JSON.stringify({ fast: form.elements.fast.checked }),
+    });
+    showJob();
+    pollJob();
+    switchView('outputs');
+    toast('Shot queued', `Shot ${number} was sent to the render pipeline.`, 'success');
+  } catch (error) {
+    toast('Could not render shot', error.message, 'error');
+  } finally {
+    setBusy(button, false);
+  }
+}
+
 function formatTime(seconds) {
   if (seconds == null) return 'Calculating ETA';
   if (seconds < 60) return `${Math.round(seconds)} sec remaining`;
   const minutes = Math.floor(seconds / 60);
   return `${minutes} min ${Math.round(seconds % 60)} sec remaining`;
+}
+
+function formatDuration(seconds) {
+  if (seconds == null) return '—';
+  const value = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const rest = value % 60;
+  return hours ? `${hours}h ${minutes}m` : (minutes ? `${minutes}m ${rest}s` : `${rest}s`);
+}
+
+function formatLoggedPrompt(prompt) {
+  return prompt ? String(prompt).replaceAll(', ', ',\n') : 'Waiting for a frame…';
+}
+
+function renderLogger() {
+  const preview = state.previewJob;
+  const usePreview = preview && (!state.job || new Date(preview.created_at) >= new Date(state.job.created_at));
+  const job = usePreview ? null : state.job;
+  const empty = $('#logger-empty');
+  const workspace = $('#logger-workspace');
+  if (!job && !preview) {
+    empty.classList.remove('hidden');
+    workspace.classList.add('hidden');
+    $('#log-count').textContent = '0';
+    $('#clear-logger').disabled = false;
+    return;
+  }
+  empty.classList.add('hidden');
+  workspace.classList.remove('hidden');
+  if (usePreview) {
+    $('#clear-logger').disabled = ['queued', 'running'].includes(preview.status);
+    $('#log-count').textContent = '1';
+    const status = $('#logger-status');
+    status.textContent = `Preview · ${preview.status}`;
+    status.className = `logger-status ${preview.status}`;
+    $('#logger-progress').textContent = 'Preview';
+    $('#logger-percent').textContent = preview.status === 'completed' ? 'Ready' : 'Rendering one shot';
+    $('#logger-elapsed').textContent = formatDuration(preview.elapsed_seconds);
+    $('#logger-eta').textContent = preview.status === 'completed' ? 'Complete' : 'Calculating';
+    $('#logger-shot').textContent = `Shot ${preview.shot}`;
+    $('#logger-seed').textContent = `Seed ${preview.seed}`;
+    $('#logger-positive').textContent = formatLoggedPrompt(preview.positive);
+    $('#logger-negative').textContent = formatLoggedPrompt(preview.negative);
+    $('#logger-job-id').textContent = `Preview ${preview.id.slice(0, 10)}`;
+    const time = new Date(preview.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    $('#logger-event-list').innerHTML = `<div class="logger-event ${escapeHtml(preview.status)}"><time>${escapeHtml(time)}</time><i>preview</i><span>${escapeHtml(`Shot ${preview.shot} preview ${preview.status}`)}</span><em>1/1</em></div>`;
+    return;
+  }
+  const logs = job.logs || [];
+  $('#clear-logger').disabled = ['queued', 'running'].includes(job.status);
+  $('#log-count').textContent = logs.length;
+  const status = $('#logger-status');
+  status.textContent = job.cancel_requested ? 'Cancelling' : job.status;
+  status.className = `logger-status ${job.status}`;
+  const visiblePosition = job.current_prompt?.position || job.completed || 0;
+  $('#logger-progress').textContent = `${visiblePosition} / ${job.total}`;
+  $('#logger-percent').textContent = `${job.progress || 0}% complete`;
+  $('#logger-elapsed').textContent = formatDuration(job.elapsed_seconds);
+  $('#logger-eta').textContent = job.status === 'completed' ? 'Complete' : formatDuration(job.eta_seconds);
+  $('#logger-shot').textContent = job.current_prompt ? `Shot ${job.current_prompt.shot}` : '—';
+  $('#logger-seed').textContent = job.current_prompt ? `Seed ${job.current_prompt.seed}` : 'Seed —';
+  $('#logger-positive').textContent = formatLoggedPrompt(job.current_prompt?.positive);
+  $('#logger-negative').textContent = formatLoggedPrompt(job.current_prompt?.negative);
+  $('#logger-job-id').textContent = `Job ${job.id.slice(0, 10)}`;
+  $('#logger-event-list').innerHTML = [...logs].reverse().map((entry) => {
+    const time = new Date(entry.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const count = entry.position ? `${entry.position}/${entry.total}` : `0/${entry.total}`;
+    const detail = entry.duration_seconds != null ? `${entry.message} · ${formatDuration(entry.duration_seconds)}` : entry.message;
+    return `<div class="logger-event ${escapeHtml(entry.type)}"><time>${escapeHtml(time)}</time><i>${escapeHtml(entry.type.replaceAll('_', ' '))}</i><span>${escapeHtml(detail)}</span><em>${escapeHtml(count)}</em></div>`;
+  }).join('');
 }
 
 function showJob() {
@@ -359,8 +542,9 @@ function showJob() {
     ? 'Cancelling… current image will finish'
     : (job.status === 'queued'
       ? 'Preparing workflow…'
-      : `Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}`);
+      : `${job.retrying ? `Retry ${job.attempt} · ` : ''}Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}`);
   $('#cancel-job').disabled = Boolean(job.cancel_requested);
+  renderLogger();
 }
 
 async function pollJob() {
@@ -508,24 +692,31 @@ async function restoreApplication() {
   await loadOutputs();
   try {
     const session = await api('/api/jobs');
-    if (!session.active_job) return;
-    state.job = session.active_job;
-    try {
-      state.storyboard = await api(`/api/storyboards/${state.job.storyboard_id}`);
-      restoreConfig(state.storyboard.config, state.job);
-      renderStoryboard();
-    } catch (error) {
-      toast('Storyboard recovery limited', error.message, 'error');
+    state.previewJob = session.latest_preview || null;
+    state.job = session.active_job || session.jobs?.[0] || null;
+    renderLogger();
+    if (state.job) {
+      try {
+        state.storyboard = await api(`/api/storyboards/${state.job.storyboard_id}`);
+        restoreConfig(state.storyboard.config, state.job);
+        renderStoryboard();
+      } catch (error) {
+        toast('Storyboard recovery limited', error.message, 'error');
+      }
+      showJob();
+      if (session.active_job) pollJob();
+      toast(
+        session.active_job ? 'Active render restored' : 'Latest render restored',
+        `${state.job.completed} of ${state.job.total} images completed.`,
+        'success',
+      );
     }
-    showJob();
-    pollJob();
-    toast(
-      'Active render restored',
-      `${state.job.completed} of ${state.job.total} images completed.`,
-      'success',
-    );
   } catch (error) {
     toast('Could not restore render state', error.message, 'error');
+  }
+  if (!state.storyboard && !state.initialAutoResolved) {
+    state.initialAutoResolved = true;
+    await resolveStoryboard(null, { initial: true });
   }
 }
 
@@ -715,11 +906,12 @@ function renderDirector() {
   $('#director-summary').innerHTML = [
     ['Subject', shot.subject], ['Wardrobe', shot.wardrobe],
     ['Location', shot.location], ['Treatment', shot.photography],
+    ['Variation', `${shot.seed_manual ? 'Custom · ' : ''}${shot.inference_seed}`],
   ].map(([label, value]) => `<div class="director-summary-${label.toLowerCase()}"><span>${label}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
-  const icons = { identity: 'ID', face: '◉', hair: '≈', body: '◇', styling: '✦', wardrobe: '◫', scene: '⌂', direction: '↗' };
+  const icons = { identity: 'ID', face: '◉', hair: '≈', body: '◇', styling: '✦', wardrobe: '◫', scene: '⌂', camera: '⌾', direction: '↗' };
   $('#director-groups').innerHTML = data.groups.map((group) => `
     <details class="director-group" data-director-group="${escapeHtml(group.id)}" ${state.directorOpenGroup === group.id ? 'open' : ''}>
-      <summary><span class="director-group-title"><i>${icons[group.id] || '•'}</i>${escapeHtml(group.label)}</span><small>${group.fields.length} settings · ${group.id === 'direction' ? 'shot' : 'set'}</small></summary>
+      <summary><span class="director-group-title"><i>${icons[group.id] || '•'}</i>${escapeHtml(group.label)}</span><small>${group.fields.length} settings · ${['direction', 'camera'].includes(group.id) ? 'shot' : 'set'}</small></summary>
       <div class="director-fields">${group.fields.map(directorField).join('')}</div>
     </details>
   `).join('');
@@ -870,9 +1062,8 @@ async function applyDirectorChange(select) {
 }
 
 async function closeShotPreview() {
-  clearTimeout(state.previewJobTimer);
-  const preview = state.previewJob;
-  state.previewJob = null;
+  const preview = state.previewDisplayed;
+  state.previewDisplayed = null;
   $('#shot-preview-window').classList.add('hidden');
   $('#shot-preview-image').removeAttribute('src');
   if (!preview?.id) return;
@@ -883,24 +1074,45 @@ async function closeShotPreview() {
   }
 }
 
-function openShotPreview(preview) {
+async function openShotPreview(preview) {
   const windowElement = $('#shot-preview-window');
+  const previous = state.previewDisplayed;
+  state.previewDisplayed = preview;
   $('#shot-preview-title').textContent = `Shot ${preview.shot} preview`;
   $('#shot-preview-image').src = `${preview.image_url}?v=${Date.now()}`;
   windowElement.classList.remove('hidden');
+  const rect = windowElement.getBoundingClientRect();
+  windowElement.style.left = `${rect.left}px`;
+  windowElement.style.top = `${rect.top}px`;
+  windowElement.style.right = 'auto';
+  windowElement.style.bottom = 'auto';
+  clampShotPreviewWindow();
+  if (previous?.id && previous.id !== preview.id) {
+    try { await api(`/api/previews/${previous.id}`, { method: 'DELETE' }); } catch { /* already expired */ }
+  }
+}
+
+function setPreviewBusy(button, busy) {
+  if (button?.id === 'shot-preview-refresh') {
+    button.disabled = busy;
+    button.classList.toggle('spinning', busy);
+    return;
+  }
+  setBusy(button, busy, busy ? 'Rendering…' : undefined);
 }
 
 async function pollShotPreview(button) {
   if (!state.previewJob) return;
   try {
     state.previewJob = await api(`/api/previews/${state.previewJob.id}`);
+    renderLogger();
     if (['queued', 'running'].includes(state.previewJob.status)) {
       state.previewJobTimer = setTimeout(() => pollShotPreview(button), 1000);
       return;
     }
-    setBusy(button, false);
+    setPreviewBusy(button, false);
     if (state.previewJob.status === 'completed') {
-      openShotPreview(state.previewJob);
+      await openShotPreview(state.previewJob);
       toast('Shot preview ready', 'Temporary preview rendered without adding it to Outputs.', 'success');
     } else {
       const message = state.previewJob.error || 'Preview rendering failed';
@@ -917,10 +1129,6 @@ async function pollShotPreview(button) {
 
 async function startShotPreview(number, button) {
   if (!state.storyboard) return;
-  if (!form.elements.fast.checked) {
-    toast('Fast test mode required', 'Enable Fast test mode in Studio before rendering a shot preview.', 'error');
-    return;
-  }
   if (isRenderActive()) {
     toast('Preview unavailable', 'Wait for the active storyboard render to finish or cancel it first.', 'error');
     return;
@@ -929,8 +1137,7 @@ async function startShotPreview(number, button) {
     toast('Preview already active', 'Wait for the current shot preview to finish.');
     return;
   }
-  if (state.previewJob) await closeShotPreview();
-  setBusy(button, true, 'Rendering…');
+  setPreviewBusy(button, true);
   try {
     state.previewJob = await api('/api/previews', {
       method: 'POST',
@@ -940,10 +1147,11 @@ async function startShotPreview(number, button) {
         fast: true,
       }),
     });
-    toast('Preview queued', `Rendering shot ${number} in Fast test mode.`);
+    renderLogger();
+    toast('Preview queued', `Rendering shot ${number} with the preview workflow.`);
     pollShotPreview(button);
   } catch (error) {
-    setBusy(button, false);
+    setPreviewBusy(button, false);
     toast('Could not start preview', error.message, 'error');
   }
 }
@@ -960,9 +1168,10 @@ function switchView(name) {
   $$('.view').forEach((view) => view.classList.toggle('active', view.id === `${name}-view`));
   $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.view === name));
   $('#view-title').textContent = {
-    studio: 'Production Studio', director: 'Director’s Desk', outputs: 'Output Gallery',
+    studio: 'Production Studio', director: 'Director’s Desk', outputs: 'Output Gallery', logger: 'Render Logger',
   }[name] || 'Project Valhalla';
   if (name === 'director') loadDirector();
+  if (name === 'logger') renderLogger();
 }
 
 async function captureWorkflow() {
@@ -985,9 +1194,12 @@ async function captureWorkflow() {
 
 form.addEventListener('submit', resolveStoryboard);
 form.addEventListener('input', syncForm);
+form.addEventListener('input', scheduleSeedResolve);
 $('#theme-button').addEventListener('click', cycleTheme);
 $('#refresh-status').addEventListener('click', () => refreshStatus(true));
 $('#reset-config').addEventListener('click', () => { form.reset(); syncForm(); toast('Setup reset', 'Default production settings restored.'); });
+$('#randomize-storyboard-seed').addEventListener('click', () => randomizeSeedField('prompt_seed'));
+$('#randomize-variation-seed').addEventListener('click', () => randomizeSeedField('inference_seed'));
 $('#reroll-all').addEventListener('click', resolveStoryboard);
 $('#export-storyboard').addEventListener('click', exportStoryboard);
 $('#import-storyboard').addEventListener('click', () => $('#storyboard-file').click());
@@ -999,6 +1211,11 @@ $('.director-quick-actions').addEventListener('click', (event) => {
   const previewButton = event.target.closest('#director-preview-shot');
   if (previewButton) {
     startShotPreview(state.directorShot, previewButton);
+    return;
+  }
+  const variationButton = event.target.closest('#director-randomize-seed');
+  if (variationButton) {
+    randomizeShotSeed(state.directorShot, variationButton);
     return;
   }
   const button = event.target.closest('[data-director-remix]');
@@ -1049,10 +1266,19 @@ shotGrid.addEventListener('click', (event) => {
     switchView('director');
   }
   if (button.dataset.action === 'preview') startShotPreview(number, button);
+  if (button.dataset.action === 'render') startShotRender(number, button);
+  if (button.dataset.action === 'variation') randomizeShotSeed(number, button);
   if (button.dataset.action === 'reroll') rerollShot(number, button);
 });
 
 $('#shot-preview-close').addEventListener('click', closeShotPreview);
+$('#shot-preview-refresh').addEventListener('click', (event) => {
+  const directorActive = $('#director-view').classList.contains('active');
+  const shot = directorActive
+    ? state.directorShot
+    : (state.previewDisplayed?.shot || state.previewJob?.shot);
+  if (shot) startShotPreview(shot, event.currentTarget);
+});
 $('#shot-preview-image').addEventListener('error', () => {
   toast('Could not display preview', 'The temporary preview image is no longer available.', 'error');
 });
@@ -1079,6 +1305,9 @@ $('#shot-preview-drag-handle').addEventListener('pointermove', (event) => {
 $('#shot-preview-drag-handle').addEventListener('pointerup', () => { previewDrag = null; });
 $('#shot-preview-drag-handle').addEventListener('pointercancel', () => { previewDrag = null; });
 window.addEventListener('resize', clampShotPreviewWindow);
+if ('ResizeObserver' in window) {
+  new ResizeObserver(clampShotPreviewWindow).observe($('#shot-preview-window'));
+}
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !$('#shot-preview-window').classList.contains('hidden')) {
     closeShotPreview();
@@ -1112,6 +1341,32 @@ $('#capture-button').addEventListener('click', () => $('#capture-dialog').showMo
 $$('.capture-close').forEach((button) => button.addEventListener('click', () => $('#capture-dialog').close()));
 $('#capture-confirm').addEventListener('click', captureWorkflow);
 $$('.nav-item').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
+$('#logger-view').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-copy-log]');
+  if (!button || !state.job?.current_prompt) return;
+  const key = button.dataset.copyLog;
+  try {
+    await navigator.clipboard.writeText(state.job.current_prompt[key] || '');
+    toast('Prompt copied', `${key[0].toUpperCase()}${key.slice(1)} prompt copied.`, 'success');
+  } catch (error) {
+    toast('Could not copy prompt', error.message, 'error');
+  }
+});
+$('#clear-logger').addEventListener('click', async () => {
+  const button = $('#clear-logger');
+  setBusy(button, true, 'Clearing…');
+  try {
+    const result = await api('/api/logger', { method: 'DELETE' });
+    state.job = null;
+    state.previewJob = null;
+    renderLogger();
+    toast('Logger cleared', `${result.cleared} log source${result.cleared === 1 ? '' : 's'} removed.`, 'success');
+  } catch (error) {
+    toast('Could not clear logger', error.message, 'error');
+  } finally {
+    setBusy(button, false);
+  }
+});
 
 applyTheme();
 syncForm();

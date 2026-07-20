@@ -13,6 +13,44 @@ def director_fields(payload):
     }
 
 
+class DatabaseExpansionTests(unittest.TestCase):
+    def test_catalog_is_tripled_and_curated_everyday_sets_are_present(self):
+        database, _ = app.load_database()
+        self.assertGreaterEqual(sum(1 for _ in app.iter_content_items(database)), 2703)
+        self.assertGreaterEqual(len(database["interiors"]), 123)
+        self.assertGreaterEqual(len(database["poses"]), 240)
+        self.assertGreaterEqual(len(database["actions"]), 177)
+        self.assertGreaterEqual(
+            sum(len(items) for items in database["garments"].values()), 1026
+        )
+        ids = {item["id"] for item in app.iter_content_items(database)}
+        self.assertIn("interior_apartment_compact_bedroom", ids)
+        self.assertIn("interior_apartment_studio_flat", ids)
+        self.assertIn("shoes_simple_01", ids)
+        self.assertIn("action_curated_20", ids)
+
+    def test_expansion_preserves_modifier_relationships(self):
+        database, _ = app.load_database()
+        for modifier in database["patterns"] + database["fabric_textures"]:
+            allowed = set(modifier["allowed_garment_ids"])
+            for original in list(allowed):
+                if original.endswith(("_studio", "_editorial")):
+                    continue
+                self.assertIn(f"{original}_studio", allowed)
+                self.assertIn(f"{original}_editorial", allowed)
+
+    def test_catalog_prompts_are_unique_and_model_friendly(self):
+        database, _ = app.load_database()
+        prompts = [
+            item["prompt"].strip().casefold()
+            for item in app.iter_content_items(database)
+            if item.get("prompt")
+        ]
+        self.assertEqual(len(prompts), len(set(prompts)))
+        self.assertLessEqual(max(len(prompt.split()) for prompt in prompts), 48)
+        self.assertFalse(any("production variation" in prompt for prompt in prompts))
+
+
 class DirectorRegressionTests(unittest.TestCase):
     def make_storyboard(self, **overrides):
         state = app.WebState()
@@ -34,6 +72,73 @@ class DirectorRegressionTests(unittest.TestCase):
         self.assertTrue(
             {"covered", "lingerie", "topless", "nude", "explicit"}.issubset(levels)
         )
+
+    def test_camera_grammar_is_visible_and_editable_in_director(self):
+        state, storyboard_id = self.make_storyboard()
+        payload = state.director_payload(storyboard_id, 1)
+        fields = director_fields(payload)
+        for key in (
+            "shot.furniture", "shot.editorial_role", "shot.shot_size",
+            "shot.camera_angle", "shot.framing", "shot.focus_target",
+        ):
+            self.assertIn(key, fields)
+            self.assertTrue(fields[key]["options"])
+
+    def test_sequence_seeds_are_stable_and_unique(self):
+        first_state, first_id = self.make_storyboard(inference_strategy="sequence")
+        second_state, second_id = self.make_storyboard(inference_strategy="sequence")
+        first = [shot["inference_seed"] for shot in first_state.storyboard_payload(first_state.get_storyboard(first_id))["shots"]]
+        second = [shot["inference_seed"] for shot in second_state.storyboard_payload(second_state.get_storyboard(second_id))["shots"]]
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), len(set(first)))
+
+    def test_single_frame_job_targets_only_requested_shot(self):
+        state, storyboard_id = self.make_storyboard()
+        with patch.object(app.threading, "Thread"):
+            job = state.create_job(storyboard_id, False, [3])
+        self.assertEqual(job["kind"], "shot")
+        self.assertEqual(job["shot_numbers"], [3])
+        self.assertEqual(job["total"], 1)
+        self.assertEqual(job["logs"][0]["type"], "queued")
+        self.assertEqual(job["logs"][0]["total"], 1)
+
+    def test_new_variation_changes_only_the_shot_inference_seed(self):
+        state, storyboard_id = self.make_storyboard()
+        before = state.storyboard_payload(state.get_storyboard(storyboard_id))["shots"][1]
+        after = state.randomize_shot_seed(storyboard_id, 2)
+        self.assertNotEqual(before["inference_seed"], after["inference_seed"])
+        self.assertTrue(after["seed_manual"])
+        self.assertEqual(before["positive_prompt"], after["positive_prompt"])
+        self.assertEqual(before["selected_ids"], after["selected_ids"])
+
+    def test_changing_variation_settings_preserves_director_custom_values(self):
+        state, storyboard_id = self.make_storyboard()
+        state.update_director(
+            storyboard_id,
+            {"shot": 1, "field": "shot.pose", "custom_value": "custom held pose"},
+        )
+        before = state.get_storyboard(storyboard_id)["shots"][0]
+        scene_id = id(before["scene"])
+        updated = state.update_storyboard_seeds(
+            storyboard_id,
+            {"inference_seed": 987654, "inference_strategy": "sequence"},
+        )
+        after = state.get_storyboard(storyboard_id)["shots"][0]
+        self.assertEqual(id(after["scene"]), scene_id)
+        self.assertEqual(after["custom_values"]["shot.pose"], "custom held pose")
+        self.assertIn("custom held pose", updated["shots"][0]["positive_prompt"])
+
+    def test_custom_subject_value_updates_director_summary(self):
+        state, storyboard_id = self.make_storyboard()
+        updated = state.update_director(
+            storyboard_id,
+            {
+                "shot": 1,
+                "field": "human.hair_color",
+                "custom_value": "vivid copper hair",
+            },
+        )
+        self.assertIn("vivid copper hair", updated["summary"]["subject"])
 
     def test_stage_change_is_manual_and_rebuilds_compatible_direction(self):
         state, storyboard_id = self.make_storyboard()
@@ -116,13 +221,17 @@ class PreviewRegressionTests(unittest.TestCase):
         self.assertEqual(state.delete_preview(preview["id"]), {"deleted": True})
         self.assertNotIn(preview["id"], state.previews)
 
-    def test_preview_requires_fast_mode(self):
+    def test_preview_always_uses_preview_workflow_without_toggle(self):
         state = app.WebState()
         board = state.create_storyboard(
             {"count": 1, "prompt_seed": 33, "inference_seed": 44}
         )
-        with self.assertRaisesRegex(app.AppError, "Fast test mode"):
-            state.create_preview(board["id"], 1, False)
+        with patch.object(app.threading, "Thread"):
+            preview = state.create_preview(board["id"], 1, False)
+        self.assertEqual(preview["type"], "preview")
+        self.assertTrue(preview["positive"])
+        self.assertTrue(preview["negative"])
+        self.assertEqual(preview["seed"], board["shots"][0]["inference_seed"])
 
     def test_save_image_nodes_become_temporary_preview_nodes(self):
         class Response:
@@ -174,6 +283,24 @@ class PreviewRegressionTests(unittest.TestCase):
         self.assertEqual(mime_type, "image/png")
         self.assertEqual(session.queued_workflow["save"]["class_type"], "PreviewImage")
         self.assertNotIn("filename_prefix", session.queued_workflow["save"]["inputs"])
+
+    def test_clear_logger_hides_preview_but_keeps_displayed_image_available(self):
+        state = app.WebState()
+        board = state.create_storyboard(
+            {"count": 1, "prompt_seed": 55, "inference_seed": 66}
+        )
+        with patch.object(app.threading, "Thread"):
+            preview = state.create_preview(board["id"], 1, False)
+        stored = state.previews[preview["id"]]
+        stored.update(
+            status="completed", image_bytes=b"still-visible", mime_type="image/png"
+        )
+        result = state.clear_logger()
+        self.assertEqual(result["previews"], 1)
+        self.assertIsNone(state.jobs_payload()["latest_preview"])
+        self.assertEqual(
+            state.preview_image(preview["id"]), (b"still-visible", "image/png")
+        )
 
 
 class RenderLifecycleRegressionTests(unittest.TestCase):

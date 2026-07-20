@@ -70,7 +70,9 @@ def iter_content_items(db: dict[str, Any]) -> Iterable[dict[str, Any]]:
         yield from values
     for section in (
         "outfit_templates", "interiors", "furniture", "poses", "actions",
-        "props", "expressions", "moods", "photography_styles",
+        "props", "expressions", "moods", "photography_styles", "shot_sizes",
+        "camera_angles", "framings", "focus_targets", "editorial_roles",
+        "explicit_recipes",
     ):
         yield from db.get(section, [])
 
@@ -115,7 +117,9 @@ def validate_database(db: dict[str, Any]) -> None:
         "settings", "prompt_defaults", "colors", "patterns", "fabric_textures",
         "human_model_parts", "garments",
         "outfit_templates", "interiors", "furniture", "poses", "actions", "props",
-        "expressions", "moods", "photography_styles",
+        "expressions", "moods", "photography_styles", "shot_sizes",
+        "camera_angles", "framings", "focus_targets", "editorial_roles",
+        "explicit_recipes",
     )
     for section in required_sections:
         if section not in db:
@@ -170,7 +174,9 @@ def validate_database(db: dict[str, Any]) -> None:
             ids.add(item["id"]); index[item["id"]] = item
     for section in (
         "colors", "patterns", "fabric_textures", "outfit_templates", "interiors", "furniture", "poses", "actions",
-        "props", "expressions", "moods", "photography_styles",
+        "props", "expressions", "moods", "photography_styles", "shot_sizes",
+        "camera_angles", "framings", "focus_targets", "editorial_roles",
+        "explicit_recipes",
     ):
         values = db[section]
         if not isinstance(values, list) or not values:
@@ -182,6 +188,16 @@ def validate_database(db: dict[str, Any]) -> None:
             ids.add(item["id"]); index[item["id"]] = item
 
     enabled_ids = {item_id for item_id, item in index.items() if not item.get("disabled", False)}
+    for recipe in db["explicit_recipes"]:
+        for field, section in (
+            ("shot_size", "shot_sizes"),
+            ("camera_angle", "camera_angles"),
+            ("focus_target", "focus_targets"),
+        ):
+            if recipe.get(field) not in {item["id"] for item in db[section]}:
+                raise AppError(
+                    f"explicit_recipes.{recipe['id']}.{field} references unknown id"
+                )
     human_defaults = settings.get("human_defaults", {})
     if not isinstance(human_defaults, dict):
         raise AppError("settings.human_defaults must be an object")
@@ -267,6 +283,32 @@ def validate_database(db: dict[str, Any]) -> None:
             configured_colors = set(item.get("allowed_colors", []))
             if configured_colors and not configured_colors & enabled_color_ids:
                 raise AppError(f"Enabled item {item['id']} has no enabled allowed colors")
+
+    prompt_owners: dict[str, str] = {}
+    internal_prompt_phrases = {
+        "production variation", "editorial variation", "understated variation",
+        "realistic variation", "production detail", "construction detail",
+    }
+    for item in iter_content_items(db):
+        prompt = item.get("prompt")
+        if not isinstance(prompt, str) or not prompt.strip():
+            continue
+        normalized = re.sub(r"\s+", " ", prompt.strip().casefold())
+        internal = next(
+            (phrase for phrase in internal_prompt_phrases if phrase in normalized), None
+        )
+        if internal:
+            raise AppError(
+                f"{item['id']}.prompt contains internal non-visual wording: {internal}"
+            )
+        if len(prompt.split()) > 48:
+            raise AppError(f"{item['id']}.prompt is too long for a catalog fragment")
+        owner = prompt_owners.get(normalized)
+        if owner is not None:
+            raise AppError(
+                f"{item['id']}.prompt duplicates the visual wording of {owner}"
+            )
+        prompt_owners[normalized] = item["id"]
 
     for template in db["outfit_templates"]:
         if template.get("wardrobe_category") not in {"normal", "glamour"}:
@@ -806,11 +848,35 @@ class Composer:
         stage: dict[str, Any],
         fixed: dict[str, Any],
         overrides: dict[str, str] | None = None,
+        avoid: dict[str, set[str]] | None = None,
     ) -> dict[str, Any]:
         overrides = overrides or {}
+        avoid = avoid or {}
+        def choose(section: str, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+            fresh = [item for item in candidates if item["id"] not in avoid.get(section, set())]
+            return weighted_choice(self.rng, fresh or candidates)
+
+        furniture_candidates = [
+            item for item in self.db["furniture"]
+            if not item.get("disabled", False)
+            and compatible_with_requirements(item, tags(fixed["interior"]))
+        ]
+        if overrides.get("furniture"):
+            furniture_candidates = [item for item in furniture_candidates if item["id"] == overrides["furniture"]]
+        furniture = choose("furniture", furniture_candidates)
         available_tags = set(stage.get("body_visibility", [])) | {stage["level"]}
         available_tags |= set(stage.get("visible_slots", []))
-        available_tags |= tags(fixed["furniture"]) | tags(fixed["interior"])
+        available_tags |= tags(furniture) | tags(fixed["interior"])
+        recipe = None
+        if stage["level"] == "explicit":
+            recipes = [item for item in self.db["explicit_recipes"] if not item.get("disabled", False)]
+            if stage.get("plateau_kind"):
+                recipes = [item for item in recipes if item.get("plateau_kind") == stage["plateau_kind"]]
+            if overrides.get("explicit_recipe"):
+                recipes = [item for item in recipes if item["id"] == overrides["explicit_recipe"]]
+            if recipes:
+                recipe = choose("explicit_recipe", recipes)
+                available_tags |= tags(recipe)
         poses = [
             item for item in self.db["poses"]
             if stage["level"] in item.get("allowed_levels", [stage["level"]])
@@ -833,9 +899,12 @@ class Composer:
                 item for item in poses
                 if "open_legs" in tags(item) and "provocative_rear" not in tags(item)
             ]
+        if recipe and recipe.get("pose_tags"):
+            required = set(recipe["pose_tags"])
+            poses = [item for item in poses if required & tags(item)]
         if overrides.get("pose"):
             poses = [item for item in poses if item["id"] == overrides["pose"]]
-        pose = weighted_choice(self.rng, poses)
+        pose = choose("pose", poses)
         action_tags = available_tags | tags(pose)
         actions = [
             item for item in self.db["actions"]
@@ -857,9 +926,12 @@ class Composer:
             actions = [item for item in actions if "masturbation_action" in tags(item)]
         elif plateau_kind == "panties_aside":
             actions = [item for item in actions if "panties_aside_action" in tags(item)]
+        if recipe and recipe.get("action_tags"):
+            required = set(recipe["action_tags"])
+            actions = [item for item in actions if required & tags(item)]
         if overrides.get("action"):
             actions = [item for item in actions if item["id"] == overrides["action"]]
-        action = weighted_choice(self.rng, actions)
+        action = choose("action", actions)
         prop = None
         required_prop_tags = set(action.get("requires_prop_tags", []))
         if required_prop_tags:
@@ -884,11 +956,51 @@ class Composer:
                 item for item in expression_candidates
                 if item["id"] == overrides["expression"]
             ]
+        editorial_role = None
+        if overrides.get("editorial_role"):
+            editorial_role = self.item_index.get(overrides["editorial_role"])
+        if editorial_role is None:
+            role_hint = "role_" + {
+                "covered": "establishing", "lingerie": "development",
+                "topless": "reveal", "nude": "nude_study", "explicit": "plateau",
+            }.get(stage["level"], "portrait")
+            candidates = [item for item in self.db["editorial_roles"] if role_hint in tags(item) or item["id"] == role_hint]
+            editorial_role = choose("editorial_role", candidates or self.db["editorial_roles"])
+        camera_tags = available_tags | tags(pose) | tags(action) | tags(editorial_role)
+        camera = {}
+        recipe_refs = {
+            "shot_size": recipe.get("shot_size") if recipe else None,
+            "camera_angle": recipe.get("camera_angle") if recipe else None,
+            "focus_target": recipe.get("focus_target") if recipe else None,
+        }
+        for key, section in (
+            ("shot_size", "shot_sizes"), ("camera_angle", "camera_angles"),
+            ("framing", "framings"), ("focus_target", "focus_targets"),
+        ):
+            candidates = [
+                item for item in self.db[section]
+                if not item.get("disabled", False)
+                and stage["level"] in item.get("allowed_levels", [stage["level"]])
+                and compatible_with_requirements(item, camera_tags)
+            ]
+            wanted = overrides.get(key) or recipe_refs.get(key)
+            if wanted:
+                candidates = [item for item in candidates if item["id"] == wanted]
+            camera[key] = choose(key, candidates)
+            camera_tags |= tags(camera[key])
+        intensity = overrides.get("intensity") or (recipe.get("intensity", "explicit") if recipe else {
+            "covered": "fashion", "lingerie": "sensual", "topless": "erotic", "nude": "nude"
+        }.get(stage["level"], "fashion"))
         return {
+            "furniture": furniture,
             "pose": pose,
             "action": action,
             "prop": prop,
-            "expression": weighted_choice(self.rng, expression_candidates),
+            "expression": choose("expression", expression_candidates),
+            "editorial_role": editorial_role,
+            "explicit_recipe": recipe,
+            "intensity": intensity,
+            **camera,
         }
 
     def resolve_scene(
@@ -896,13 +1008,14 @@ class Composer:
         fixed: dict[str, Any],
         stage: dict[str, Any],
         overrides: dict[str, str] | None = None,
+        avoid: dict[str, set[str]] | None = None,
     ) -> dict[str, Any]:
         attempts = int(self.db["settings"].get("max_scene_attempts", 100))
         last_error = "no candidates"
         for _ in range(attempts):
             try:
                 scene = dict(fixed)
-                scene.update(self.variable_context(stage, fixed, overrides))
+                scene.update(self.variable_context(stage, fixed, overrides, avoid))
                 scene_pools = self.db["settings"]["scene_defaults"].get("pools", {})
                 base_photo_ids = set(scene_pools.get("photography_styles", []))
                 explicit_photo_ids = scene_pools.get("explicit_photography_styles", [])
@@ -940,7 +1053,9 @@ class Composer:
                 item for slot, item in scene["outfit"].get(modifier_key, {}).items()
                 if slot in visible_slots
             )
-        flattened.extend([scene[key] for key in ("interior", "furniture", "pose", "action", "expression", "mood", "photography_style")])
+        flattened.extend([scene[key] for key in ("interior", "furniture", "pose", "action", "expression", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target")])
+        if scene.get("explicit_recipe"):
+            flattened.append(scene["explicit_recipe"])
         if scene.get("prop"):
             flattened.append(scene["prop"])
         flattened.extend(scene.get("dependencies", []))
@@ -1059,14 +1174,39 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     age_prompt = custom.get("human.age") or scene["human"]["age"]["prompt"]
     positive_prefix = defaults.get("positive_prefix", "").replace("{age}", age_prompt)
     fragments = [positive_prefix]
-    fragments.extend(
-        human_fragments(scene["human"], visibility, covered_chest, custom)
-    )
+    # Compiler v2 keeps the subject first, then establishes editorial intent and camera.
+    for key in ("editorial_role", "shot_size", "camera_angle", "framing", "focus_target"):
+        item = scene.get(key)
+        if item:
+            fragments.append(custom.get(f"shot.{key}") or item["prompt"])
     stage_custom = custom.get("shot.stage")
     if stage_custom:
         fragments.append(stage_custom)
     elif xxx_prompt:
         fragments.append(xxx_prompt)
+    if scene.get("explicit_recipe"):
+        fragments.append(custom.get("shot.explicit_recipe") or scene["explicit_recipe"]["prompt"])
+    if scene.get("intensity"):
+        fragments.append(custom.get("shot.intensity") or f"{scene['intensity']} visual intensity")
+    if scene.get("garment_transition"):
+        fragments.append(custom.get("shot.garment_transition") or scene["garment_transition"]["prompt"])
+    for key in ("pose", "action", "prop"):
+        item = scene.get(key)
+        if item:
+            fragments.append(custom.get(f"shot.{key}") or item["prompt"])
+    fragments.extend(
+        human_fragments(scene["human"], visibility, covered_chest, custom)
+    )
+    if stage_custom:
+        fragments.append(stage_custom)
+    elif xxx_prompt:
+        fragments.append(xxx_prompt)
+    if scene.get("explicit_recipe"):
+        fragments.append(custom.get("shot.explicit_recipe") or scene["explicit_recipe"]["prompt"])
+    if scene.get("intensity"):
+        fragments.append(custom.get("shot.intensity") or f"{scene['intensity']} visual intensity")
+    if scene.get("garment_transition"):
+        fragments.append(custom.get("shot.garment_transition") or scene["garment_transition"]["prompt"])
     visible_slots = set(stage.get("visible_slots", []))
     outfit = scene["outfit"]
     if custom.get("outfit.template"):
@@ -1088,16 +1228,41 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     for key in ("pose", "action", "prop", "expression", "interior", "furniture", "mood", "photography_style"):
         item = scene.get(key)
         if item:
-            director_key = f"shot.{key}" if key in {"pose", "action", "expression"} else f"scene.{key}"
+            director_key = f"shot.{key}" if key in {"pose", "action", "expression", "furniture"} else f"scene.{key}"
             fragments.append(custom.get(director_key) or item["prompt"])
     fragments.extend(item["prompt"] for item in scene.get("dependencies", []))
     fragments.append(defaults.get("positive_suffix", ""))
-    positive = ", ".join(fragment.strip(" ,") for fragment in fragments if fragment.strip(" ,"))
+    unique_fragments = []
+    seen_fragments = set()
+    for fragment in fragments:
+        clean = fragment.strip(" ,")
+        normalized = re.sub(r"\s+", " ", clean.casefold())
+        if clean and normalized not in seen_fragments:
+            unique_fragments.append(clean)
+            seen_fragments.add(normalized)
+    profile = scene.get("prompt_profile", db["settings"].get("prompt_profile", "balanced"))
+    budgets = db["settings"].get("prompt_token_budgets", {})
+    budget = int(budgets.get(profile, 230))
+    kept, words = [], 0
+    for position, fragment in enumerate(unique_fragments):
+        cost = max(1, round(len(fragment.split()) * 1.3))
+        mandatory = position < 14
+        if mandatory or words + cost <= budget:
+            kept.append(fragment)
+            words += cost
+    unique_fragments = kept
+    positive = ", ".join(unique_fragments)
     negative = defaults.get("negative_prompt", "")
     if covered_chest and defaults.get("covered_chest_negative"):
         negative = f"{negative}, {defaults['covered_chest_negative']}"
     if plateau_kind and defaults.get("xxx_negative_additions"):
-        negative = f"{negative}, {defaults['xxx_negative_additions']}"
+        xxx_negative = defaults["xxx_negative_additions"]
+        if plateau_kind == "panties_aside":
+            xxx_negative = ", ".join(
+                term.strip() for term in xxx_negative.split(",")
+                if term.strip() not in {"clothes", "underwear"}
+            )
+        negative = f"{negative}, {xxx_negative}"
     kind_negative = defaults.get("xxx_plateau_negative_additions", {}).get(
         plateau_kind, ""
     )
@@ -1112,11 +1277,25 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             item["id"] for slot, item in outfit.get(modifier_key, {}).items()
             if slot in visible_slots
         )
-    ids.extend(scene[key]["id"] for key in ("pose", "action", "expression", "interior", "furniture", "mood", "photography_style"))
+    ids.extend(scene[key]["id"] for key in ("pose", "action", "expression", "interior", "furniture", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target"))
+    if scene.get("explicit_recipe"):
+        ids.append(scene["explicit_recipe"]["id"])
     if scene.get("prop"):
         ids.append(scene["prop"]["id"])
     ids.extend(item["id"] for item in scene.get("dependencies", []))
     return positive, negative, ids
+
+
+def prompt_lint(scene: dict[str, Any], positive: str) -> list[str]:
+    warnings: list[str] = []
+    folded = positive.casefold()
+    if folded.count("single subject") > 1:
+        warnings.append("Subject identity is repeated")
+    if scene["stage"]["level"] == "covered" and any(term in folded for term in ("fully nude", "exposed genitals")):
+        warnings.append("Covered stage contains exposed-content wording")
+    if scene.get("focus_target", {}).get("id") == "environment" and scene.get("shot_size", {}).get("id") in {"intimate_macro", "breast_closeup"}:
+        warnings.append("Environmental focus conflicts with close-up framing")
+    return warnings
 
 
 def model_signature(human: dict[str, Any]) -> str:
@@ -1129,12 +1308,21 @@ def model_signature(human: dict[str, Any]) -> str:
     return "+".join(parts)
 
 
-def model_description(human: dict[str, Any]) -> str:
+def model_description(
+    human: dict[str, Any], custom: dict[str, str] | None = None
+) -> str:
+    custom = custom or {}
     keys = (
         "age", "ethnic_appearance", "skin_tone", "hair_length", "hair_style",
         "hair_color", "height", "body_frame", "breast_size",
     )
-    return " · ".join(human[key]["prompt"] for key in keys)
+    parts = [custom.get(f"human.{key}") or human[key]["prompt"] for key in keys]
+    summarized = {f"human.{key}" for key in keys}
+    parts.extend(
+        value for key, value in custom.items()
+        if key.startswith("human.") and key not in summarized and value
+    )
+    return " · ".join(parts)
 
 
 def photoshoot_signature(context: dict[str, Any]) -> tuple[Any, ...]:
@@ -1529,6 +1717,7 @@ def build_storyboard(
     seen_photoshoots: set[tuple[Any, ...]] = set()
     storyboard: list[dict[str, Any]] = []
     for photoshoot_index in range(photoshoot_count):
+        avoid: dict[str, set[str]] = {}
         fixed = None
         if args.mode == "photoshoot":
             attempts = int(db["settings"].get("max_scene_attempts", 100))
@@ -1556,18 +1745,54 @@ def build_storyboard(
                     nsfw_percent, plateau_percent,
                 )
             )
+            role_id = "role_peak" if shot_index == args.count - 1 and stage["level"] == "explicit" else {
+                "covered": "role_establishing" if shot_index == 0 else "role_portrait",
+                "lingerie": "role_development", "topless": "role_reveal", "nude": "role_nude_study",
+                "explicit": "role_plateau",
+            }.get(stage["level"], "portrait")
+            try:
+                scene = composer.resolve_scene(
+                    context, stage, {"editorial_role": role_id}, avoid
+                )
+            except AppError:
+                # Diversity is a preference; compatibility always wins.
+                scene = composer.resolve_scene(
+                    context, stage, {"editorial_role": role_id}
+                )
+            scene["prompt_profile"] = args.prompt_profile
+            previous = storyboard[-1] if storyboard and storyboard[-1]["photoshoot_index"] == photoshoot_index else None
+            previous_slots = set(previous["stage"].get("visible_slots", [])) if previous else set(stage.get("visible_slots", []))
+            removed = previous_slots - set(stage.get("visible_slots", []))
+            if removed:
+                names = [
+                    context["outfit"]["garments"][slot]["prompt"]
+                    for slot in context["outfit"]["template"]["slots"]
+                    if slot in removed and slot in context["outfit"]["garments"]
+                ]
+                if names:
+                    scene["garment_transition"] = {
+                        "id": "transition_" + "_".join(sorted(removed)),
+                        "prompt": "deliberately removing " + " and ".join(names),
+                        "slots": sorted(removed),
+                    }
+            for key in ("furniture", "pose", "action", "expression", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe"):
+                item = scene.get(key)
+                if item:
+                    avoid.setdefault(key, set()).add(item["id"])
+            inference_seed = args.inference_seed
+            if args.inference_strategy == "random":
+                inference_seed = secrets.randbelow(2**63)
+            elif args.inference_strategy == "sequence":
+                material = f"{args.inference_seed}:{photoshoot_index}:{shot_index}".encode()
+                inference_seed = int.from_bytes(hashlib.sha256(material).digest()[:8], "big") & (2**63 - 1)
             storyboard.append({
                 "number": len(storyboard) + 1,
                 "photoshoot_index": photoshoot_index,
                 "shot_index": shot_index,
                 "context": context,
                 "stage": stage,
-                "scene": composer.resolve_scene(context, stage),
-                "inference_seed": (
-                    args.inference_seed
-                    if args.inference_seed is not None
-                    else secrets.randbelow(2**63)
-                ),
+                "scene": scene,
+                "inference_seed": inference_seed,
             })
     return storyboard
 
@@ -1633,6 +1858,18 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
         photoshoots = 1
     prompt_seed = _optional_seed(payload.get("prompt_seed"), "Prompt seed", 2**63 - 1)
     inference_seed = _optional_seed(payload.get("inference_seed"), "Inference seed", 2**64 - 1)
+    inference_strategy = str(payload.get("inference_strategy", "sequence"))
+    if inference_strategy not in {"random", "fixed", "sequence"}:
+        raise AppError("Inference seed strategy must be random, fixed, or sequence")
+    if inference_strategy in {"fixed", "sequence"} and inference_seed is None:
+        inference_seed = secrets.randbelow(2**63)
+    prompt_profile = str(payload.get("prompt_profile", db["settings"].get("prompt_profile", "balanced")))
+    if prompt_profile not in {"compact", "balanced", "detailed"}:
+        raise AppError("Prompt profile must be compact, balanced, or detailed")
+    retry_count = _safe_int(
+        payload.get("retry_count", db["settings"].get("render_retry_count", 2)),
+        "Render retries", 0, 5,
+    )
     xxx_only = bool(payload.get("xxx_only", False))
     progression = db["settings"].get("photoshoot_progression", {})
     nsfw = _safe_percent(
@@ -1651,6 +1888,9 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
         photoshoots=photoshoots,
         prompt_seed=prompt_seed,
         inference_seed=inference_seed,
+        inference_strategy=inference_strategy,
+        prompt_profile=prompt_profile,
+        retry_count=retry_count,
         xxx_only=xxx_only,
         nsfw_percent=None if xxx_only or mode == "random" else nsfw,
         plateau_percent=None if xxx_only or mode == "random" else plateau,
@@ -1686,18 +1926,29 @@ def serialize_shot(db: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
             "manual": bool(shot.get("stage_manual", False)),
         },
         "inference_seed": shot["inference_seed"],
-        "subject": model_description(context["human"]),
+        "seed_manual": bool(shot.get("seed_manual", False)),
+        "subject": model_description(context["human"], scene.get("custom_values")),
         "wardrobe": template.get("menu_label", template["id"]),
         "outfit": _outfit_summary(context["outfit"]),
         "location": context["interior"]["prompt"],
-        "surface": context["furniture"]["prompt"],
+        "surface": scene["furniture"]["prompt"],
         "mood": context["mood"]["prompt"],
         "photography": context["photography_style"]["prompt"],
         "pose": {"id": scene["pose"]["id"], "prompt": scene["pose"]["prompt"]},
         "action": {"id": scene["action"]["id"], "prompt": scene["action"]["prompt"]},
         "expression": {"id": scene["expression"]["id"], "prompt": scene["expression"]["prompt"]},
+        "editorial_role": {"id": scene["editorial_role"]["id"], "prompt": scene["editorial_role"]["prompt"]},
+        "camera": " · ".join(scene[key]["prompt"] for key in ("shot_size", "camera_angle", "framing", "focus_target")),
+        "shot_size": {"id": scene["shot_size"]["id"], "prompt": scene["shot_size"]["prompt"]},
+        "camera_angle": {"id": scene["camera_angle"]["id"], "prompt": scene["camera_angle"]["prompt"]},
+        "framing": {"id": scene["framing"]["id"], "prompt": scene["framing"]["prompt"]},
+        "focus_target": {"id": scene["focus_target"]["id"], "prompt": scene["focus_target"]["prompt"]},
+        "explicit_recipe": ({"id": scene["explicit_recipe"]["id"], "prompt": scene["explicit_recipe"]["prompt"]} if scene.get("explicit_recipe") else None),
+        "intensity": scene["intensity"],
+        "garment_transition": scene.get("garment_transition", {}).get("prompt"),
         "positive_prompt": positive,
         "negative_prompt": negative,
+        "prompt_warnings": prompt_lint(scene, positive),
         "selected_ids": selected_ids,
     }
 
@@ -1876,11 +2127,19 @@ class WebState:
 
     def storyboard_payload(self, record: dict[str, Any]) -> dict[str, Any]:
         args = record["args"]
+        scenes = [shot["scene"] for shot in record["shots"]]
+        comparisons = 0
+        changes = 0
+        for previous, current in zip(scenes, scenes[1:]):
+            for key in ("pose", "action", "furniture", "shot_size", "camera_angle", "framing", "focus_target"):
+                comparisons += 1
+                changes += previous[key]["id"] != current[key]["id"]
         return {
             "id": record["id"],
             "created_at": record["created_at"],
             "config": _args_dict(args),
             "total": len(record["shots"]),
+            "diversity": round(changes * 100 / comparisons) if comparisons else 100,
             "shots": [serialize_shot(record["db"], shot) for shot in record["shots"]],
         }
 
@@ -2032,7 +2291,6 @@ class WebState:
         scene_fields = []
         for key, section, label in (
             ("interior", "interiors", "Location"),
-            ("furniture", "furniture", "Surface"),
             ("mood", "moods", "Mood"),
             ("photography_style", "photography_styles", "Render style"),
         ):
@@ -2055,6 +2313,80 @@ class WebState:
             })
         groups.append({"id": "scene", "label": "Scene & treatment", "fields": scene_fields})
 
+        camera_fields = []
+        for key, section, label in (
+            ("furniture", "furniture", "Surface / support"),
+            ("editorial_role", "editorial_roles", "Editorial role"),
+            ("shot_size", "shot_sizes", "Shot size"),
+            ("camera_angle", "camera_angles", "Camera angle"),
+            ("framing", "framings", "Framing"),
+            ("focus_target", "focus_targets", "Focus target"),
+        ):
+            current_item = shot["scene"][key]
+            camera_tags = (
+                set(shot["stage"].get("body_visibility", []))
+                | set(shot["stage"].get("visible_slots", []))
+                | {shot["stage"]["level"]}
+                | tags(shot["scene"]["interior"])
+                | tags(shot["scene"]["furniture"])
+                | tags(shot["scene"]["pose"])
+                | tags(shot["scene"]["action"])
+                | tags(shot["scene"]["editorial_role"])
+                | tags(shot["scene"]["shot_size"])
+                | tags(shot["scene"]["camera_angle"])
+                | tags(shot["scene"]["framing"])
+                | tags(shot["scene"]["focus_target"])
+            )
+            compatible = [
+                item for item in db[section]
+                if not item.get("disabled", False)
+                and (
+                    key == "furniture"
+                    and compatible_with_requirements(item, tags(context["interior"]))
+                    or key == "editorial_role"
+                    or key not in {"furniture", "editorial_role"}
+                    and shot["stage"]["level"] in item.get("allowed_levels", [shot["stage"]["level"]])
+                    and compatible_with_requirements(item, camera_tags)
+                )
+            ]
+            camera_fields.append({
+                "key": f"shot.{key}", "label": label, "scope": "shot",
+                "value": current_item["id"],
+                "options": [director_option(item, current_item["id"]) for item in compatible],
+            })
+        compatible_recipes = [
+            item for item in db["explicit_recipes"]
+            if not item.get("disabled", False)
+            and (
+                not shot["stage"].get("plateau_kind")
+                or item.get("plateau_kind") == shot["stage"].get("plateau_kind")
+            )
+        ]
+        if shot["stage"]["level"] == "explicit" and compatible_recipes:
+            current_recipe = shot["scene"].get("explicit_recipe")
+            camera_fields.append({
+                "key": "shot.explicit_recipe", "label": "Explicit recipe", "scope": "shot",
+                "value": current_recipe["id"] if current_recipe else "",
+                "options": [
+                    director_option(item, current_recipe["id"] if current_recipe else None)
+                    for item in compatible_recipes
+                ],
+            })
+        camera_fields.append({
+            "key": "shot.intensity", "label": "Visual intensity", "scope": "shot",
+            "value": shot["scene"]["intensity"],
+            "options": [
+                {
+                    "id": level, "label": level.title(),
+                    "prompt": f"{level} visual intensity",
+                    "current": level == shot["scene"]["intensity"],
+                    "default": level == shot["scene"]["intensity"],
+                }
+                for level in ("fashion", "sensual", "erotic", "nude", "explicit", "peak")
+            ],
+        })
+        groups.append({"id": "camera", "label": "Camera & editorial", "fields": camera_fields})
+
         direction_fields = []
         stages = director_stage_options(shot, record["args"].xxx_only)
         direction_fields.append({
@@ -2075,16 +2407,64 @@ class WebState:
             ("expression", "expressions", "Expression"),
         ):
             current_item = shot["scene"][key]
-            compatible = []
-            for item in db[section]:
-                if item.get("disabled", False):
-                    continue
-                trial = Composer(db, random.Random(0))
-                try:
-                    trial.resolve_scene(context, shot["stage"], {key: item["id"]})
-                except AppError:
-                    continue
-                compatible.append(item)
+            stage = shot["stage"]
+            available = (
+                set(stage.get("body_visibility", [])) | set(stage.get("visible_slots", []))
+                | {stage["level"]} | tags(shot["scene"]["furniture"])
+                | tags(shot["scene"]["interior"])
+            )
+            compatible = [item for item in db[section] if not item.get("disabled", False)]
+            if key == "pose":
+                compatible = [
+                    item for item in compatible
+                    if stage["level"] in item.get("allowed_levels", [stage["level"]])
+                    and compatible_with_requirements(item, available)
+                ]
+                if stage["level"] == "explicit":
+                    compatible = [item for item in compatible if "explicit_pose" in tags(item)]
+                elif stage["level"] in {"topless", "nude"}:
+                    compatible = [item for item in compatible if tags(item) & {"erotic_pose", "topless_pose", "nude_pose", "open_legs"}]
+                plateau = stage.get("plateau_kind")
+                plateau_tags = {
+                    "provocative_rear": {"provocative_rear"},
+                    "intimate_closeup": {"intimate_closeup"},
+                    "masturbation": {"masturbation_pose"},
+                    "panties_aside": {"open_legs"},
+                }.get(plateau)
+                if plateau_tags:
+                    compatible = [item for item in compatible if tags(item) & plateau_tags]
+                recipe = shot["scene"].get("explicit_recipe")
+                if recipe and recipe.get("pose_tags"):
+                    recipe_tags = set(recipe["pose_tags"])
+                    compatible = [item for item in compatible if tags(item) & recipe_tags]
+            elif key == "action":
+                action_tags = available | tags(shot["scene"]["pose"])
+                compatible = [
+                    item for item in compatible
+                    if stage["level"] in item.get("allowed_levels", [stage["level"]])
+                    and compatible_with_requirements(item, action_tags)
+                ]
+                if stage["level"] == "explicit":
+                    compatible = [item for item in compatible if "explicit_action" in tags(item)]
+                elif stage["level"] in {"topless", "nude"}:
+                    compatible = [item for item in compatible if tags(item) & {"erotic_action", "undressing_action"}]
+                plateau = stage.get("plateau_kind")
+                plateau_tags = {
+                    "provocative_rear": {"provocative_action"},
+                    "intimate_closeup": {"closeup_action"},
+                    "masturbation": {"masturbation_action"},
+                    "panties_aside": {"panties_aside_action"},
+                }.get(plateau)
+                if plateau_tags:
+                    compatible = [item for item in compatible if tags(item) & plateau_tags]
+                recipe = shot["scene"].get("explicit_recipe")
+                if recipe and recipe.get("action_tags"):
+                    recipe_tags = set(recipe["action_tags"])
+                    compatible = [item for item in compatible if tags(item) & recipe_tags]
+            else:
+                required = set(shot["scene"]["action"].get("requires_expression_tags", []))
+                if required:
+                    compatible = [item for item in compatible if required.issubset(tags(item))]
             direction_fields.append({
                 "key": f"shot.{key}", "label": label, "scope": "shot",
                 "value": current_item["id"],
@@ -2197,7 +2577,12 @@ class WebState:
                     and parts[2] in context["outfit"]["template"]["slots"]
                 )
                 or field in {"scene.interior", "scene.furniture", "scene.mood", "scene.photography_style"}
-                or field in {"shot.stage", "shot.pose", "shot.action", "shot.expression"}
+                or field in {
+                    "shot.stage", "shot.pose", "shot.action", "shot.expression",
+                    "shot.furniture", "shot.editorial_role", "shot.shot_size",
+                    "shot.camera_angle", "shot.framing", "shot.focus_target",
+                    "shot.explicit_recipe", "shot.intensity", "shot.garment_transition",
+                }
             )
             if not valid:
                 raise AppError("Unknown Director field")
@@ -2408,12 +2793,37 @@ class WebState:
                 if clear_custom:
                     shot.setdefault("custom_values", {}).pop(field, None)
                 self._apply_director_customs(shot, shot["scene"], context)
-            elif key in {"pose", "action", "expression"}:
+            elif key == "intensity":
+                if value not in {"fashion", "sensual", "erotic", "nude", "explicit", "peak"}:
+                    raise AppError("Unknown intensity")
+                shot["scene"]["intensity"] = value
+                if clear_custom:
+                    shot.setdefault("custom_values", {}).pop(field, None)
+                self._apply_director_customs(shot, shot["scene"], context)
+            elif key in {
+                "pose", "action", "expression", "furniture", "editorial_role",
+                "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe",
+            }:
                 if value not in index:
                     raise AppError("Unknown direction")
-                scene = record["composer"].resolve_scene(
-                    context, shot["stage"], {key: value}
-                )
+                preserved = {
+                    candidate: shot["scene"][candidate]["id"]
+                    for candidate in (
+                        "pose", "action", "expression", "furniture", "editorial_role",
+                        "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe",
+                    )
+                    if candidate != key and shot["scene"].get(candidate)
+                }
+                preserved[key] = value
+                try:
+                    scene = record["composer"].resolve_scene(
+                        context, shot["stage"], preserved
+                    )
+                except AppError:
+                    scene = record["composer"].resolve_scene(
+                        context, shot["stage"], {key: value}
+                    )
+                scene["prompt_profile"] = record["args"].prompt_profile
                 shot["scene"] = scene
                 if clear_custom:
                     shot.setdefault("custom_values", {}).pop(field, None)
@@ -2562,8 +2972,66 @@ class WebState:
                 shot["inference_seed"] = secrets.randbelow(2**63)
             return serialize_shot(record["db"], shot)
 
-    def create_job(self, storyboard_id: str, fast: bool) -> dict[str, Any]:
+    def randomize_shot_seed(self, storyboard_id: str, number: int) -> dict[str, Any]:
         record = self.get_storyboard(storyboard_id)
+        if not 1 <= number <= len(record["shots"]):
+            raise AppError("Shot number is out of range")
+        with self.lock:
+            if any(
+                job["storyboard_id"] == storyboard_id
+                and job["status"] in {"queued", "running"}
+                for job in self.jobs.values()
+            ):
+                raise AppError("Image variation cannot change while this storyboard is rendering")
+            shot = record["shots"][number - 1]
+            previous = shot["inference_seed"]
+            while shot["inference_seed"] == previous:
+                shot["inference_seed"] = secrets.randbelow(2**63)
+            shot["seed_manual"] = True
+            return serialize_shot(record["db"], shot)
+
+    def update_storyboard_seeds(
+        self, storyboard_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        record = self.get_storyboard(storyboard_id)
+        strategy = str(payload.get("inference_strategy", record["args"].inference_strategy))
+        if strategy not in {"random", "fixed", "sequence"}:
+            raise AppError("Inference seed strategy must be random, fixed, or sequence")
+        base_seed = _optional_seed(
+            payload.get("inference_seed"), "Image variation seed", 2**64 - 1
+        )
+        if strategy in {"fixed", "sequence"} and base_seed is None:
+            base_seed = secrets.randbelow(2**63)
+        with self.lock:
+            if any(
+                job["storyboard_id"] == storyboard_id
+                and job["status"] in {"queued", "running"}
+                for job in self.jobs.values()
+            ):
+                raise AppError("Image variation cannot change while this storyboard is rendering")
+            record["args"].inference_strategy = strategy
+            record["args"].inference_seed = base_seed
+            for shot in record["shots"]:
+                if strategy == "random":
+                    seed = secrets.randbelow(2**63)
+                elif strategy == "fixed":
+                    seed = base_seed
+                else:
+                    material = (
+                        f"{base_seed}:{shot['photoshoot_index']}:{shot['shot_index']}"
+                    ).encode()
+                    seed = int.from_bytes(
+                        hashlib.sha256(material).digest()[:8], "big"
+                    ) & (2**63 - 1)
+                shot["inference_seed"] = seed
+                shot["seed_manual"] = False
+            return self.storyboard_payload(record)
+
+    def create_job(self, storyboard_id: str, fast: bool, shot_numbers: list[int] | None = None) -> dict[str, Any]:
+        record = self.get_storyboard(storyboard_id)
+        shot_numbers = shot_numbers or [shot["number"] for shot in record["shots"]]
+        if not shot_numbers or any(number < 1 or number > len(record["shots"]) for number in shot_numbers):
+            raise AppError("Render selection contains an invalid shot")
         job_id = uuid.uuid4().hex
         job = {
             "id": job_id,
@@ -2574,12 +3042,22 @@ class WebState:
             "started_at": None,
             "finished_at": None,
             "completed": 0,
-            "total": len(record["shots"]),
+            "total": len(shot_numbers),
+            "shot_numbers": shot_numbers,
+            "kind": "shot" if len(shot_numbers) == 1 else "storyboard",
+            "attempt": 0,
+            "retrying": False,
+            "last_error": None,
             "current_shot": None,
             "progress": 0,
             "elapsed_seconds": 0,
             "eta_seconds": None,
             "outputs": [],
+            "current_prompt": None,
+            "logs": [{
+                "time": _iso_now(), "type": "queued", "message": "Render job queued",
+                "shot": None, "position": 0, "total": len(shot_numbers),
+            }],
             "error": None,
             "cancel_requested": False,
         }
@@ -2596,8 +3074,6 @@ class WebState:
     def create_preview(
         self, storyboard_id: str, number: int, fast: bool
     ) -> dict[str, Any]:
-        if not fast:
-            raise AppError("Shot Preview requires Fast test mode")
         record = self.get_storyboard(storyboard_id)
         if not 1 <= number <= len(record["shots"]):
             raise AppError("Shot number is out of range")
@@ -2611,6 +3087,8 @@ class WebState:
             "status": "queued",
             "created_at": _iso_now(),
             "finished_at": None,
+            "started_at": None,
+            "elapsed_seconds": 0,
             "prompt_id": None,
             "image_bytes": None,
             "mime_type": None,
@@ -2633,7 +3111,7 @@ class WebState:
         return self.preview_payload(preview)
 
     def preview_payload(self, preview: dict[str, Any]) -> dict[str, Any]:
-        return {
+        payload = {
             "id": preview["id"],
             "storyboard_id": preview["storyboard_id"],
             "shot": preview["shot"],
@@ -2646,7 +3124,18 @@ class WebState:
                 if preview["status"] == "completed" else None
             ),
             "error": preview["error"],
+            "type": "preview",
+            "positive": preview["positive"],
+            "negative": preview["negative"],
+            "seed": preview["seed"],
+            "started_at": preview["started_at"],
+            "elapsed_seconds": preview["elapsed_seconds"],
         }
+        if preview["status"] == "running" and preview.get("_started_monotonic") is not None:
+            payload["elapsed_seconds"] = round(
+                time.monotonic() - preview["_started_monotonic"], 1
+            )
+        return payload
 
     def get_preview(self, preview_id: str) -> dict[str, Any]:
         with self.lock:
@@ -2678,6 +3167,8 @@ class WebState:
         with self.lock:
             preview = self.previews[preview_id]
             preview["status"] = "running"
+            preview["started_at"] = _iso_now()
+            preview["_started_monotonic"] = time.monotonic()
         try:
             db = preview["db"]
             _, db_path = load_database()
@@ -2702,9 +3193,19 @@ class WebState:
         finally:
             with self.lock:
                 preview["finished_at"] = _iso_now()
+                preview["elapsed_seconds"] = round(
+                    time.monotonic() - preview["_started_monotonic"], 1
+                )
 
     def job_payload(self, job: dict[str, Any]) -> dict[str, Any]:
-        return dict(job)
+        payload = {key: value for key, value in job.items() if not key.startswith("_")}
+        if job["status"] == "running" and job.get("_started_monotonic") is not None:
+            elapsed = time.monotonic() - job["_started_monotonic"]
+            payload["elapsed_seconds"] = round(elapsed, 1)
+            if job["completed"]:
+                remaining = job["total"] - job["completed"]
+                payload["eta_seconds"] = round(elapsed / job["completed"] * remaining, 1)
+        return payload
 
     def get_job(self, job_id: str) -> dict[str, Any]:
         with self.lock:
@@ -2716,6 +3217,14 @@ class WebState:
     def jobs_payload(self) -> dict[str, Any]:
         with self.lock:
             jobs = [self.job_payload(job) for job in self.jobs.values()]
+            visible_previews = [
+                preview for preview in self.previews.values()
+                if not preview.get("logger_hidden", False)
+            ]
+            latest_preview = (
+                self.preview_payload(visible_previews[-1])
+                if visible_previews else None
+            )
         active = next(
             (job for job in reversed(jobs) if job["status"] in {"queued", "running"}),
             None,
@@ -2723,7 +3232,30 @@ class WebState:
         return {
             "active_job": active,
             "jobs": list(reversed(jobs)),
+            "latest_preview": latest_preview,
         }
+
+    def clear_logger(self) -> dict[str, Any]:
+        with self.lock:
+            if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
+                raise AppError("Logger cannot be cleared while a production render is active")
+            if any(
+                preview["status"] in {"queued", "running"}
+                for preview in self.previews.values()
+            ):
+                raise AppError("Logger cannot be cleared while a preview render is active")
+            cleared_jobs = len(self.jobs)
+            self.jobs.clear()
+            visible_previews = 0
+            for preview in self.previews.values():
+                if not preview.get("logger_hidden", False):
+                    visible_previews += 1
+                preview["logger_hidden"] = True
+            return {
+                "cleared": cleared_jobs + visible_previews,
+                "jobs": cleared_jobs,
+                "previews": visible_previews,
+            }
 
     def cancel_job(self, job_id: str) -> dict[str, Any]:
         with self.lock:
@@ -2731,7 +3263,13 @@ class WebState:
             if job is None:
                 raise AppError("Render job not found or expired")
             if job["status"] in {"queued", "running"}:
-                job["cancel_requested"] = True
+                if not job["cancel_requested"]:
+                    job["cancel_requested"] = True
+                    job["logs"].append({
+                        "time": _iso_now(), "type": "cancel_requested",
+                        "message": "Cancellation requested", "shot": job.get("current_shot"),
+                        "position": job["completed"], "total": job["total"],
+                    })
             return self.job_payload(job)
 
     def _run_job(self, job_id: str) -> None:
@@ -2739,6 +3277,11 @@ class WebState:
             job = self.jobs[job_id]
             job["status"] = "running"
             job["started_at"] = _iso_now()
+            job["_started_monotonic"] = time.monotonic()
+            job["logs"].append({
+                "time": _iso_now(), "type": "started", "message": "Workflow started",
+                "shot": None, "position": 0, "total": job["total"],
+            })
         started = time.monotonic()
         try:
             record = self.get_storyboard(job["storyboard_id"])
@@ -2746,24 +3289,69 @@ class WebState:
             _, db_path = load_database()
             workflow, mapping = load_workflow_runtime(db, db_path, job["fast"])
             run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            for shot in record["shots"]:
+            selected_shots = [record["shots"][number - 1] for number in job["shot_numbers"]]
+            for completed_index, shot in enumerate(selected_shots, 1):
+                shot_started = time.monotonic()
                 with self.lock:
                     if job["cancel_requested"]:
                         job["status"] = "cancelled"
+                        job["logs"].append({
+                            "time": _iso_now(), "type": "cancelled", "message": "Render job cancelled",
+                            "shot": None, "position": job["completed"], "total": job["total"],
+                        })
                         break
                     job["current_shot"] = shot["number"]
                 positive, negative, _ = compile_scene(db, shot["scene"])
-                prompt_id, paths = generate_one(
-                    db, db_path, positive, negative, shot["inference_seed"],
-                    record["args"].mode, shot["shot_index"], shot["photoshoot_index"],
-                    run_id, job["fast"], workflow, mapping,
-                )
+                with self.lock:
+                    job["current_prompt"] = {
+                        "shot": shot["number"], "position": completed_index,
+                        "positive": positive, "negative": negative,
+                        "seed": shot["inference_seed"],
+                    }
+                    job["logs"].append({
+                        "time": _iso_now(), "type": "shot_started",
+                        "message": f"Rendering shot {shot['number']}",
+                        "shot": shot["number"], "position": completed_index,
+                        "total": len(selected_shots), "seed": shot["inference_seed"],
+                        "positive": positive, "negative": negative,
+                    })
+                prompt_id = None
+                paths = []
+                for attempt in range(record["args"].retry_count + 1):
+                    with self.lock:
+                        job["attempt"] = attempt + 1
+                        job["retrying"] = attempt > 0
+                    seed = shot["inference_seed"]
+                    if attempt and record["args"].inference_strategy != "fixed":
+                        material = f"{seed}:retry:{attempt}".encode()
+                        seed = int.from_bytes(hashlib.sha256(material).digest()[:8], "big") & (2**63 - 1)
+                    try:
+                        prompt_id, paths = generate_one(
+                            db, db_path, positive, negative, seed,
+                            record["args"].mode, shot["shot_index"], shot["photoshoot_index"],
+                            run_id, job["fast"], workflow, mapping,
+                        )
+                        with self.lock:
+                            job["last_error"] = None
+                            job["retrying"] = False
+                        break
+                    except Exception as exc:
+                        with self.lock:
+                            job["last_error"] = str(exc)
+                            job["logs"].append({
+                                "time": _iso_now(), "type": "retry" if attempt < record["args"].retry_count else "error",
+                                "message": str(exc), "shot": shot["number"],
+                                "position": completed_index, "total": len(selected_shots),
+                                "attempt": attempt + 1,
+                            })
+                        if attempt >= record["args"].retry_count:
+                            raise
                 elapsed = time.monotonic() - started
-                completed = shot["number"]
-                remaining = len(record["shots"]) - completed
+                completed = completed_index
+                remaining = len(selected_shots) - completed
                 with self.lock:
                     job["completed"] = completed
-                    job["progress"] = round(completed * 100 / len(record["shots"]), 1)
+                    job["progress"] = round(completed * 100 / len(selected_shots), 1)
                     job["elapsed_seconds"] = round(elapsed, 1)
                     job["eta_seconds"] = round(elapsed / completed * remaining, 1) if remaining else 0
                     for path in paths:
@@ -2773,13 +3361,29 @@ class WebState:
                             "prompt_id": prompt_id,
                             "shot": shot["number"],
                         })
+                    job["logs"].append({
+                        "time": _iso_now(), "type": "shot_completed",
+                        "message": f"Shot {shot['number']} completed",
+                        "shot": shot["number"], "position": completed,
+                        "total": len(selected_shots),
+                        "elapsed_seconds": round(elapsed, 1),
+                        "duration_seconds": round(time.monotonic() - shot_started, 1),
+                    })
             with self.lock:
                 if job["status"] == "running":
                     job["status"] = "completed"
+                    job["logs"].append({
+                        "time": _iso_now(), "type": "completed", "message": "Render job completed",
+                        "shot": None, "position": job["completed"], "total": job["total"],
+                    })
         except Exception as exc:
             with self.lock:
                 job["status"] = "failed"
                 job["error"] = str(exc)
+                job["logs"].append({
+                    "time": _iso_now(), "type": "error", "message": str(exc),
+                    "shot": job.get("current_shot"), "position": job["completed"], "total": job["total"],
+                })
         finally:
             with self.lock:
                 job["elapsed_seconds"] = round(time.monotonic() - started, 1)
@@ -2974,9 +3578,23 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             elif path.endswith("/director") and path.startswith("/api/storyboards/"):
                 storyboard_id = path.split("/")[3]
                 self.send_json(WEB_STATE.update_director(storyboard_id, self.read_json()))
+            elif path.endswith("/seeds") and path.startswith("/api/storyboards/"):
+                storyboard_id = path.split("/")[3]
+                self.send_json(WEB_STATE.update_storyboard_seeds(storyboard_id, self.read_json()))
             elif path.endswith("/reroll") and path.startswith("/api/storyboards/"):
                 parts = path.split("/")
                 self.send_json(WEB_STATE.reroll_shot(parts[3], _safe_int(parts[5], "Shot", 1, 10000)))
+            elif path.endswith("/seed") and path.startswith("/api/storyboards/"):
+                parts = path.split("/")
+                self.send_json(WEB_STATE.randomize_shot_seed(parts[3], _safe_int(parts[5], "Shot", 1, 10000)))
+            elif path.endswith("/render") and path.startswith("/api/storyboards/"):
+                parts = path.split("/")
+                payload = self.read_json()
+                number = _safe_int(parts[5], "Shot", 1, 10_000)
+                self.send_json(
+                    WEB_STATE.create_job(parts[3], bool(payload.get("fast", False)), [number]),
+                    HTTPStatus.ACCEPTED,
+                )
             elif path == "/api/jobs":
                 payload = self.read_json()
                 self.send_json(
@@ -3012,6 +3630,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == "/api/outputs":
                 self.send_json(delete_all_output_images())
+            elif path == "/api/logger":
+                self.send_json(WEB_STATE.clear_logger())
             elif path.startswith("/api/outputs/"):
                 name = unquote(path.removeprefix("/api/outputs/"))
                 self.send_json(delete_output_image(name))
