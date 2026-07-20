@@ -46,10 +46,16 @@ async function api(path, options = {}) {
 
 function toast(title, message = '', type = '') {
   const item = document.createElement('div');
+  const compactMessage = String(message).length > 180 ? `${String(message).slice(0, 177)}…` : message;
   item.className = `toast ${type}`;
-  item.innerHTML = `<strong>${escapeHtml(title)}</strong>${escapeHtml(message)}`;
+  item.title = 'Click to dismiss';
+  item.innerHTML = `<span class="toast-copy"><strong>${escapeHtml(title)}</strong>${escapeHtml(compactMessage)}</span><i class="toast-clock" aria-hidden="true"></i>`;
   $('#toast-region').append(item);
-  setTimeout(() => item.remove(), 4800);
+  const timer = setTimeout(() => item.remove(), 3600);
+  item.addEventListener('click', () => {
+    clearTimeout(timer);
+    item.remove();
+  });
 }
 
 function setBusy(button, busy, label) {
@@ -163,6 +169,55 @@ async function resolveStoryboard(event) {
     toast('Could not resolve storyboard', error.message, 'error');
   } finally {
     loadingState.classList.add('hidden');
+    setBusy(button, false);
+  }
+}
+
+async function exportStoryboard() {
+  if (!state.storyboard) return;
+  const button = $('#export-storyboard');
+  setBusy(button, true, 'Exporting…');
+  try {
+    const payload = await api(`/api/storyboards/${state.storyboard.id}/export`);
+    if (payload.format !== 'valhalla-storyboard') {
+      throw new Error('Server returned a storyboard snapshot instead of an export. Restart the server and try again.');
+    }
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    const link = document.createElement('a');
+    const stamp = new Date().toISOString().replaceAll(':', '-').replace(/\.\d{3}Z$/, 'Z');
+    link.href = URL.createObjectURL(blob);
+    link.download = `valhalla-storyboard-${stamp}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
+    toast('Storyboard exported', `${state.storyboard.total} shots saved in compact JSON.`, 'success');
+  } catch (error) {
+    toast('Export failed', error.message, 'error');
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+async function importStoryboard(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  const button = $('#import-storyboard');
+  setBusy(button, true, 'Importing…');
+  try {
+    if (file.size > 32_000_000) throw new Error('Storyboard file is larger than 32 MB.');
+    const payload = JSON.parse(await file.text());
+    state.storyboard = await api('/api/storyboards/import', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    restoreConfig(state.storyboard.config, { fast: state.storyboard.config.fast });
+    renderStoryboard();
+    switchView('studio');
+    toast('Storyboard imported', `${state.storyboard.total} shots are ready to render.`, 'success');
+  } catch (error) {
+    const message = error instanceof SyntaxError ? 'The selected file is not valid JSON.' : error.message;
+    toast('Import failed', message, 'error');
+  } finally {
     setBusy(button, false);
   }
 }
@@ -599,6 +654,9 @@ $('#theme-button').addEventListener('click', cycleTheme);
 $('#refresh-status').addEventListener('click', () => refreshStatus(true));
 $('#reset-config').addEventListener('click', () => { form.reset(); syncForm(); toast('Setup reset', 'Default production settings restored.'); });
 $('#reroll-all').addEventListener('click', resolveStoryboard);
+$('#export-storyboard').addEventListener('click', exportStoryboard);
+$('#import-storyboard').addEventListener('click', () => $('#storyboard-file').click());
+$('#storyboard-file').addEventListener('change', importStoryboard);
 $('#generate-button').addEventListener('click', startGeneration);
 $('#cancel-job').addEventListener('click', async () => {
   if (!state.job) return;

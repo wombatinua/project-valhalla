@@ -34,7 +34,7 @@ The UI includes:
 - deterministic prompt seeds and optional fixed inference seeds;
 - production and fast-test render profiles;
 - automatic recovery of the active storyboard, settings, render progress, ETA, outputs, and polling after a browser reload;
-- storyboard cards with one-shot reroll and prompt inspection;
+- storyboard cards with one-shot reroll, prompt inspection, and compact JSON export/import tied to the exact semantic database version;
 - cancellable background render jobs;
 - a persistent output gallery with full-screen preview, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, previous/next navigation, swipe, downloads, individual deletion, and confirmed bulk deletion;
 - safe or forced workflow capture from the latest successful ComfyUI run.
@@ -87,6 +87,8 @@ The Web UI is served from `/`. All application endpoints are under `/api`.
 | `GET` | `/api/status` | ComfyUI, workflow, output, and catalog status |
 | `POST` | `/api/storyboards` | Validate configuration and resolve a complete storyboard |
 | `GET` | `/api/storyboards/{id}` | Retrieve a resolved storyboard |
+| `GET` | `/api/storyboards/{id}/export` | Export a compact, database-bound storyboard JSON |
+| `POST` | `/api/storyboards/import` | Validate and restore a complete exported storyboard |
 | `POST` | `/api/storyboards/{id}/shots/{number}/reroll` | Resolve a new compatible composition for one shot |
 | `POST` | `/api/jobs` | Start a background render job for a storyboard |
 | `GET` | `/api/jobs` | Discover the active render job and recover browser state after reload |
@@ -124,6 +126,8 @@ The prompt seed controls all compositional decisions. Leaving it empty creates a
 
 The inference seed is sent to ComfyUI. Leaving it empty produces a different seed for every image. Entering a value deliberately reuses the same literal seed for the complete run.
 
+The compact storyboard format stores catalog references by ID and includes a semantic SHA-256 fingerprint of the complete database. Import succeeds only against the matching database content; reordering JSON keys does not break compatibility, but changing catalog data does. Imported storyboards remain fully reviewable, rerollable, and renderable.
+
 ## Workflow capture
 
 First complete a representative workflow successfully in ComfyUI. Then choose **Capture workflow** in the top bar.
@@ -137,6 +141,18 @@ Fast test patches the captured graph to keep the base sampler and VAE output whi
 ## Database
 
 `database.json` contains 901 selectable production records covering adult-model traits, garments, modifiers, outfit templates, private locations, surfaces, poses, actions, expressions, moods, and photography treatments.
+
+The catalog follows the order in which a scene is assembled, so related material stays easy to find:
+
+1. `settings` — defaults, progression, limits, and server timing.
+2. `human_model_parts` — subject identity, face, hair, body, and styling.
+3. `colors`, `patterns`, `fabric_textures`, `garments`, `outfit_templates` — wardrobe building blocks and complete outfits.
+4. `poses`, `actions`, `props`, `expressions` — what the subject is doing and how it reads.
+5. `interiors`, `furniture` — location and physical scene context.
+6. `moods`, `photography_styles` — atmosphere and visual treatment.
+7. `prompt_defaults` — final prompt compiler defaults and safety exclusions.
+
+Within `human_model_parts`, traits progress from identity and complexion through face and hair to body and styling. Garments progress from upper/lower/full-body layers through lingerie, legwear, footwear, and accessories.
 
 Records can be temporarily excluded without deletion:
 

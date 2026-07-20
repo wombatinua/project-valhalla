@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import math
 import random
@@ -513,6 +514,17 @@ def progressive_stage(stages: list[dict[str, Any]], index: int, count: int) -> d
     return stages[min(len(stages) - 1, index * len(stages) // count)]
 
 
+HUMAN_SELECTION_ORDER = (
+    "age", "ethnic_appearance", "skin_tone", "face_shape", "eye_shape",
+    "eye_color", "eyebrows", "nose", "lips", "cheekbones", "jawline",
+    "hair_texture", "hair_length", "hair_style", "hair_color", "height",
+    "body_frame", "waist", "hips", "breast_size", "breast_shape",
+    "areola_size", "areola_color", "nipple_size", "nipple_shape",
+    "pubic_hair", "genital_appearance", "facial_accents", "makeup",
+    "manicure",
+)
+
+
 class Composer:
     def __init__(self, db: dict[str, Any], rng: random.Random):
         self.db = db
@@ -553,7 +565,10 @@ class Composer:
             default_pools.pop("ethnic_appearance", None)
         human: dict[str, Any] = {}
         parts = self.db["human_model_parts"]
-        order = list(parts)
+        order = [category for category in HUMAN_SELECTION_ORDER if category in parts]
+        order.extend(
+            category for category in parts if category not in HUMAN_SELECTION_ORDER
+        )
         selected_tags: set[str] = set()
         for category in order:
             if category == "facial_accents":
@@ -1568,6 +1583,41 @@ def serialize_shot(db: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+STORYBOARD_FORMAT = "valhalla-storyboard"
+STORYBOARD_FORMAT_VERSION = 1
+
+
+def database_fingerprint(db: dict[str, Any]) -> str:
+    canonical = json.dumps(
+        db, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def encode_database_refs(value: Any, index: dict[str, dict[str, Any]]) -> Any:
+    if isinstance(value, dict):
+        item_id = value.get("id")
+        if isinstance(item_id, str) and index.get(item_id) == value:
+            return {"$": item_id}
+        return {key: encode_database_refs(item, index) for key, item in value.items()}
+    if isinstance(value, list):
+        return [encode_database_refs(item, index) for item in value]
+    return value
+
+
+def decode_database_refs(value: Any, index: dict[str, dict[str, Any]]) -> Any:
+    if isinstance(value, dict):
+        if set(value) == {"$"}:
+            item_id = value["$"]
+            if not isinstance(item_id, str) or item_id not in index:
+                raise AppError(f"Storyboard references unknown database item: {item_id}")
+            return index[item_id]
+        return {key: decode_database_refs(item, index) for key, item in value.items()}
+    if isinstance(value, list):
+        return [decode_database_refs(item, index) for item in value]
+    return value
+
+
 class WebState:
     def __init__(self) -> None:
         self.lock = threading.RLock()
@@ -1620,6 +1670,115 @@ class WebState:
         if record is None:
             raise AppError("Storyboard not found or expired")
         return record
+
+    def export_storyboard(self, storyboard_id: str) -> dict[str, Any]:
+        record = self.get_storyboard(storyboard_id)
+        db = record["db"]
+        index = {item["id"]: item for item in iter_content_items(db)}
+        shots = []
+        for shot in record["shots"]:
+            context = shot["context"]
+            scene_delta = {
+                key: value for key, value in shot["scene"].items()
+                if key not in context or context[key] != value
+            }
+            shots.append({
+                "n": shot["number"],
+                "p": shot["photoshoot_index"],
+                "s": shot["shot_index"],
+                "seed": shot["inference_seed"],
+                "stage": encode_database_refs(shot["stage"], index),
+                "context": encode_database_refs(context, index),
+                "scene": encode_database_refs(scene_delta, index),
+            })
+        return {
+            "format": STORYBOARD_FORMAT,
+            "version": STORYBOARD_FORMAT_VERSION,
+            "database": database_fingerprint(db),
+            "created_at": record["created_at"],
+            "config": _args_dict(record["args"]),
+            "shots": shots,
+        }
+
+    def import_storyboard(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if payload.get("format") != STORYBOARD_FORMAT:
+            if all(key in payload for key in ("id", "config", "shots")):
+                raise AppError(
+                    "This file is a UI storyboard snapshot, not an export file. "
+                    "Export the storyboard again with the updated server."
+                )
+            raise AppError("This is not a Project Valhalla storyboard export file")
+        if payload.get("version") != STORYBOARD_FORMAT_VERSION:
+            raise AppError("Unsupported storyboard format version")
+        db, _ = load_database()
+        if payload.get("database") != database_fingerprint(db):
+            raise AppError(
+                "Storyboard belongs to a different database version. "
+                "Restore its matching database.json before importing it."
+            )
+        config = payload.get("config")
+        compact_shots = payload.get("shots")
+        if not isinstance(config, dict) or not isinstance(compact_shots, list):
+            raise AppError("Storyboard file is missing its configuration or shots")
+        if not compact_shots or len(compact_shots) > 10_000:
+            raise AppError("Storyboard must contain between 1 and 10000 shots")
+        args = parse_run_config(
+            {key: value for key, value in config.items() if value is not None}, db
+        )
+        if args.prompt_seed is None:
+            raise AppError("Storyboard file is missing its prompt seed")
+        expected_total = args.count * (
+            args.photoshoots if args.mode == "photoshoot" else 1
+        )
+        if len(compact_shots) != expected_total:
+            raise AppError("Storyboard shot count does not match its configuration")
+        rng = random.Random(args.prompt_seed)
+        composer = Composer(db, rng)
+        index = {item["id"]: item for item in iter_content_items(db)}
+        shots = []
+        for position, compact in enumerate(compact_shots, 1):
+            if not isinstance(compact, dict):
+                raise AppError(f"Storyboard shot {position} is invalid")
+            context = decode_database_refs(compact.get("context"), index)
+            stage = decode_database_refs(compact.get("stage"), index)
+            scene_delta = decode_database_refs(compact.get("scene"), index)
+            if not all(isinstance(value, dict) for value in (context, stage, scene_delta)):
+                raise AppError(f"Storyboard shot {position} is incomplete")
+            scene = dict(context)
+            scene.update(scene_delta)
+            shot = {
+                "number": _safe_int(compact.get("n"), "Shot number", 1, 10_000),
+                "photoshoot_index": _safe_int(
+                    compact.get("p"), "Photoshoot index", 0, 10_000
+                ),
+                "shot_index": _safe_int(
+                    compact.get("s"), "Shot index", 0, 10_000
+                ),
+                "inference_seed": _safe_int(
+                    compact.get("seed"), "Inference seed", 0, 2**64 - 1
+                ),
+                "context": context,
+                "stage": stage,
+                "scene": scene,
+            }
+            if shot["number"] != position:
+                raise AppError("Storyboard shot numbers must be consecutive")
+            serialize_shot(db, shot)
+            shots.append(shot)
+        storyboard_id = uuid.uuid4().hex
+        record = {
+            "id": storyboard_id,
+            "created_at": str(payload.get("created_at") or _iso_now()),
+            "db": db,
+            "args": args,
+            "composer": composer,
+            "rng": rng,
+            "shots": shots,
+        }
+        with self.lock:
+            self.storyboards[storyboard_id] = record
+            self.trim(self.storyboards, MAX_STORYBOARDS)
+        return self.storyboard_payload(record)
 
     def reroll_shot(self, storyboard_id: str, number: int) -> dict[str, Any]:
         record = self.get_storyboard(storyboard_id)
@@ -1872,8 +2031,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError as exc:
             raise AppError("Invalid Content-Length") from exc
-        if length > 1_000_000:
-            raise AppError("Request body is too large")
+        if length > 32_000_000:
+            raise AppError("Request body is too large (maximum 32 MB)")
         try:
             value = json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError as exc:
@@ -1887,6 +2046,9 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == "/api/status":
                 self.send_json(application_status())
+            elif path.endswith("/export") and path.startswith("/api/storyboards/"):
+                storyboard_id = path.split("/")[3]
+                self.send_json(WEB_STATE.export_storyboard(storyboard_id))
             elif path.startswith("/api/storyboards/"):
                 storyboard_id = path.split("/")[3]
                 self.send_json(WEB_STATE.storyboard_payload(WEB_STATE.get_storyboard(storyboard_id)))
@@ -1914,6 +2076,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == "/api/storyboards":
                 self.send_json(WEB_STATE.create_storyboard(self.read_json()), HTTPStatus.CREATED)
+            elif path == "/api/storyboards/import":
+                self.send_json(WEB_STATE.import_storyboard(self.read_json()), HTTPStatus.CREATED)
             elif path.endswith("/reroll") and path.startswith("/api/storyboards/"):
                 parts = path.split("/")
                 self.send_json(WEB_STATE.reroll_shot(parts[3], _safe_int(parts[5], "Shot", 1, 10000)))

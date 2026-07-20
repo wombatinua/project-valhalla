@@ -39,6 +39,8 @@
           <h1 id="view-title">Production Studio</h1>
         </div>
         <div class="topbar-actions">
+          <button class="button ghost" id="import-storyboard"><span>⇧</span> Import storyboard</button>
+          <input class="hidden" id="storyboard-file" type="file" accept="application/json,.json">
           <button class="button ghost" id="capture-button"><span>⌁</span> Capture workflow</button>
           <button class="theme-button" id="theme-button" aria-label="Change color theme" title="Theme: system"><span id="theme-icon">◐</span></button>
         </div>
@@ -103,6 +105,7 @@
               <div><p class="eyebrow">Director’s desk</p><h2>Storyboard</h2></div>
               <div class="storyboard-actions hidden" id="storyboard-actions">
                 <span class="seed-pill" id="seed-pill">Seed —</span>
+                <button class="button ghost" id="export-storyboard">↓ Export</button>
                 <button class="button ghost" id="reroll-all">↻ Reroll all</button>
                 <button class="button primary" id="generate-button">Generate images</button>
               </div>

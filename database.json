@@ -52,232 +52,15 @@
       "pattern_chance": 0.22,
       "texture_chance": 0.28
     },
-    "http_timeout_seconds": 15,
-    "poll_interval_seconds": 1,
-    "generation_timeout_seconds": 600,
-    "max_scene_attempts": 100,
     "photoshoot_progression": {
       "nsfw_final_percent": 50,
       "explicit_plateau_percent": 30
-    }
+    },
+    "max_scene_attempts": 100,
+    "http_timeout_seconds": 15,
+    "poll_interval_seconds": 1,
+    "generation_timeout_seconds": 600
   },
-  "prompt_defaults": {
-    "positive_prefix": "(solo {age}:1.4), (single subject:1.4)",
-    "cameltoe_prompt": "clearly visible natural cameltoe contour through the tight fabric",
-    "positive_suffix": "complete intact body, two arms, two legs, two hands, two feet, correct hands and feet, coherent anatomy, realistic photography, natural skin texture, high detail",
-    "negative_prompt": "child, minor, underage, teen, young-looking, man, male, men, male body, male hands, penis, testicles, multiple people, duplicate person, twins, mirror, reflection, sex toy, vibrator, dildo, amputee, missing limb, missing arm, missing leg, detached limb, limb stump, prosthetic limb, extra limbs, extra arms, extra legs, duplicated limbs, fused limbs, malformed arms, malformed legs, bad hands, missing fingers, extra fingers, fused fingers, malformed fingers, bad feet, missing toes, extra toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
-    "xxx_plateau_prompts": {
-      "provocative_rear": "(anatomically coherent rear-facing nude pose:1.5), back, shoulders, torso, pelvis and buttocks all facing away from the camera in one consistent direction, only the head and neck may turn to look back, exposed buttocks and genitals from behind, uncensored",
-      "intimate_closeup": "(explicit intimate anatomical close-up:1.5), fully nude, clearly visible, uncensored",
-      "panties_aside": "(explicit panties-pulled-aside view:1.5), exposed vulva between parted legs, uncensored",
-      "masturbation": "(hands-only masturbation:1.5), exposed genitals, fully nude, uncensored"
-    },
-    "xxx_plateau_negative_additions": {
-      "provocative_rear": "front-facing shoulders, front-facing torso, chest facing camera, frontal breasts, simultaneous front and rear view, twisted spine, reversed torso, impossible torso rotation, disconnected waist, giant foreground buttocks, fisheye body distortion"
-    },
-    "xxx_negative_additions": "clothes, underwear, covered genitals, censorship, mosaic, black bars, implied nudity"
-  },
-  "colors": [
-    {
-      "id": "color_black",
-      "prompt": "black"
-    },
-    {
-      "id": "color_white",
-      "prompt": "white"
-    },
-    {
-      "id": "color_ivory",
-      "prompt": "ivory"
-    },
-    {
-      "id": "color_red",
-      "prompt": "deep red"
-    },
-    {
-      "id": "color_burgundy",
-      "prompt": "burgundy"
-    },
-    {
-      "id": "color_navy",
-      "prompt": "navy blue"
-    },
-    {
-      "id": "color_emerald",
-      "prompt": "emerald green"
-    },
-    {
-      "id": "color_beige",
-      "prompt": "warm beige"
-    },
-    {
-      "id": "color_pink",
-      "prompt": "dusty pink"
-    },
-    {
-      "id": "color_gray",
-      "prompt": "charcoal gray"
-    },
-    {
-      "id": "color_scarlet",
-      "prompt": "scarlet red"
-    },
-    {
-      "id": "color_crimson",
-      "prompt": "dark crimson"
-    },
-    {
-      "id": "color_cobalt",
-      "prompt": "cobalt blue"
-    },
-    {
-      "id": "color_teal",
-      "prompt": "deep teal"
-    },
-    {
-      "id": "color_purple",
-      "prompt": "royal purple"
-    },
-    {
-      "id": "color_lilac",
-      "prompt": "soft lilac"
-    },
-    {
-      "id": "color_champagne",
-      "prompt": "champagne gold"
-    },
-    {
-      "id": "color_silver",
-      "prompt": "metallic silver"
-    },
-    {
-      "id": "color_chocolate",
-      "prompt": "dark chocolate brown"
-    },
-    {
-      "id": "color_tan",
-      "prompt": "warm tan"
-    },
-    {
-      "id": "color_coral",
-      "prompt": "soft coral"
-    },
-    {
-      "id": "color_leopard",
-      "prompt": "classic leopard print"
-    }
-  ],
-  "patterns": [
-    {
-      "id": "pattern_small_floral",
-      "prompt": "small delicate floral print",
-      "weight": 3,
-      "allowed_garment_ids": ["top_cotton_camisole", "top_tiefront_blouse_casual", "top_pointelle_cardigan", "dress_cotton_wrap_day", "dress_cotton_cami_mini", "dress_wrap_jersey_mini", "panties_ribbed_bikini", "panties_lace_bow"]
-    },
-    {
-      "id": "pattern_ditsy_flowers",
-      "prompt": "tiny scattered ditsy-flower print",
-      "weight": 3,
-      "allowed_garment_ids": ["top_spaghetti_tank", "top_cotton_camisole", "top_cropped_cardigan", "dress_cotton_wrap_day", "dress_cotton_cami_mini", "dress_wrap_jersey_mini", "panties_ruffled", "panties_ribbed_bikini"]
-    },
-    {
-      "id": "pattern_botanical",
-      "prompt": "flowing botanical leaf ornament",
-      "allowed_garment_ids": ["top_silk_blouse", "top_tiefront_blouse_casual", "dress_wrap_jersey_mini", "dress_cotton_wrap_day", "dress_scoop_tank_midi", "robe_silk_long"]
-    },
-    {
-      "id": "pattern_polka_dots",
-      "prompt": "classic small polka-dot print",
-      "weight": 2,
-      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "dress_square_neck_mini", "dress_cotton_wrap_day", "dress_casual_ruched_mini", "panties_cotton_bikini", "panties_ribbed_bikini"]
-    },
-    {
-      "id": "pattern_gingham",
-      "prompt": "small casual gingham check",
-      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "top_fitted_oxford_shirt", "lower_cotton_mini_skirt", "lower_wrap_cotton_mini", "dress_cotton_shirt_mini", "dress_cotton_wrap_day"]
-    },
-    {
-      "id": "pattern_soft_plaid",
-      "prompt": "soft understated plaid pattern",
-      "allowed_garment_ids": ["top_flannel_shirt", "top_cotton_button_shirt", "lower_pleated_micro_casual", "lower_aline_skirt", "lower_corduroy_mini"]
-    },
-    {
-      "id": "pattern_pinstripe",
-      "prompt": "subtle vertical pinstripe pattern",
-      "allowed_garment_ids": ["top_fitted_oxford_shirt", "top_stretch_button_shirt", "top_cotton_button_shirt", "lower_tailored_trousers", "lower_pencil_skirt", "dress_cotton_shirt_mini"]
-    },
-    {
-      "id": "pattern_houndstooth",
-      "prompt": "small refined houndstooth pattern",
-      "allowed_garment_ids": ["lower_pencil_skirt", "lower_aline_skirt", "lower_corduroy_mini", "dress_square_neck_mini", "outer_blazer"]
-    },
-    {
-      "id": "pattern_thin_stripes",
-      "prompt": "fine evenly spaced stripe pattern",
-      "weight": 2,
-      "allowed_garment_ids": ["top_cotton_tee", "top_boxy_tshirt", "top_crewneck_tshirt", "top_vneck_tshirt", "top_longsleeve_tshirt", "dress_tshirt_bodycon", "dress_buttonfront_jersey"]
-    },
-    {
-      "id": "pattern_tiny_hearts",
-      "prompt": "playful tiny-heart print",
-      "allowed_garment_ids": ["top_cotton_camisole", "top_lounge_brushed", "lower_jersey_shorts", "lower_lounge_dolphin_shorts", "panties_cotton_bikini", "panties_ribbed_bikini", "panties_ruffled"]
-    },
-    {
-      "id": "pattern_abstract_geometric",
-      "prompt": "restrained abstract geometric print",
-      "allowed_garment_ids": ["top_one_shoulder_jersey", "top_asymmetric_ribbed", "lower_aline_skirt", "dress_casual_ruched_mini", "dress_scoop_tank_midi", "swimsuit_cutout"]
-    },
-    {
-      "id": "pattern_delicate_vines",
-      "prompt": "delicate embroidered vine ornament",
-      "allowed_garment_ids": ["top_silk_blouse", "top_pointelle_cardigan", "top_tiefront_blouse_casual", "dress_cotton_wrap_day", "bra_balconette_lace", "panties_lace_embroidered", "robe_lace_open"]
-    }
-  ],
-  "fabric_textures": [
-    {
-      "id": "texture_fine_ribbed",
-      "prompt": "fine ribbed fabric texture",
-      "weight": 3,
-      "allowed_garment_ids": ["top_plain_tank", "top_cotton_camisole", "top_fitted_baby_tee", "top_cotton_halter", "lower_jersey_skirt", "dress_casual_bodycon_mini", "dress_cotton_cami_mini", "panties_cotton_bikini"]
-    },
-    {
-      "id": "texture_slub_cotton",
-      "prompt": "subtle natural slub-cotton texture",
-      "weight": 3,
-      "allowed_garment_ids": ["top_cotton_tee", "top_boxy_tshirt", "top_crewneck_tshirt", "top_vneck_tshirt", "top_basic_crop", "top_plain_tank", "dress_tshirt_bodycon", "dress_cotton_wrap_day"]
-    },
-    {
-      "id": "texture_brushed_cotton",
-      "prompt": "soft brushed-cotton finish",
-      "allowed_garment_ids": ["top_plain_sweatshirt", "top_pullover_hoodie", "top_cropped_sweatshirt", "top_lounge_brushed", "lower_plain_joggers", "lower_jersey_shorts", "lower_lounge_dolphin_shorts", "dress_hooded_sweatshirt_mini"]
-    },
-    {
-      "id": "texture_waffle_knit",
-      "prompt": "small waffle-knit texture",
-      "allowed_garment_ids": ["top_longsleeve_tshirt", "top_henley", "top_boatneck_jersey", "top_lounge_brushed", "lower_jersey_shorts", "dress_buttonfront_jersey"]
-    },
-    {
-      "id": "texture_cable_knit",
-      "prompt": "soft narrow cable-knit texture",
-      "allowed_garment_ids": ["top_cashmere", "top_cardigan", "top_cropped_cardigan", "top_pointelle_cardigan", "dress_knit_sweater_mini", "dress_offshoulder_knit_mini"]
-    },
-    {
-      "id": "texture_washed_denim",
-      "prompt": "naturally faded washed-denim finish",
-      "weight": 2,
-      "allowed_garment_ids": ["top_denim_shirt", "top_chambray_shirt", "lower_straight_jeans", "lower_relaxed_jeans", "lower_highwaist_jeans", "lower_mom_jeans", "lower_bootcut_jeans", "lower_cropped_jeans", "lower_denim_skirt", "lower_denim_mini_skirt", "dress_denim_fitted_mini", "dress_denim_buttonfront"]
-    },
-    {
-      "id": "texture_crinkled_cotton",
-      "prompt": "light naturally crinkled cotton texture",
-      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "top_spaghetti_tank", "lower_cotton_shorts", "lower_paperbag_shorts", "dress_cotton_shirt_mini", "dress_cotton_wrap_day"]
-    },
-    {
-      "id": "texture_soft_velour",
-      "prompt": "soft matte velour finish",
-      "allowed_garment_ids": ["top_zip_hoodie", "top_cropped_sweatshirt", "lower_velour_lounge_shorts", "lower_plain_joggers", "dress_hooded_sweatshirt_mini"]
-    }
-  ],
   "human_model_parts": {
     "age": [
       {
@@ -929,6 +712,48 @@
       {
         "id": "jaw_strong",
         "prompt": "strong feminine jawline"
+      }
+    ],
+    "facial_accents": [
+      {
+        "id": "accent_freckles",
+        "prompt": "subtle freckles across her cheeks"
+      },
+      {
+        "id": "accent_beauty_mark",
+        "prompt": "small elegant beauty mark"
+      },
+      {
+        "id": "accent_dimples",
+        "prompt": "soft cheek dimples"
+      },
+      {
+        "id": "accent_long_lashes",
+        "prompt": "long natural eyelashes"
+      },
+      {
+        "id": "accent_nose_freckles",
+        "prompt": "light freckles across her nose"
+      },
+      {
+        "id": "accent_mole_lip",
+        "prompt": "tiny beauty mark near her lips"
+      },
+      {
+        "id": "accent_mole_cheek",
+        "prompt": "distinctive beauty mark on one cheek"
+      },
+      {
+        "id": "accent_sun_kissed",
+        "prompt": "subtle sun-kissed complexion"
+      },
+      {
+        "id": "accent_glossy_skin",
+        "prompt": "soft healthy skin glow"
+      },
+      {
+        "id": "accent_lush_lashes",
+        "prompt": "lush curled eyelashes"
       }
     ],
     "hair_texture": [
@@ -1791,48 +1616,6 @@
         "menu_label": "Subtle"
       }
     ],
-    "facial_accents": [
-      {
-        "id": "accent_freckles",
-        "prompt": "subtle freckles across her cheeks"
-      },
-      {
-        "id": "accent_beauty_mark",
-        "prompt": "small elegant beauty mark"
-      },
-      {
-        "id": "accent_dimples",
-        "prompt": "soft cheek dimples"
-      },
-      {
-        "id": "accent_long_lashes",
-        "prompt": "long natural eyelashes"
-      },
-      {
-        "id": "accent_nose_freckles",
-        "prompt": "light freckles across her nose"
-      },
-      {
-        "id": "accent_mole_lip",
-        "prompt": "tiny beauty mark near her lips"
-      },
-      {
-        "id": "accent_mole_cheek",
-        "prompt": "distinctive beauty mark on one cheek"
-      },
-      {
-        "id": "accent_sun_kissed",
-        "prompt": "subtle sun-kissed complexion"
-      },
-      {
-        "id": "accent_glossy_skin",
-        "prompt": "soft healthy skin glow"
-      },
-      {
-        "id": "accent_lush_lashes",
-        "prompt": "lush curled eyelashes"
-      }
-    ],
     "makeup": [
       {
         "id": "makeup_natural",
@@ -1916,6 +1699,207 @@
       }
     ]
   },
+  "colors": [
+    {
+      "id": "color_black",
+      "prompt": "black"
+    },
+    {
+      "id": "color_white",
+      "prompt": "white"
+    },
+    {
+      "id": "color_ivory",
+      "prompt": "ivory"
+    },
+    {
+      "id": "color_red",
+      "prompt": "deep red"
+    },
+    {
+      "id": "color_burgundy",
+      "prompt": "burgundy"
+    },
+    {
+      "id": "color_navy",
+      "prompt": "navy blue"
+    },
+    {
+      "id": "color_emerald",
+      "prompt": "emerald green"
+    },
+    {
+      "id": "color_beige",
+      "prompt": "warm beige"
+    },
+    {
+      "id": "color_pink",
+      "prompt": "dusty pink"
+    },
+    {
+      "id": "color_gray",
+      "prompt": "charcoal gray"
+    },
+    {
+      "id": "color_scarlet",
+      "prompt": "scarlet red"
+    },
+    {
+      "id": "color_crimson",
+      "prompt": "dark crimson"
+    },
+    {
+      "id": "color_cobalt",
+      "prompt": "cobalt blue"
+    },
+    {
+      "id": "color_teal",
+      "prompt": "deep teal"
+    },
+    {
+      "id": "color_purple",
+      "prompt": "royal purple"
+    },
+    {
+      "id": "color_lilac",
+      "prompt": "soft lilac"
+    },
+    {
+      "id": "color_champagne",
+      "prompt": "champagne gold"
+    },
+    {
+      "id": "color_silver",
+      "prompt": "metallic silver"
+    },
+    {
+      "id": "color_chocolate",
+      "prompt": "dark chocolate brown"
+    },
+    {
+      "id": "color_tan",
+      "prompt": "warm tan"
+    },
+    {
+      "id": "color_coral",
+      "prompt": "soft coral"
+    },
+    {
+      "id": "color_leopard",
+      "prompt": "classic leopard print"
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pattern_small_floral",
+      "prompt": "small delicate floral print",
+      "weight": 3,
+      "allowed_garment_ids": ["top_cotton_camisole", "top_tiefront_blouse_casual", "top_pointelle_cardigan", "dress_cotton_wrap_day", "dress_cotton_cami_mini", "dress_wrap_jersey_mini", "panties_ribbed_bikini", "panties_lace_bow"]
+    },
+    {
+      "id": "pattern_ditsy_flowers",
+      "prompt": "tiny scattered ditsy-flower print",
+      "weight": 3,
+      "allowed_garment_ids": ["top_spaghetti_tank", "top_cotton_camisole", "top_cropped_cardigan", "dress_cotton_wrap_day", "dress_cotton_cami_mini", "dress_wrap_jersey_mini", "panties_ruffled", "panties_ribbed_bikini"]
+    },
+    {
+      "id": "pattern_botanical",
+      "prompt": "flowing botanical leaf ornament",
+      "allowed_garment_ids": ["top_silk_blouse", "top_tiefront_blouse_casual", "dress_wrap_jersey_mini", "dress_cotton_wrap_day", "dress_scoop_tank_midi", "robe_silk_long"]
+    },
+    {
+      "id": "pattern_polka_dots",
+      "prompt": "classic small polka-dot print",
+      "weight": 2,
+      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "dress_square_neck_mini", "dress_cotton_wrap_day", "dress_casual_ruched_mini", "panties_cotton_bikini", "panties_ribbed_bikini"]
+    },
+    {
+      "id": "pattern_gingham",
+      "prompt": "small casual gingham check",
+      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "top_fitted_oxford_shirt", "lower_cotton_mini_skirt", "lower_wrap_cotton_mini", "dress_cotton_shirt_mini", "dress_cotton_wrap_day"]
+    },
+    {
+      "id": "pattern_soft_plaid",
+      "prompt": "soft understated plaid pattern",
+      "allowed_garment_ids": ["top_flannel_shirt", "top_cotton_button_shirt", "lower_pleated_micro_casual", "lower_aline_skirt", "lower_corduroy_mini"]
+    },
+    {
+      "id": "pattern_pinstripe",
+      "prompt": "subtle vertical pinstripe pattern",
+      "allowed_garment_ids": ["top_fitted_oxford_shirt", "top_stretch_button_shirt", "top_cotton_button_shirt", "lower_tailored_trousers", "lower_pencil_skirt", "dress_cotton_shirt_mini"]
+    },
+    {
+      "id": "pattern_houndstooth",
+      "prompt": "small refined houndstooth pattern",
+      "allowed_garment_ids": ["lower_pencil_skirt", "lower_aline_skirt", "lower_corduroy_mini", "dress_square_neck_mini", "outer_blazer"]
+    },
+    {
+      "id": "pattern_thin_stripes",
+      "prompt": "fine evenly spaced stripe pattern",
+      "weight": 2,
+      "allowed_garment_ids": ["top_cotton_tee", "top_boxy_tshirt", "top_crewneck_tshirt", "top_vneck_tshirt", "top_longsleeve_tshirt", "dress_tshirt_bodycon", "dress_buttonfront_jersey"]
+    },
+    {
+      "id": "pattern_tiny_hearts",
+      "prompt": "playful tiny-heart print",
+      "allowed_garment_ids": ["top_cotton_camisole", "top_lounge_brushed", "lower_jersey_shorts", "lower_lounge_dolphin_shorts", "panties_cotton_bikini", "panties_ribbed_bikini", "panties_ruffled"]
+    },
+    {
+      "id": "pattern_abstract_geometric",
+      "prompt": "restrained abstract geometric print",
+      "allowed_garment_ids": ["top_one_shoulder_jersey", "top_asymmetric_ribbed", "lower_aline_skirt", "dress_casual_ruched_mini", "dress_scoop_tank_midi", "swimsuit_cutout"]
+    },
+    {
+      "id": "pattern_delicate_vines",
+      "prompt": "delicate embroidered vine ornament",
+      "allowed_garment_ids": ["top_silk_blouse", "top_pointelle_cardigan", "top_tiefront_blouse_casual", "dress_cotton_wrap_day", "bra_balconette_lace", "panties_lace_embroidered", "robe_lace_open"]
+    }
+  ],
+  "fabric_textures": [
+    {
+      "id": "texture_fine_ribbed",
+      "prompt": "fine ribbed fabric texture",
+      "weight": 3,
+      "allowed_garment_ids": ["top_plain_tank", "top_cotton_camisole", "top_fitted_baby_tee", "top_cotton_halter", "lower_jersey_skirt", "dress_casual_bodycon_mini", "dress_cotton_cami_mini", "panties_cotton_bikini"]
+    },
+    {
+      "id": "texture_slub_cotton",
+      "prompt": "subtle natural slub-cotton texture",
+      "weight": 3,
+      "allowed_garment_ids": ["top_cotton_tee", "top_boxy_tshirt", "top_crewneck_tshirt", "top_vneck_tshirt", "top_basic_crop", "top_plain_tank", "dress_tshirt_bodycon", "dress_cotton_wrap_day"]
+    },
+    {
+      "id": "texture_brushed_cotton",
+      "prompt": "soft brushed-cotton finish",
+      "allowed_garment_ids": ["top_plain_sweatshirt", "top_pullover_hoodie", "top_cropped_sweatshirt", "top_lounge_brushed", "lower_plain_joggers", "lower_jersey_shorts", "lower_lounge_dolphin_shorts", "dress_hooded_sweatshirt_mini"]
+    },
+    {
+      "id": "texture_waffle_knit",
+      "prompt": "small waffle-knit texture",
+      "allowed_garment_ids": ["top_longsleeve_tshirt", "top_henley", "top_boatneck_jersey", "top_lounge_brushed", "lower_jersey_shorts", "dress_buttonfront_jersey"]
+    },
+    {
+      "id": "texture_cable_knit",
+      "prompt": "soft narrow cable-knit texture",
+      "allowed_garment_ids": ["top_cashmere", "top_cardigan", "top_cropped_cardigan", "top_pointelle_cardigan", "dress_knit_sweater_mini", "dress_offshoulder_knit_mini"]
+    },
+    {
+      "id": "texture_washed_denim",
+      "prompt": "naturally faded washed-denim finish",
+      "weight": 2,
+      "allowed_garment_ids": ["top_denim_shirt", "top_chambray_shirt", "lower_straight_jeans", "lower_relaxed_jeans", "lower_highwaist_jeans", "lower_mom_jeans", "lower_bootcut_jeans", "lower_cropped_jeans", "lower_denim_skirt", "lower_denim_mini_skirt", "dress_denim_fitted_mini", "dress_denim_buttonfront"]
+    },
+    {
+      "id": "texture_crinkled_cotton",
+      "prompt": "light naturally crinkled cotton texture",
+      "allowed_garment_ids": ["top_cotton_button_shirt", "top_tiefront_blouse_casual", "top_spaghetti_tank", "lower_cotton_shorts", "lower_paperbag_shorts", "dress_cotton_shirt_mini", "dress_cotton_wrap_day"]
+    },
+    {
+      "id": "texture_soft_velour",
+      "prompt": "soft matte velour finish",
+      "allowed_garment_ids": ["top_zip_hoodie", "top_cropped_sweatshirt", "lower_velour_lounge_shorts", "lower_plain_joggers", "dress_hooded_sweatshirt_mini"]
+    }
+  ],
   "garments": {
     "upperwear": [
       {
@@ -3856,6 +3840,171 @@
         "allowed_colors": ["color_white", "color_navy", "color_beige", "color_pink", "color_teal"]
       }
     ],
+    "outerwear": [
+      {
+        "id": "outer_blazer",
+        "prompt": "tailored blazer",
+        "tags": [
+          "office",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_navy",
+          "color_beige"
+        ]
+      },
+      {
+        "id": "outer_leather_jacket",
+        "prompt": "fitted leather jacket",
+        "tags": [
+          "casual",
+          "leather"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_burgundy"
+        ]
+      },
+      {
+        "id": "outer_trench",
+        "prompt": "elegant belted trench coat",
+        "tags": [
+          "everyday",
+          "elegant"
+        ],
+        "allowed_colors": [
+          "color_beige",
+          "color_black",
+          "color_navy"
+        ]
+      },
+      {
+        "id": "outer_satin_kimono",
+        "prompt": "flowing satin kimono",
+        "tags": [
+          "home",
+          "boudoir",
+          "silk",
+          "luxury"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_burgundy",
+          "color_champagne",
+          "color_pink",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "outer_sheer_robe",
+        "prompt": "transparent floor-length chiffon robe",
+        "tags": [
+          "home",
+          "boudoir",
+          "erotic",
+          "sheer"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_pink",
+          "color_lilac"
+        ]
+      },
+      {
+        "id": "outer_lace_robe",
+        "prompt": "delicate open-front lace robe",
+        "tags": [
+          "home",
+          "boudoir",
+          "erotic",
+          "lace"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_red",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "outer_cashmere_cardigan",
+        "prompt": "soft oversized cashmere cardigan",
+        "tags": [
+          "home",
+          "casual",
+          "cozy"
+        ],
+        "allowed_colors": [
+          "color_beige",
+          "color_gray",
+          "color_ivory",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "outer_denim_jacket",
+        "prompt": "cropped fitted denim jacket",
+        "tags": [
+          "casual",
+          "outdoor"
+        ],
+        "allowed_colors": [
+          "color_navy",
+          "color_white",
+          "color_black"
+        ]
+      },
+      {
+        "id": "outer_faux_fur",
+        "prompt": "plush faux-fur evening wrap",
+        "tags": [
+          "elegant",
+          "formal",
+          "luxury"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_ivory",
+          "color_pink"
+        ]
+      },
+      {
+        "id": "outer_silk_shawl",
+        "prompt": "light silk shoulder shawl",
+        "tags": [
+          "elegant",
+          "formal",
+          "outdoor"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_red",
+          "color_navy",
+          "color_champagne",
+          "color_ivory"
+        ]
+      },
+      {
+        "id": "outer_pool_coverup",
+        "prompt": "sheer flowing poolside cover-up",
+        "tags": [
+          "swimwear",
+          "outdoor",
+          "sheer"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_white",
+          "color_teal",
+          "color_coral"
+        ]
+      }
+    ],
     "bra": [
       {
         "id": "bra_tshirt",
@@ -5736,171 +5885,6 @@
         "allowed_colors": ["color_white", "color_gray", "color_beige", "color_pink"]
       }
     ],
-    "outerwear": [
-      {
-        "id": "outer_blazer",
-        "prompt": "tailored blazer",
-        "tags": [
-          "office",
-          "elegant"
-        ],
-        "allowed_colors": [
-          "color_black",
-          "color_navy",
-          "color_beige"
-        ]
-      },
-      {
-        "id": "outer_leather_jacket",
-        "prompt": "fitted leather jacket",
-        "tags": [
-          "casual",
-          "leather"
-        ],
-        "allowed_colors": [
-          "color_black",
-          "color_burgundy"
-        ]
-      },
-      {
-        "id": "outer_trench",
-        "prompt": "elegant belted trench coat",
-        "tags": [
-          "everyday",
-          "elegant"
-        ],
-        "allowed_colors": [
-          "color_beige",
-          "color_black",
-          "color_navy"
-        ]
-      },
-      {
-        "id": "outer_satin_kimono",
-        "prompt": "flowing satin kimono",
-        "tags": [
-          "home",
-          "boudoir",
-          "silk",
-          "luxury"
-        ],
-        "allowed_colors": [
-          "color_black",
-          "color_red",
-          "color_burgundy",
-          "color_champagne",
-          "color_pink",
-          "color_ivory"
-        ]
-      },
-      {
-        "id": "outer_sheer_robe",
-        "prompt": "transparent floor-length chiffon robe",
-        "tags": [
-          "home",
-          "boudoir",
-          "erotic",
-          "sheer"
-        ],
-        "allowed_colors": [
-          "color_black",
-          "color_white",
-          "color_red",
-          "color_pink",
-          "color_lilac"
-        ]
-      },
-      {
-        "id": "outer_lace_robe",
-        "prompt": "delicate open-front lace robe",
-        "tags": [
-          "home",
-          "boudoir",
-          "erotic",
-          "lace"
-        ],
-        "allowed_colors": [
-          "color_black",
-          "color_white",
-          "color_red",
-          "color_ivory"
-        ]
-      },
-      {
-        "id": "outer_cashmere_cardigan",
-        "prompt": "soft oversized cashmere cardigan",
-        "tags": [
-          "home",
-          "casual",
-          "cozy"
-        ],
-        "allowed_colors": [
-          "color_beige",
-          "color_gray",
-          "color_ivory",
-          "color_pink"
-        ]
-      },
-      {
-        "id": "outer_denim_jacket",
-        "prompt": "cropped fitted denim jacket",
-        "tags": [
-          "casual",
-          "outdoor"
-        ],
-        "allowed_colors": [
-          "color_navy",
-          "color_white",
-          "color_black"
-        ]
-      },
-      {
-        "id": "outer_faux_fur",
-        "prompt": "plush faux-fur evening wrap",
-        "tags": [
-          "elegant",
-          "formal",
-          "luxury"
-        ],
-        "allowed_colors": [
-          "color_black",
-          "color_white",
-          "color_ivory",
-          "color_pink"
-        ]
-      },
-      {
-        "id": "outer_silk_shawl",
-        "prompt": "light silk shoulder shawl",
-        "tags": [
-          "elegant",
-          "formal",
-          "outdoor"
-        ],
-        "allowed_colors": [
-          "color_black",
-          "color_red",
-          "color_navy",
-          "color_champagne",
-          "color_ivory"
-        ]
-      },
-      {
-        "id": "outer_pool_coverup",
-        "prompt": "sheer flowing poolside cover-up",
-        "tags": [
-          "swimwear",
-          "outdoor",
-          "sheer"
-        ],
-        "allowed_colors": [
-          "color_black",
-          "color_white",
-          "color_teal",
-          "color_coral"
-        ]
-      }
-    ],
     "accessories": [
       {
         "id": "accessory_pearl_necklace",
@@ -7674,724 +7658,6 @@
             "nipples"
           ]
         }
-      ]
-    }
-  ],
-  "interiors": [
-    {
-      "id": "interior_modern_bedroom",
-      "prompt": "inside a refined modern bedroom",
-      "tags": [
-        "indoor",
-        "bedroom",
-        "intimate"
-      ]
-    },
-    {
-      "id": "interior_hotel_suite",
-      "prompt": "inside an elegant luxury hotel suite",
-      "tags": [
-        "indoor",
-        "bedroom",
-        "luxury"
-      ]
-    },
-    {
-      "id": "interior_photo_studio",
-      "prompt": "inside a professional minimalist photo studio",
-      "tags": [
-        "indoor",
-        "studio"
-      ]
-    },
-    {
-      "id": "interior_living_room",
-      "prompt": "inside a stylish contemporary living room",
-      "tags": [
-        "indoor",
-        "living_room"
-      ]
-    },
-    {
-      "id": "interior_loft",
-      "prompt": "inside a spacious sunlit loft",
-      "tags": [
-        "indoor",
-        "studio",
-        "living_room"
-      ]
-    },
-    {
-      "id": "interior_boudoir_room",
-      "prompt": "inside a luxurious intimate boudoir room",
-      "tags": [
-        "indoor",
-        "bedroom",
-        "intimate",
-        "luxury"
-      ]
-    },
-    {
-      "id": "interior_master_bedroom",
-      "prompt": "inside a spacious private master bedroom with layered linens",
-      "tags": [
-        "indoor",
-        "bedroom",
-        "intimate",
-        "luxury"
-      ]
-    },
-    {
-      "id": "interior_cottage_bedroom",
-      "prompt": "inside a cozy secluded cottage bedroom",
-      "tags": [
-        "indoor",
-        "bedroom",
-        "cozy",
-        "private"
-      ]
-    },
-    {
-      "id": "interior_attic_bedroom",
-      "prompt": "inside a warm private attic bedroom beneath timber beams",
-      "tags": [
-        "indoor",
-        "bedroom",
-        "cozy",
-        "private"
-      ]
-    },
-    {
-      "id": "interior_villa_suite",
-      "prompt": "inside an opulent private villa suite",
-      "tags": [
-        "indoor",
-        "bedroom",
-        "luxury",
-        "private"
-      ]
-    },
-    {
-      "id": "interior_penthouse_lounge",
-      "prompt": "inside a secluded luxury penthouse lounge",
-      "tags": [
-        "indoor",
-        "living_room",
-        "luxury",
-        "private"
-      ]
-    },
-    {
-      "id": "interior_fireplace_lounge",
-      "prompt": "inside a private lounge warmed by a modern fireplace",
-      "tags": [
-        "indoor",
-        "living_room",
-        "cozy",
-        "private"
-      ]
-    },
-    {
-      "id": "interior_sunroom",
-      "prompt": "inside a bright private sunroom filled with soft daylight",
-      "tags": [
-        "indoor",
-        "living_room",
-        "garden",
-        "private"
-      ]
-    },
-    {
-      "id": "interior_conservatory",
-      "prompt": "inside a secluded glass conservatory surrounded by greenery",
-      "tags": [
-        "indoor",
-        "garden",
-        "romantic",
-        "private",
-        "luxury"
-      ]
-    },
-    {
-      "id": "interior_luxury_bathroom",
-      "prompt": "inside a luxurious private marble bathroom",
-      "tags": [
-        "indoor",
-        "bathroom",
-        "intimate",
-        "luxury"
-      ]
-    },
-    {
-      "id": "interior_rain_shower",
-      "prompt": "inside a private spa bathroom with a glass rain shower",
-      "tags": [
-        "indoor",
-        "bathroom",
-        "intimate",
-        "spa",
-        "luxury"
-      ]
-    },
-    {
-      "id": "interior_private_kitchen",
-      "prompt": "inside a stylish private designer kitchen",
-      "tags": [
-        "indoor",
-        "kitchen",
-        "home",
-        "private"
-      ]
-    },
-    {
-      "id": "interior_private_pool",
-      "prompt": "beside a secluded indoor villa pool",
-      "tags": [
-        "indoor",
-        "pool",
-        "spa",
-        "private",
-        "luxury"
-      ]
-    },
-    {
-      "id": "interior_small_apartment_bedroom",
-      "prompt": "inside a small everyday apartment bedroom",
-      "weight": 1.25,
-      "tags": ["indoor", "bedroom", "apartment", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_ordinary_apartment_bedroom",
-      "prompt": "inside an ordinary lived-in apartment bedroom",
-      "weight": 1.25,
-      "tags": ["indoor", "bedroom", "apartment", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_rental_bedroom",
-      "prompt": "inside a simple rented apartment bedroom",
-      "weight": 1.2,
-      "tags": ["indoor", "bedroom", "apartment", "home", "modest", "private"]
-    },
-    {
-      "id": "interior_spare_bedroom",
-      "prompt": "inside a modest private spare bedroom",
-      "weight": 1.15,
-      "tags": ["indoor", "bedroom", "home", "modest", "private"]
-    },
-    {
-      "id": "interior_suburban_bedroom",
-      "prompt": "inside a normal suburban home bedroom",
-      "weight": 1.2,
-      "tags": ["indoor", "bedroom", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_older_apartment_bedroom",
-      "prompt": "inside a tidy older apartment bedroom",
-      "weight": 1.15,
-      "tags": ["indoor", "bedroom", "apartment", "home", "modest", "private"]
-    },
-    {
-      "id": "interior_compact_studio_apartment",
-      "prompt": "inside a compact one-room studio apartment",
-      "weight": 1.25,
-      "tags": ["indoor", "bedroom", "living_room", "studio", "apartment", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_simple_studio_flat",
-      "prompt": "inside a simple open-plan studio flat",
-      "weight": 1.2,
-      "tags": ["indoor", "bedroom", "living_room", "studio", "apartment", "home", "modest", "private"]
-    },
-    {
-      "id": "interior_small_apartment_living_room",
-      "prompt": "inside a small everyday apartment living room",
-      "weight": 1.25,
-      "tags": ["indoor", "living_room", "apartment", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_ordinary_living_room",
-      "prompt": "inside an ordinary comfortable home living room",
-      "weight": 1.25,
-      "tags": ["indoor", "living_room", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_rental_living_room",
-      "prompt": "inside a modest rented apartment living room",
-      "weight": 1.2,
-      "tags": ["indoor", "living_room", "apartment", "home", "modest", "private"]
-    },
-    {
-      "id": "interior_older_apartment_living_room",
-      "prompt": "inside a tidy older apartment living room",
-      "weight": 1.15,
-      "tags": ["indoor", "living_room", "apartment", "home", "modest", "private"]
-    },
-    {
-      "id": "interior_compact_apartment_kitchen",
-      "prompt": "inside a compact everyday apartment kitchen",
-      "weight": 1.2,
-      "tags": ["indoor", "kitchen", "apartment", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_ordinary_home_kitchen",
-      "prompt": "inside an ordinary practical home kitchen",
-      "weight": 1.2,
-      "tags": ["indoor", "kitchen", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_small_apartment_bathroom",
-      "prompt": "inside a small clean apartment bathroom",
-      "weight": 1.15,
-      "tags": ["indoor", "bathroom", "apartment", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_ordinary_home_bathroom",
-      "prompt": "inside an ordinary tiled home bathroom",
-      "weight": 1.15,
-      "tags": ["indoor", "bathroom", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_apartment_home_office",
-      "prompt": "inside a simple private apartment home office",
-      "weight": 1.1,
-      "tags": ["indoor", "studio", "apartment", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_apartment_hallway",
-      "prompt": "inside a quiet ordinary apartment hallway",
-      "weight": 1.05,
-      "tags": ["indoor", "hallway", "apartment", "home", "everyday", "private"]
-    },
-    {
-      "id": "interior_garden_patio",
-      "prompt": "on a secluded private garden patio screened by greenery",
-      "tags": [
-        "outdoor",
-        "garden",
-        "private",
-        "romantic"
-      ]
-    },
-    {
-      "id": "interior_private_lawn",
-      "prompt": "on a secluded manicured private lawn",
-      "tags": [
-        "outdoor",
-        "garden",
-        "private",
-        "nature"
-      ]
-    },
-    {
-      "id": "interior_flower_garden",
-      "prompt": "in a hidden private flower garden in full bloom",
-      "tags": [
-        "outdoor",
-        "garden",
-        "private",
-        "romantic",
-        "nature"
-      ]
-    },
-    {
-      "id": "interior_forest_clearing",
-      "prompt": "in a secluded sunlit forest clearing far from any path",
-      "tags": [
-        "outdoor",
-        "nature",
-        "private",
-        "forest"
-      ]
-    },
-    {
-      "id": "interior_lakeside_cabin_deck",
-      "prompt": "on the private deck of a remote lakeside cabin",
-      "tags": [
-        "outdoor",
-        "nature",
-        "private",
-        "deck"
-      ]
-    }
-  ],
-  "furniture": [
-    {
-      "id": "furniture_bed",
-      "prompt": "beside a neatly made bed",
-      "tags": [
-        "bed",
-        "lying_surface",
-        "sitting_surface"
-      ],
-      "requires_tags": [
-        "bedroom"
-      ]
-    },
-    {
-      "id": "furniture_sofa",
-      "prompt": "beside an elegant sofa",
-      "tags": [
-        "sofa",
-        "lying_surface",
-        "sitting_surface"
-      ],
-      "requires_tags": [
-        "indoor"
-      ],
-      "requires_any_tags": [
-        "bedroom",
-        "living_room",
-        "studio"
-      ]
-    },
-    {
-      "id": "furniture_chair",
-      "prompt": "beside a modern chair",
-      "tags": [
-        "chair",
-        "sitting_surface"
-      ],
-      "requires_tags": [
-        "indoor"
-      ],
-      "requires_any_tags": [
-        "bedroom",
-        "living_room",
-        "studio",
-        "kitchen"
-      ]
-    },
-    {
-      "id": "furniture_armchair",
-      "prompt": "beside a plush armchair",
-      "tags": [
-        "chair",
-        "sitting_surface"
-      ],
-      "requires_tags": [
-        "indoor"
-      ],
-      "requires_any_tags": [
-        "bedroom",
-        "living_room",
-        "studio"
-      ]
-    },
-    {
-      "id": "furniture_wall",
-      "prompt": "beside a clean interior wall",
-      "tags": [
-        "wall",
-        "standing_area"
-      ],
-      "requires_tags": [
-        "indoor"
-      ]
-    },
-    {
-      "id": "furniture_floor",
-      "prompt": "on a clean soft floor",
-      "tags": [
-        "floor",
-        "lying_surface",
-        "sitting_surface"
-      ],
-      "requires_tags": [
-        "indoor"
-      ]
-    },
-    {
-      "id": "furniture_simple_double_bed",
-      "prompt": "on a simple double bed with cotton sheets",
-      "tags": ["bed", "lying_surface", "sitting_surface", "everyday"],
-      "requires_tags": ["bedroom"]
-    },
-    {
-      "id": "furniture_unmade_home_bed",
-      "prompt": "on a casually unmade everyday bed",
-      "tags": ["bed", "lying_surface", "sitting_surface", "everyday"],
-      "requires_tags": ["bedroom"]
-    },
-    {
-      "id": "furniture_compact_fabric_sofa",
-      "prompt": "on a compact fabric sofa",
-      "tags": ["sofa", "lying_surface", "sitting_surface", "everyday"],
-      "requires_tags": ["living_room"]
-    },
-    {
-      "id": "furniture_worn_home_sofa",
-      "prompt": "on a comfortable slightly worn home sofa",
-      "tags": ["sofa", "lying_surface", "sitting_surface", "everyday"],
-      "requires_tags": ["living_room"]
-    },
-    {
-      "id": "furniture_simple_wooden_chair",
-      "prompt": "beside a simple wooden chair",
-      "tags": ["chair", "sitting_surface", "everyday"],
-      "requires_tags": ["indoor"],
-      "requires_any_tags": ["bedroom", "living_room", "studio", "kitchen", "hallway"]
-    },
-    {
-      "id": "furniture_small_home_armchair",
-      "prompt": "in a small comfortable home armchair",
-      "tags": ["chair", "sitting_surface", "everyday"],
-      "requires_tags": ["indoor"],
-      "requires_any_tags": ["bedroom", "living_room", "studio"]
-    },
-    {
-      "id": "furniture_thin_apartment_rug",
-      "prompt": "on a simple woven apartment rug",
-      "tags": ["floor", "lying_surface", "sitting_surface", "everyday"],
-      "requires_tags": ["indoor"]
-    },
-    {
-      "id": "furniture_laminate_counter",
-      "prompt": "beside a clean laminate kitchen counter",
-      "tags": ["counter", "sitting_surface", "standing_area", "everyday"],
-      "requires_tags": ["kitchen"]
-    },
-    {
-      "id": "furniture_standard_bathtub",
-      "prompt": "in a standard built-in bathtub",
-      "tags": ["bathtub", "lying_surface", "sitting_surface", "wet_surface", "everyday"],
-      "requires_tags": ["bathroom"]
-    },
-    {
-      "id": "furniture_tiled_shower_wall",
-      "prompt": "against a clean tiled shower wall",
-      "tags": ["wall", "standing_area", "wet_surface", "everyday"],
-      "requires_tags": ["bathroom"]
-    },
-    {
-      "id": "furniture_narrow_windowsill",
-      "prompt": "beside a narrow apartment windowsill",
-      "tags": ["window", "standing_area", "everyday"],
-      "requires_tags": ["indoor", "apartment"]
-    },
-    {
-      "id": "furniture_canopy_bed",
-      "prompt": "on a luxurious canopy bed with rumpled linen sheets",
-      "tags": [
-        "bed",
-        "lying_surface",
-        "sitting_surface",
-        "intimate",
-        "luxury"
-      ],
-      "requires_tags": [
-        "bedroom",
-        "luxury"
-      ]
-    },
-    {
-      "id": "furniture_velvet_bed",
-      "prompt": "on a deep velvet-upholstered bed with satin sheets",
-      "tags": [
-        "bed",
-        "lying_surface",
-        "sitting_surface",
-        "luxury"
-      ],
-      "requires_tags": [
-        "bedroom",
-        "luxury"
-      ]
-    },
-    {
-      "id": "furniture_chaise",
-      "prompt": "on an elegant curved chaise longue",
-      "tags": [
-        "sofa",
-        "lying_surface",
-        "sitting_surface",
-        "luxury"
-      ],
-      "requires_tags": [
-        "indoor",
-        "luxury"
-      ],
-      "requires_any_tags": [
-        "bedroom",
-        "living_room",
-        "studio"
-      ]
-    },
-    {
-      "id": "furniture_sectional_sofa",
-      "prompt": "on a broad soft sectional sofa",
-      "tags": [
-        "sofa",
-        "lying_surface",
-        "sitting_surface"
-      ],
-      "requires_tags": [
-        "living_room"
-      ]
-    },
-    {
-      "id": "furniture_velvet_armchair",
-      "prompt": "in a deep velvet armchair",
-      "tags": [
-        "chair",
-        "sitting_surface",
-        "luxury"
-      ],
-      "requires_tags": [
-        "indoor",
-        "luxury"
-      ],
-      "requires_any_tags": [
-        "bedroom",
-        "living_room",
-        "studio"
-      ]
-    },
-    {
-      "id": "furniture_bathtub",
-      "prompt": "in a deep freestanding bathtub",
-      "tags": [
-        "bathtub",
-        "lying_surface",
-        "sitting_surface",
-        "wet_surface"
-      ],
-      "requires_tags": [
-        "bathroom"
-      ]
-    },
-    {
-      "id": "furniture_shower_wall",
-      "prompt": "against the misted glass wall of a rain shower",
-      "tags": [
-        "wall",
-        "standing_area",
-        "wet_surface"
-      ],
-      "requires_tags": [
-        "bathroom"
-      ]
-    },
-    {
-      "id": "furniture_kitchen_counter",
-      "prompt": "beside a polished stone kitchen island",
-      "tags": [
-        "counter",
-        "sitting_surface",
-        "standing_area"
-      ],
-      "requires_tags": [
-        "kitchen"
-      ]
-    },
-    {
-      "id": "furniture_windowsill",
-      "prompt": "on a broad private windowsill",
-      "tags": [
-        "sitting_surface",
-        "window",
-        "standing_area"
-      ],
-      "requires_tags": [
-        "indoor"
-      ]
-    },
-    {
-      "id": "furniture_soft_rug",
-      "prompt": "on a thick plush rug",
-      "tags": [
-        "floor",
-        "lying_surface",
-        "sitting_surface"
-      ],
-      "requires_tags": [
-        "indoor"
-      ]
-    },
-    {
-      "id": "furniture_pool_edge_indoor",
-      "prompt": "seated on the smooth edge of the private pool",
-      "tags": [
-        "pool_edge",
-        "sitting_surface",
-        "wet_surface"
-      ],
-      "requires_tags": [
-        "pool"
-      ]
-    },
-    {
-      "id": "furniture_garden_bench",
-      "prompt": "on a secluded wrought-iron garden bench",
-      "tags": [
-        "bench",
-        "sitting_surface",
-        "garden"
-      ],
-      "requires_tags": [
-        "outdoor"
-      ]
-    },
-    {
-      "id": "furniture_sun_lounger",
-      "prompt": "on a cushioned private sun lounger",
-      "tags": [
-        "lounger",
-        "lying_surface",
-        "sitting_surface",
-        "garden"
-      ],
-      "requires_tags": [
-        "outdoor"
-      ]
-    },
-    {
-      "id": "furniture_picnic_blanket",
-      "prompt": "on a soft blanket spread over the private lawn",
-      "tags": [
-        "blanket",
-        "lying_surface",
-        "sitting_surface",
-        "nature"
-      ],
-      "requires_tags": [
-        "outdoor"
-      ]
-    },
-    {
-      "id": "furniture_garden_wall",
-      "prompt": "against a secluded ivy-covered garden wall",
-      "tags": [
-        "wall",
-        "standing_area",
-        "garden"
-      ],
-      "requires_tags": [
-        "outdoor"
-      ]
-    },
-    {
-      "id": "furniture_tree_trunk",
-      "prompt": "beside a broad tree trunk in the secluded clearing",
-      "tags": [
-        "tree",
-        "standing_area",
-        "nature"
-      ],
-      "requires_tags": [
-        "outdoor"
-      ]
-    },
-    {
-      "id": "furniture_cabin_deck",
-      "prompt": "on the timber deck beside a private cabin",
-      "tags": [
-        "floor",
-        "lying_surface",
-        "sitting_surface",
-        "nature"
-      ],
-      "requires_tags": [
-        "outdoor"
       ]
     }
   ],
@@ -10383,6 +9649,724 @@
       ]
     }
   ],
+  "interiors": [
+    {
+      "id": "interior_modern_bedroom",
+      "prompt": "inside a refined modern bedroom",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "intimate"
+      ]
+    },
+    {
+      "id": "interior_hotel_suite",
+      "prompt": "inside an elegant luxury hotel suite",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_photo_studio",
+      "prompt": "inside a professional minimalist photo studio",
+      "tags": [
+        "indoor",
+        "studio"
+      ]
+    },
+    {
+      "id": "interior_living_room",
+      "prompt": "inside a stylish contemporary living room",
+      "tags": [
+        "indoor",
+        "living_room"
+      ]
+    },
+    {
+      "id": "interior_loft",
+      "prompt": "inside a spacious sunlit loft",
+      "tags": [
+        "indoor",
+        "studio",
+        "living_room"
+      ]
+    },
+    {
+      "id": "interior_boudoir_room",
+      "prompt": "inside a luxurious intimate boudoir room",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "intimate",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_master_bedroom",
+      "prompt": "inside a spacious private master bedroom with layered linens",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "intimate",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_cottage_bedroom",
+      "prompt": "inside a cozy secluded cottage bedroom",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "cozy",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_attic_bedroom",
+      "prompt": "inside a warm private attic bedroom beneath timber beams",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "cozy",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_villa_suite",
+      "prompt": "inside an opulent private villa suite",
+      "tags": [
+        "indoor",
+        "bedroom",
+        "luxury",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_penthouse_lounge",
+      "prompt": "inside a secluded luxury penthouse lounge",
+      "tags": [
+        "indoor",
+        "living_room",
+        "luxury",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_fireplace_lounge",
+      "prompt": "inside a private lounge warmed by a modern fireplace",
+      "tags": [
+        "indoor",
+        "living_room",
+        "cozy",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_sunroom",
+      "prompt": "inside a bright private sunroom filled with soft daylight",
+      "tags": [
+        "indoor",
+        "living_room",
+        "garden",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_conservatory",
+      "prompt": "inside a secluded glass conservatory surrounded by greenery",
+      "tags": [
+        "indoor",
+        "garden",
+        "romantic",
+        "private",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_luxury_bathroom",
+      "prompt": "inside a luxurious private marble bathroom",
+      "tags": [
+        "indoor",
+        "bathroom",
+        "intimate",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_rain_shower",
+      "prompt": "inside a private spa bathroom with a glass rain shower",
+      "tags": [
+        "indoor",
+        "bathroom",
+        "intimate",
+        "spa",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_private_kitchen",
+      "prompt": "inside a stylish private designer kitchen",
+      "tags": [
+        "indoor",
+        "kitchen",
+        "home",
+        "private"
+      ]
+    },
+    {
+      "id": "interior_private_pool",
+      "prompt": "beside a secluded indoor villa pool",
+      "tags": [
+        "indoor",
+        "pool",
+        "spa",
+        "private",
+        "luxury"
+      ]
+    },
+    {
+      "id": "interior_small_apartment_bedroom",
+      "prompt": "inside a small everyday apartment bedroom",
+      "weight": 1.25,
+      "tags": ["indoor", "bedroom", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_ordinary_apartment_bedroom",
+      "prompt": "inside an ordinary lived-in apartment bedroom",
+      "weight": 1.25,
+      "tags": ["indoor", "bedroom", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_rental_bedroom",
+      "prompt": "inside a simple rented apartment bedroom",
+      "weight": 1.2,
+      "tags": ["indoor", "bedroom", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_spare_bedroom",
+      "prompt": "inside a modest private spare bedroom",
+      "weight": 1.15,
+      "tags": ["indoor", "bedroom", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_suburban_bedroom",
+      "prompt": "inside a normal suburban home bedroom",
+      "weight": 1.2,
+      "tags": ["indoor", "bedroom", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_older_apartment_bedroom",
+      "prompt": "inside a tidy older apartment bedroom",
+      "weight": 1.15,
+      "tags": ["indoor", "bedroom", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_compact_studio_apartment",
+      "prompt": "inside a compact one-room studio apartment",
+      "weight": 1.25,
+      "tags": ["indoor", "bedroom", "living_room", "studio", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_simple_studio_flat",
+      "prompt": "inside a simple open-plan studio flat",
+      "weight": 1.2,
+      "tags": ["indoor", "bedroom", "living_room", "studio", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_small_apartment_living_room",
+      "prompt": "inside a small everyday apartment living room",
+      "weight": 1.25,
+      "tags": ["indoor", "living_room", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_ordinary_living_room",
+      "prompt": "inside an ordinary comfortable home living room",
+      "weight": 1.25,
+      "tags": ["indoor", "living_room", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_rental_living_room",
+      "prompt": "inside a modest rented apartment living room",
+      "weight": 1.2,
+      "tags": ["indoor", "living_room", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_older_apartment_living_room",
+      "prompt": "inside a tidy older apartment living room",
+      "weight": 1.15,
+      "tags": ["indoor", "living_room", "apartment", "home", "modest", "private"]
+    },
+    {
+      "id": "interior_compact_apartment_kitchen",
+      "prompt": "inside a compact everyday apartment kitchen",
+      "weight": 1.2,
+      "tags": ["indoor", "kitchen", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_ordinary_home_kitchen",
+      "prompt": "inside an ordinary practical home kitchen",
+      "weight": 1.2,
+      "tags": ["indoor", "kitchen", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_small_apartment_bathroom",
+      "prompt": "inside a small clean apartment bathroom",
+      "weight": 1.15,
+      "tags": ["indoor", "bathroom", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_ordinary_home_bathroom",
+      "prompt": "inside an ordinary tiled home bathroom",
+      "weight": 1.15,
+      "tags": ["indoor", "bathroom", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_apartment_home_office",
+      "prompt": "inside a simple private apartment home office",
+      "weight": 1.1,
+      "tags": ["indoor", "studio", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_apartment_hallway",
+      "prompt": "inside a quiet ordinary apartment hallway",
+      "weight": 1.05,
+      "tags": ["indoor", "hallway", "apartment", "home", "everyday", "private"]
+    },
+    {
+      "id": "interior_garden_patio",
+      "prompt": "on a secluded private garden patio screened by greenery",
+      "tags": [
+        "outdoor",
+        "garden",
+        "private",
+        "romantic"
+      ]
+    },
+    {
+      "id": "interior_private_lawn",
+      "prompt": "on a secluded manicured private lawn",
+      "tags": [
+        "outdoor",
+        "garden",
+        "private",
+        "nature"
+      ]
+    },
+    {
+      "id": "interior_flower_garden",
+      "prompt": "in a hidden private flower garden in full bloom",
+      "tags": [
+        "outdoor",
+        "garden",
+        "private",
+        "romantic",
+        "nature"
+      ]
+    },
+    {
+      "id": "interior_forest_clearing",
+      "prompt": "in a secluded sunlit forest clearing far from any path",
+      "tags": [
+        "outdoor",
+        "nature",
+        "private",
+        "forest"
+      ]
+    },
+    {
+      "id": "interior_lakeside_cabin_deck",
+      "prompt": "on the private deck of a remote lakeside cabin",
+      "tags": [
+        "outdoor",
+        "nature",
+        "private",
+        "deck"
+      ]
+    }
+  ],
+  "furniture": [
+    {
+      "id": "furniture_bed",
+      "prompt": "beside a neatly made bed",
+      "tags": [
+        "bed",
+        "lying_surface",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "bedroom"
+      ]
+    },
+    {
+      "id": "furniture_sofa",
+      "prompt": "beside an elegant sofa",
+      "tags": [
+        "sofa",
+        "lying_surface",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio"
+      ]
+    },
+    {
+      "id": "furniture_chair",
+      "prompt": "beside a modern chair",
+      "tags": [
+        "chair",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio",
+        "kitchen"
+      ]
+    },
+    {
+      "id": "furniture_armchair",
+      "prompt": "beside a plush armchair",
+      "tags": [
+        "chair",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "indoor"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio"
+      ]
+    },
+    {
+      "id": "furniture_wall",
+      "prompt": "beside a clean interior wall",
+      "tags": [
+        "wall",
+        "standing_area"
+      ],
+      "requires_tags": [
+        "indoor"
+      ]
+    },
+    {
+      "id": "furniture_floor",
+      "prompt": "on a clean soft floor",
+      "tags": [
+        "floor",
+        "lying_surface",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "indoor"
+      ]
+    },
+    {
+      "id": "furniture_simple_double_bed",
+      "prompt": "on a simple double bed with cotton sheets",
+      "tags": ["bed", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["bedroom"]
+    },
+    {
+      "id": "furniture_unmade_home_bed",
+      "prompt": "on a casually unmade everyday bed",
+      "tags": ["bed", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["bedroom"]
+    },
+    {
+      "id": "furniture_compact_fabric_sofa",
+      "prompt": "on a compact fabric sofa",
+      "tags": ["sofa", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["living_room"]
+    },
+    {
+      "id": "furniture_worn_home_sofa",
+      "prompt": "on a comfortable slightly worn home sofa",
+      "tags": ["sofa", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["living_room"]
+    },
+    {
+      "id": "furniture_simple_wooden_chair",
+      "prompt": "beside a simple wooden chair",
+      "tags": ["chair", "sitting_surface", "everyday"],
+      "requires_tags": ["indoor"],
+      "requires_any_tags": ["bedroom", "living_room", "studio", "kitchen", "hallway"]
+    },
+    {
+      "id": "furniture_small_home_armchair",
+      "prompt": "in a small comfortable home armchair",
+      "tags": ["chair", "sitting_surface", "everyday"],
+      "requires_tags": ["indoor"],
+      "requires_any_tags": ["bedroom", "living_room", "studio"]
+    },
+    {
+      "id": "furniture_thin_apartment_rug",
+      "prompt": "on a simple woven apartment rug",
+      "tags": ["floor", "lying_surface", "sitting_surface", "everyday"],
+      "requires_tags": ["indoor"]
+    },
+    {
+      "id": "furniture_laminate_counter",
+      "prompt": "beside a clean laminate kitchen counter",
+      "tags": ["counter", "sitting_surface", "standing_area", "everyday"],
+      "requires_tags": ["kitchen"]
+    },
+    {
+      "id": "furniture_standard_bathtub",
+      "prompt": "in a standard built-in bathtub",
+      "tags": ["bathtub", "lying_surface", "sitting_surface", "wet_surface", "everyday"],
+      "requires_tags": ["bathroom"]
+    },
+    {
+      "id": "furniture_tiled_shower_wall",
+      "prompt": "against a clean tiled shower wall",
+      "tags": ["wall", "standing_area", "wet_surface", "everyday"],
+      "requires_tags": ["bathroom"]
+    },
+    {
+      "id": "furniture_narrow_windowsill",
+      "prompt": "beside a narrow apartment windowsill",
+      "tags": ["window", "standing_area", "everyday"],
+      "requires_tags": ["indoor", "apartment"]
+    },
+    {
+      "id": "furniture_canopy_bed",
+      "prompt": "on a luxurious canopy bed with rumpled linen sheets",
+      "tags": [
+        "bed",
+        "lying_surface",
+        "sitting_surface",
+        "intimate",
+        "luxury"
+      ],
+      "requires_tags": [
+        "bedroom",
+        "luxury"
+      ]
+    },
+    {
+      "id": "furniture_velvet_bed",
+      "prompt": "on a deep velvet-upholstered bed with satin sheets",
+      "tags": [
+        "bed",
+        "lying_surface",
+        "sitting_surface",
+        "luxury"
+      ],
+      "requires_tags": [
+        "bedroom",
+        "luxury"
+      ]
+    },
+    {
+      "id": "furniture_chaise",
+      "prompt": "on an elegant curved chaise longue",
+      "tags": [
+        "sofa",
+        "lying_surface",
+        "sitting_surface",
+        "luxury"
+      ],
+      "requires_tags": [
+        "indoor",
+        "luxury"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio"
+      ]
+    },
+    {
+      "id": "furniture_sectional_sofa",
+      "prompt": "on a broad soft sectional sofa",
+      "tags": [
+        "sofa",
+        "lying_surface",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "living_room"
+      ]
+    },
+    {
+      "id": "furniture_velvet_armchair",
+      "prompt": "in a deep velvet armchair",
+      "tags": [
+        "chair",
+        "sitting_surface",
+        "luxury"
+      ],
+      "requires_tags": [
+        "indoor",
+        "luxury"
+      ],
+      "requires_any_tags": [
+        "bedroom",
+        "living_room",
+        "studio"
+      ]
+    },
+    {
+      "id": "furniture_bathtub",
+      "prompt": "in a deep freestanding bathtub",
+      "tags": [
+        "bathtub",
+        "lying_surface",
+        "sitting_surface",
+        "wet_surface"
+      ],
+      "requires_tags": [
+        "bathroom"
+      ]
+    },
+    {
+      "id": "furniture_shower_wall",
+      "prompt": "against the misted glass wall of a rain shower",
+      "tags": [
+        "wall",
+        "standing_area",
+        "wet_surface"
+      ],
+      "requires_tags": [
+        "bathroom"
+      ]
+    },
+    {
+      "id": "furniture_kitchen_counter",
+      "prompt": "beside a polished stone kitchen island",
+      "tags": [
+        "counter",
+        "sitting_surface",
+        "standing_area"
+      ],
+      "requires_tags": [
+        "kitchen"
+      ]
+    },
+    {
+      "id": "furniture_windowsill",
+      "prompt": "on a broad private windowsill",
+      "tags": [
+        "sitting_surface",
+        "window",
+        "standing_area"
+      ],
+      "requires_tags": [
+        "indoor"
+      ]
+    },
+    {
+      "id": "furniture_soft_rug",
+      "prompt": "on a thick plush rug",
+      "tags": [
+        "floor",
+        "lying_surface",
+        "sitting_surface"
+      ],
+      "requires_tags": [
+        "indoor"
+      ]
+    },
+    {
+      "id": "furniture_pool_edge_indoor",
+      "prompt": "seated on the smooth edge of the private pool",
+      "tags": [
+        "pool_edge",
+        "sitting_surface",
+        "wet_surface"
+      ],
+      "requires_tags": [
+        "pool"
+      ]
+    },
+    {
+      "id": "furniture_garden_bench",
+      "prompt": "on a secluded wrought-iron garden bench",
+      "tags": [
+        "bench",
+        "sitting_surface",
+        "garden"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_sun_lounger",
+      "prompt": "on a cushioned private sun lounger",
+      "tags": [
+        "lounger",
+        "lying_surface",
+        "sitting_surface",
+        "garden"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_picnic_blanket",
+      "prompt": "on a soft blanket spread over the private lawn",
+      "tags": [
+        "blanket",
+        "lying_surface",
+        "sitting_surface",
+        "nature"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_garden_wall",
+      "prompt": "against a secluded ivy-covered garden wall",
+      "tags": [
+        "wall",
+        "standing_area",
+        "garden"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_tree_trunk",
+      "prompt": "beside a broad tree trunk in the secluded clearing",
+      "tags": [
+        "tree",
+        "standing_area",
+        "nature"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    },
+    {
+      "id": "furniture_cabin_deck",
+      "prompt": "on the timber deck beside a private cabin",
+      "tags": [
+        "floor",
+        "lying_surface",
+        "sitting_surface",
+        "nature"
+      ],
+      "requires_tags": [
+        "outdoor"
+      ]
+    }
+  ],
   "moods": [
     {
       "id": "mood_bright_fashion",
@@ -10578,5 +10562,21 @@
       "menu_label": "Handheld close-up",
       "menu_group": "Explicit"
     }
-  ]
+  ],
+  "prompt_defaults": {
+    "positive_prefix": "(solo {age}:1.4), (single subject:1.4)",
+    "positive_suffix": "complete intact body, two arms, two legs, two hands, two feet, correct hands and feet, coherent anatomy, realistic photography, natural skin texture, high detail",
+    "negative_prompt": "child, minor, underage, teen, young-looking, man, male, men, male body, male hands, penis, testicles, multiple people, duplicate person, twins, mirror, reflection, sex toy, vibrator, dildo, amputee, missing limb, missing arm, missing leg, detached limb, limb stump, prosthetic limb, extra limbs, extra arms, extra legs, duplicated limbs, fused limbs, malformed arms, malformed legs, bad hands, missing fingers, extra fingers, fused fingers, malformed fingers, bad feet, missing toes, extra toes, malformed anatomy, distorted face, low quality, blurry, watermark, text",
+    "cameltoe_prompt": "clearly visible natural cameltoe contour through the tight fabric",
+    "xxx_plateau_prompts": {
+      "provocative_rear": "(anatomically coherent rear-facing nude pose:1.5), back, shoulders, torso, pelvis and buttocks all facing away from the camera in one consistent direction, only the head and neck may turn to look back, exposed buttocks and genitals from behind, uncensored",
+      "intimate_closeup": "(explicit intimate anatomical close-up:1.5), fully nude, clearly visible, uncensored",
+      "panties_aside": "(explicit panties-pulled-aside view:1.5), exposed vulva between parted legs, uncensored",
+      "masturbation": "(hands-only masturbation:1.5), exposed genitals, fully nude, uncensored"
+    },
+    "xxx_plateau_negative_additions": {
+      "provocative_rear": "front-facing shoulders, front-facing torso, chest facing camera, frontal breasts, simultaneous front and rear view, twisted spine, reversed torso, impossible torso rotation, disconnected waist, giant foreground buttocks, fisheye body distortion"
+    },
+    "xxx_negative_additions": "clothes, underwear, covered genitals, censorship, mosaic, black bars, implied nudity"
+  }
 }
