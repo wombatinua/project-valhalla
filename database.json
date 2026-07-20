@@ -5,11 +5,7 @@
     "output_dir": "./outputs",
     "human_defaults": {
       "pools": {
-        "age": [
-          "girl_21",
-          "girl_22",
-          "girl_23"
-        ],
+        "age": [],
         "ethnic_appearance": [
           "appearance_slavic"
         ],
@@ -164,7 +160,8 @@
     },
     "scene_defaults": {
       "wardrobe_categories": [
-        "normal"
+        "normal",
+        "glamour"
       ],
       "environment_categories": [
         "normal"
@@ -7785,10 +7782,11 @@
       {
         "id": "dress_sheer_robe",
         "prompt": "sheer lace robe",
-        "tags": [
-          "sheer",
-          "lace",
-          "boudoir"
+      "tags": [
+        "sheer",
+        "lace",
+        "boudoir",
+        "robe"
         ],
         "mix_tags": [
           "lace"
@@ -7806,11 +7804,12 @@
         ]
       },
       {
-        "id": "dress_satin_robe",
+      "id": "dress_satin_robe",
         "prompt": "short satin robe",
-        "tags": [
-          "silk",
-          "boudoir"
+      "tags": [
+        "silk",
+        "boudoir",
+        "robe"
         ],
         "mix_tags": [
           "silk"
@@ -8042,12 +8041,13 @@
         ]
       },
       {
-        "id": "robe_terry_bath",
+      "id": "robe_terry_bath",
         "prompt": "plush loosely belted terry bathrobe",
-        "tags": [
-          "home",
-          "bathrobe",
-          "boudoir"
+      "tags": [
+        "home",
+        "bathrobe",
+        "boudoir",
+        "robe"
         ],
         "occupies_slots": [
           "upperwear",
@@ -8062,13 +8062,14 @@
         ]
       },
       {
-        "id": "robe_silk_long",
+      "id": "robe_silk_long",
         "prompt": "long flowing silk robe",
-        "tags": [
-          "silk",
-          "bathrobe",
-          "boudoir",
-          "elegant"
+      "tags": [
+        "silk",
+        "bathrobe",
+        "boudoir",
+        "elegant",
+        "robe"
         ],
         "mix_tags": [
           "silk"
@@ -8086,13 +8087,14 @@
         ]
       },
       {
-        "id": "robe_lace_open",
+      "id": "robe_lace_open",
         "prompt": "open-front transparent lace robe",
-        "tags": [
-          "lace",
-          "sheer",
-          "boudoir",
-          "erotic"
+      "tags": [
+        "lace",
+        "sheer",
+        "boudoir",
+        "erotic",
+        "robe"
         ],
         "mix_tags": [
           "lace"
@@ -14169,6 +14171,9 @@
       "menu_label": "Face",
       "tags": [
         "face_focus"
+      ],
+      "excludes_tags": [
+        "rear_focus"
       ]
     },
     {
@@ -14221,8 +14226,7 @@
         "rear_focus"
       ],
       "requires_any_tags": [
-        "provocative_rear",
-        "rear_angle"
+        "provocative_rear"
       ]
     }
   ],
@@ -14334,7 +14338,8 @@
       "menu_label": "Bent over",
       "plateau_kind": "provocative_rear",
       "pose_tags": [
-        "provocative_rear"
+        "provocative_rear",
+        "bent_over"
       ],
       "action_tags": [
         "provocative_action"
@@ -14822,7 +14827,7 @@
         "erotic_pose"
       ],
       "requires_tags": [
-        "sitting_surface"
+        "bed"
       ],
       "allowed_levels": [
         "covered",
@@ -14840,7 +14845,7 @@
         "erotic_pose"
       ],
       "requires_tags": [
-        "lying_surface"
+        "bed"
       ],
       "allowed_levels": [
         "covered",
@@ -14875,7 +14880,7 @@
         "erotic_pose"
       ],
       "requires_tags": [
-        "lying_surface"
+        "sofa"
       ],
       "allowed_levels": [
         "covered",
@@ -14894,7 +14899,7 @@
         "erotic_pose"
       ],
       "requires_tags": [
-        "sitting_surface"
+        "chair"
       ],
       "allowed_levels": [
         "lingerie",
@@ -15022,7 +15027,8 @@
       "tags": [
         "explicit_pose",
         "provocative_rear",
-        "open_legs"
+        "open_legs",
+        "bent_over"
       ],
       "allowed_levels": [
         "explicit"
@@ -15354,7 +15360,8 @@
       "allowed_levels": [
         "covered",
         "lingerie"
-      ]
+      ],
+      "hands_required": 2
     },
     {
       "id": "pose_floor_crosslegged",
@@ -16184,6 +16191,10 @@
         "undressing_action",
         "erotic_action"
       ],
+      "requires_tags": [
+        "robe"
+      ],
+      "hands_required": 2,
       "allowed_levels": [
         "covered",
         "lingerie"
@@ -16196,6 +16207,10 @@
         "undressing_action",
         "erotic_action"
       ],
+      "requires_tags": [
+        "bra"
+      ],
+      "hands_required": 1,
       "allowed_levels": [
         "covered",
         "lingerie"
@@ -16220,8 +16235,9 @@
         "erotic_action"
       ],
       "requires_tags": [
-        "legwear"
+        "stockings"
       ],
+      "hands_required": 1,
       "allowed_levels": [
         "lingerie",
         "topless",
@@ -18974,7 +18990,7 @@
     "positive_prefix": "(solo {age}:1.4), (single subject:1.4)",
     "positive_suffix": "coherent visible anatomy, realistic photography, natural skin texture, high detail",
     "negative_prompt": "extra limbs, missing limbs, fused limbs, malformed hands, extra fingers, fused fingers, malformed feet, extra toes, malformed anatomy, distorted face",
-    "covered_chest_negative": "bare breasts, exposed breasts, topless, visible nipples, exposed nipples, nipples clipping through clothing, nipples protruding through fabric, nipple outline through clothes, see-through fabric over breasts, transparent chest fabric, torn chest fabric, wardrobe malfunction",
+    "covered_chest_negative": "bare breasts, exposed breasts, topless, exposed nipple skin, nipples clipping through clothing, skin-colored nipples through clothing, areola color visible through fabric, pink nipple patches on clothing, brown nipple patches on clothing, colored nipple shapes on fabric, see-through fabric over breasts, transparent chest fabric, torn chest fabric, wardrobe malfunction, multiple bras, layered bras, extra bra straps, mismatched contrasting bra straps, contrasting under-bra",
     "cameltoe_prompt": "clearly visible natural cameltoe contour through the tight fabric",
     "xxx_plateau_prompts": {
       "provocative_rear": "(anatomically coherent rear-facing nude pose:1.5), back, shoulders, torso, pelvis and buttocks all facing away from the camera in one consistent direction, only the head and neck may turn to look back, exposed buttocks and genitals from behind, uncensored",

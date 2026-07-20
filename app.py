@@ -38,6 +38,27 @@ def weighted_choice(rng: random.Random, items: list[dict[str, Any]]) -> dict[str
     return rng.choices(items, weights=weights, k=1)[0]
 
 
+def recipe_focus_compatible(
+    item: dict[str, Any], recipe: dict[str, Any] | None, kind: str
+) -> bool:
+    """Apply only high-confidence anatomical focus constraints."""
+    if not recipe:
+        return True
+    focus = recipe.get("focus_target")
+    signals = tags(item) | set(item.get("requires_tags", []))
+    if focus == "focus_breasts":
+        return bool(signals & {"breasts", "nipples", "breast_focus"})
+    if focus == "focus_intimate":
+        return (
+            bool(signals & {"genitals", "open_legs", "masturbation_pose", "masturbation_action"})
+            and not signals & {"breast_focus", "provocative_rear"}
+        )
+    if focus == "focus_rear":
+        required = "provocative_rear" if kind == "pose" else "provocative_action"
+        return required in signals
+    return True
+
+
 def database_path() -> Path:
     return Path(__file__).resolve().with_name("database.json")
 
@@ -104,6 +125,9 @@ def validate_item(item: Any, context: str) -> None:
         )
     if "reveals_cameltoe" in item and not isinstance(item["reveals_cameltoe"], bool):
         raise AppError(f"{context}.{item['id']}: reveals_cameltoe must be true or false")
+    hands_required = item.get("hands_required", 0)
+    if not isinstance(hands_required, int) or not 0 <= hands_required <= 2:
+        raise AppError(f"{context}.{item['id']}: hands_required must be an integer from 0 to 2")
     for field in ("requires_environment_tags", "excludes_environment_tags"):
         if field in item and (
             not isinstance(item[field], list)
@@ -568,6 +592,10 @@ def tags(item: dict[str, Any]) -> set[str]:
     return set(item.get("tags", []))
 
 
+def hands_required(item: dict[str, Any] | None) -> int:
+    return int((item or {}).get("hands_required", 0))
+
+
 def validate_outfit_layers(db: dict[str, Any], outfit: dict[str, Any]) -> None:
     template_id = outfit["template"]["id"]
     garments = outfit["garments"]
@@ -920,6 +948,32 @@ class Composer:
                     f"excluded_environment={sorted(excluded)}"
                 )
 
+    def validate_outfit_stage_coverage(self, outfit: dict[str, Any]) -> None:
+        """A sheer covered layer must reveal the same safe bra used later."""
+        garments = outfit["garments"]
+        bra = garments.get("bra")
+        for stage in outfit["template"].get("stages", []):
+            visible = [
+                garments[slot] for slot in stage.get("visible_slots", [])
+                if slot in garments
+            ]
+            if stage.get("level") == "covered" and any(
+                "sheer" in tags(item) for item in visible
+            ) and (
+                bra is None or tags(bra) & {"sheer", "explicit"}
+            ):
+                raise AppError(
+                    "A covered sheer outfit requires one opaque non-explicit bra beneath it"
+                )
+            if (
+                stage.get("level") == "lingerie"
+                and bra in visible
+                and "explicit" in tags(bra)
+            ):
+                raise AppError(
+                    "A lingerie stage that hides breasts cannot use an exposing bra"
+                )
+
     def choose_outfit(
         self,
         template: dict[str, Any],
@@ -930,6 +984,7 @@ class Composer:
         for _ in range(attempts):
             try:
                 outfit = self._choose_outfit_once(template)
+                self.validate_outfit_stage_coverage(outfit)
                 if interior is not None:
                     self.validate_outfit_environment(outfit, interior)
                 return outfit
@@ -1025,6 +1080,11 @@ class Composer:
         available_tags = set(stage.get("body_visibility", [])) | {stage["level"]}
         available_tags |= set(stage.get("visible_slots", []))
         available_tags |= tags(furniture) | tags(fixed["interior"])
+        visible_slots = set(stage.get("visible_slots", []))
+        available_tags |= set().union(*(
+            tags(item) for slot, item in fixed["outfit"]["garments"].items()
+            if slot in visible_slots
+        ), set())
         recipe = None
         if stage["level"] == "explicit":
             recipes = [item for item in self.db["explicit_recipes"] if not item.get("disabled", False)]
@@ -1045,7 +1105,9 @@ class Composer:
         elif stage["level"] in {"topless", "nude"}:
             nsfw_pose_tags = {"erotic_pose", "topless_pose", "nude_pose", "open_legs"}
             poses = [item for item in poses if tags(item) & nsfw_pose_tags]
-        plateau_kind = stage.get("plateau_kind")
+        plateau_kind = stage.get("plateau_kind") or (
+            recipe.get("plateau_kind") if recipe else None
+        )
         if plateau_kind == "provocative_rear":
             poses = [item for item in poses if "provocative_rear" in tags(item)]
         elif plateau_kind == "intimate_closeup":
@@ -1059,7 +1121,8 @@ class Composer:
             ]
         if recipe and recipe.get("pose_tags"):
             required = set(recipe["pose_tags"])
-            poses = [item for item in poses if required & tags(item)]
+            poses = [item for item in poses if required.issubset(tags(item))]
+        poses = [item for item in poses if recipe_focus_compatible(item, recipe, "pose")]
         if overrides.get("pose"):
             poses = [item for item in poses if item["id"] == overrides["pose"]]
         pose = choose("pose", poses)
@@ -1068,6 +1131,7 @@ class Composer:
             item for item in self.db["actions"]
             if stage["level"] in item.get("allowed_levels", [stage["level"]])
             and compatible_with_requirements(item, action_tags)
+            and hands_required(pose) + hands_required(item) <= 2
         ]
         if stage["level"] == "explicit":
             actions = [item for item in actions if "explicit_action" in tags(item)]
@@ -1086,7 +1150,11 @@ class Composer:
             actions = [item for item in actions if "panties_aside_action" in tags(item)]
         if recipe and recipe.get("action_tags"):
             required = set(recipe["action_tags"])
-            actions = [item for item in actions if required & tags(item)]
+            actions = [item for item in actions if required.issubset(tags(item))]
+        actions = [
+            item for item in actions
+            if recipe_focus_compatible(item, recipe, "action")
+        ]
         if overrides.get("action"):
             actions = [item for item in actions if item["id"] == overrides["action"]]
         action = choose("action", actions)
@@ -1102,6 +1170,7 @@ class Composer:
                         item, available_tags | tags(action)
                     )
                     and (not required_prop_tags or required_prop_tags.issubset(tags(item)))
+                    and hands_required(pose) + hands_required(action) + hands_required(item) <= 2
                 ]
                 if not candidates:
                     raise AppError("Selected prop is incompatible with this shot")
@@ -1109,12 +1178,17 @@ class Composer:
             elif required_prop_tags:
                 raise AppError("This action requires a compatible prop")
         elif required_prop_tags:
-            candidates = [item for item in self.db["props"] if required_prop_tags.issubset(tags(item))]
+            candidates = [
+                item for item in self.db["props"]
+                if required_prop_tags.issubset(tags(item))
+                and hands_required(pose) + hands_required(action) + hands_required(item) <= 2
+            ]
             prop = weighted_choice(self.rng, candidates)
         elif self.rng.random() < 0.18:
             candidates = [
                 item for item in self.db["props"]
                 if compatible_with_requirements(item, available_tags | tags(action))
+                and hands_required(pose) + hands_required(action) + hands_required(item) <= 2
             ]
             if stage["level"] != "explicit":
                 casual_props = [
@@ -1302,6 +1376,9 @@ class Composer:
         ids = {item["id"] for item in flattened}
         all_tags = set().union(*(tags(item) for item in flattened))
         all_tags |= set(scene["stage"].get("body_visibility", [])) | set(scene["stage"].get("visible_slots", [])) | {scene["stage"]["level"]}
+        hand_total = sum(hands_required(scene.get(key)) for key in ("pose", "action", "prop"))
+        if hand_total > 2:
+            raise AppError(f"Pose, action and prop require {hand_total} hands")
         for item in flattened:
             missing = set(item.get("requires", [])) - ids
             excluded = set(item.get("excludes", [])) & ids
@@ -1323,6 +1400,16 @@ class Composer:
                 f"Expression {scene['expression']['id']} is incompatible with action "
                 f"{scene['action']['id']}; required tags: {sorted(required_expression_tags)}"
             )
+        recipe = scene.get("explicit_recipe")
+        if recipe:
+            if not recipe_focus_compatible(scene["pose"], recipe, "pose"):
+                raise AppError(
+                    f"Pose {scene['pose']['id']} conflicts with recipe focus {recipe['id']}"
+                )
+            if not recipe_focus_compatible(scene["action"], recipe, "action"):
+                raise AppError(
+                    f"Action {scene['action']['id']} conflicts with recipe focus {recipe['id']}"
+                )
 
 
 ALWAYS_HUMAN_PARTS = (
@@ -1395,7 +1482,10 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     stage_visibility = set(stage.get("body_visibility", []))
     covered_chest = not bool({"breasts", "nipples"} & stage_visibility)
     visibility = set(stage_visibility)
-    plateau_kind = stage.get("plateau_kind")
+    recipe = scene.get("explicit_recipe")
+    plateau_kind = stage.get("plateau_kind") or (
+        recipe.get("plateau_kind") if recipe else None
+    )
     if plateau_kind == "provocative_rear":
         visibility -= {"breasts", "nipples"}
     xxx_prompt = defaults.get("xxx_plateau_prompts", {}).get(plateau_kind, "")
@@ -1434,33 +1524,59 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
         ):
             return casual_role_prompts.get(item["id"], item["prompt"])
         return item["prompt"]
+    visible_slots = set(stage.get("visible_slots", []))
+    outfit = scene["outfit"]
+    visible_garments = [
+        item for slot, item in outfit["garments"].items() if slot in visible_slots
+    ]
+    covered_sheer = (
+        stage.get("level") == "covered"
+        and any("sheer" in tags(item) for item in visible_garments)
+    )
+    lingerie_sheer = (
+        stage.get("level") == "lingerie"
+        and any("sheer" in tags(item) for item in visible_garments)
+    )
     # A stage label alone is UI metadata. These anchors state the visual contract
     # explicitly in vocabulary image models reliably understand.
     stage_anchors = {
         "covered": (
+            "(one opaque bra fully covering both breasts beneath the sheer outer garment "
+            "while conforming to their actual size:1.3), the same bra remains clearly "
+            "visible through the outer layer, no bare breast skin visible"
+            if covered_sheer else
             "(opaque upper-body clothing fully covering both breasts while conforming "
             "to their actual size:1.3), unbroken opaque fabric over the entire bust, "
-            "no visible nipples or nipple protrusion through the fabric"
+            "continuous garment color and fabric texture across the entire chest, "
+            "natural clothed bust silhouette, smooth continuous same-color fabric with "
+            "no colored anatomical detail visible through it"
         ),
         "lingerie": (
+            "(one coherent sheer bra or lingerie top covering both breasts while conforming "
+            "to their actual size:1.3), continuous intentional lingerie fabric across the chest"
+            if lingerie_sheer else
             "(opaque bra, lingerie top, or upper garment fully covering both breasts "
             "while conforming to their actual size:1.3), unbroken opaque fabric over "
-            "the entire bust, no visible nipples or nipple protrusion through fabric"
+            "the entire bust, continuous garment color and fabric texture across the chest, "
+            "natural clothed bust silhouette, smooth continuous same-color fabric with "
+            "no colored anatomical detail visible through it"
         ),
         "topless": "topless, bare breasts and visible nipples, lower-body garments visible",
         "nude": "fully nude body, bare breasts, visible nipples, pubic area and genitals visible",
         "explicit": "explicit adult pose, bare breasts, visible nipples, pubic area and genitals visible",
     }
     stage_anchor = stage_anchors.get(stage.get("level"), "")
-    if stage_anchor:
+    # A recipe can establish a stricter orientation than a generic explicit
+    # stage. Put that contract first and avoid frontal anatomy wording for rear views.
+    if xxx_prompt:
+        fragments.append(xxx_prompt)
+    if stage_anchor and plateau_kind != "provocative_rear":
         fragments.append(stage_anchor)
     # Stateless image inference pays more attention to earlier tokens. Keep the
     # persistent visual identity before transient direction and camera grammar.
     fragments.extend(
         human_fragments(scene["human"], visibility, covered_chest, custom)
     )
-    visible_slots = set(stage.get("visible_slots", []))
-    outfit = scene["outfit"]
     if custom.get("outfit.template"):
         fragments.append(custom["outfit.template"])
     reveals_cameltoe = False
@@ -1474,8 +1590,48 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
                 garment_parts.append(custom.get(f"outfit.textures.{slot}") or outfit["textures"][slot]["prompt"])
             garment_parts.append(custom.get(f"outfit.garments.{slot}") or garment["prompt"])
             garment_fragment = " ".join(garment_parts)
+            if slot == "bra":
+                garment_fragment = (
+                    f"one single-layer {garment_fragment}, straps and underband matching "
+                    "the same base color and material"
+                )
             fragments.append(garment_fragment)
             reveals_cameltoe = reveals_cameltoe or garment.get("reveals_cameltoe", False)
+    if covered_sheer and "bra" not in visible_slots:
+        bra = outfit["garments"].get("bra")
+        if bra:
+            bra_parts = [
+                custom.get("outfit.colors.bra") or outfit["colors"]["bra"]["prompt"]
+            ]
+            if custom.get("outfit.patterns.bra") or "bra" in outfit.get("patterns", {}):
+                bra_parts.append(
+                    custom.get("outfit.patterns.bra") or outfit["patterns"]["bra"]["prompt"]
+                )
+            if custom.get("outfit.textures.bra") or "bra" in outfit.get("textures", {}):
+                bra_parts.append(
+                    custom.get("outfit.textures.bra") or outfit["textures"]["bra"]["prompt"]
+                )
+            bra_parts.append(custom.get("outfit.garments.bra") or bra["prompt"])
+            fragments.append(
+                "the same underlying " + " ".join(bra_parts) + " clearly visible beneath the sheer outer garment"
+            )
+    panties = outfit["garments"].get("panties") if "panties" in visible_slots else None
+    legwear = outfit["garments"].get("legwear") if "legwear" in visible_slots else None
+    legwear_prompt = (legwear or {}).get("prompt", "").casefold()
+    layered_hosiery = bool(
+        panties
+        and legwear
+        and (
+            "pantyhose" in tags(legwear)
+            or "pantyhose" in legwear_prompt
+            or "tights" in legwear_prompt
+        )
+    )
+    if layered_hosiery:
+        fragments.append(
+            "the panties are worn underneath the pantyhose or tights, hosiery forms the "
+            "continuous outer layer over the panties, never panties over hosiery"
+        )
     if reveals_cameltoe:
         fragments.append(defaults["cameltoe_prompt"])
 
@@ -1509,8 +1665,6 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     stage_custom = custom.get("shot.stage")
     if stage_custom:
         fragments.append(stage_custom)
-    elif xxx_prompt:
-        fragments.append(xxx_prompt)
     if scene.get("explicit_recipe"):
         fragments.append(
             custom.get("shot.explicit_recipe") or scene["explicit_recipe"]["prompt"]
@@ -1519,7 +1673,7 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
         fragments.append(
             custom.get("shot.intensity") or f"{scene['intensity']} visual intensity"
         )
-    if scene.get("garment_transition"):
+    if scene.get("garment_transition") and plateau_kind != "provocative_rear":
         fragments.append(
             custom.get("shot.garment_transition")
             or scene["garment_transition"]["prompt"]
@@ -1527,7 +1681,12 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     for key in ("pose", "action", "prop", "expression"):
         item = scene.get(key)
         if item:
-            fragments.append(custom.get(f"shot.{key}") or item["prompt"])
+            if key == "expression" and plateau_kind == "provocative_rear":
+                fragments.append(
+                    "face turned mostly away from the camera, facial features not a composition focus"
+                )
+            else:
+                fragments.append(custom.get(f"shot.{key}") or item["prompt"])
         elif key == "prop" and custom.get("shot.prop"):
             fragments.append(custom["shot.prop"])
     for key in ("editorial_role", "shot_size", "camera_angle", "framing", "focus_target"):
@@ -1546,8 +1705,10 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             seen_fragments.add(normalized)
     positive = ", ".join(unique_fragments)
     negative = defaults.get("negative_prompt", "")
-    if covered_chest and defaults.get("covered_chest_negative"):
+    if covered_chest and not lingerie_sheer and defaults.get("covered_chest_negative"):
         negative = f"{negative}, {defaults['covered_chest_negative']}"
+    if layered_hosiery:
+        negative = f"{negative}, panties outside pantyhose, panties over tights"
     if plateau_kind and defaults.get("xxx_negative_additions"):
         xxx_negative = defaults["xxx_negative_additions"]
         negative = f"{negative}, {xxx_negative}"
@@ -1560,11 +1721,15 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     for value in scene["human"].values():
         ids.extend(item["id"] for item in value) if isinstance(value, list) else ids.append(value["id"])
     ids.extend(item["id"] for slot, item in outfit["garments"].items() if slot in visible_slots)
+    if covered_sheer and "bra" in outfit["garments"]:
+        ids.append(outfit["garments"]["bra"]["id"])
     for modifier_key in ("patterns", "textures"):
         ids.extend(
             item["id"] for slot, item in outfit.get(modifier_key, {}).items()
             if slot in visible_slots
         )
+        if covered_sheer and "bra" in outfit.get(modifier_key, {}):
+            ids.append(outfit[modifier_key]["bra"]["id"])
     ids.extend(scene[key]["id"] for key in ("pose", "action", "expression", "interior", "furniture", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target"))
     ids.extend(
         scene[key]["id"] for key in ("surface_color", "surface_texture")
@@ -2082,7 +2247,7 @@ def build_storyboard(
                 if names:
                     scene["garment_transition"] = {
                         "id": "transition_" + "_".join(sorted(removed)),
-                        "prompt": "deliberately removing " + " and ".join(names),
+                        "prompt": "fully removed and no longer wearing " + " and ".join(names),
                         "slots": sorted(removed),
                     }
             for key in ("furniture", "pose", "action", "expression", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe"):
@@ -2372,12 +2537,18 @@ def director_prop_options(db: dict[str, Any], shot: dict[str, Any]) -> list[dict
         | tags(scene["furniture"])
         | tags(scene["action"])
     )
+    visible_slots = set(stage.get("visible_slots", []))
+    available |= set().union(*(
+        tags(item) for slot, item in scene["outfit"]["garments"].items()
+        if slot in visible_slots
+    ), set())
     required = set(scene["action"].get("requires_prop_tags", []))
     return [
         item for item in db["props"]
         if not item.get("disabled", False)
         and compatible_with_requirements(item, available)
         and (not required or required.issubset(tags(item)))
+        and hands_required(scene["pose"]) + hands_required(scene["action"]) + hands_required(item) <= 2
     ]
 
 
@@ -2817,6 +2988,11 @@ class WebState:
                 | {stage["level"]} | tags(shot["scene"]["furniture"])
                 | tags(shot["scene"]["interior"])
             )
+            visible_slots = set(stage.get("visible_slots", []))
+            available |= set().union(*(
+                tags(item) for slot, item in shot["scene"]["outfit"]["garments"].items()
+                if slot in visible_slots
+            ), set())
             compatible = [item for item in db[section] if not item.get("disabled", False)]
             if key == "pose":
                 compatible = [
@@ -2840,13 +3016,18 @@ class WebState:
                 recipe = shot["scene"].get("explicit_recipe")
                 if recipe and recipe.get("pose_tags"):
                     recipe_tags = set(recipe["pose_tags"])
-                    compatible = [item for item in compatible if tags(item) & recipe_tags]
+                    compatible = [item for item in compatible if recipe_tags.issubset(tags(item))]
+                compatible = [
+                    item for item in compatible
+                    if recipe_focus_compatible(item, recipe, "pose")
+                ]
             elif key == "action":
                 action_tags = available | tags(shot["scene"]["pose"])
                 compatible = [
                     item for item in compatible
                     if stage["level"] in item.get("allowed_levels", [stage["level"]])
                     and compatible_with_requirements(item, action_tags)
+                    and hands_required(shot["scene"]["pose"]) + hands_required(item) <= 2
                 ]
                 if stage["level"] == "explicit":
                     compatible = [item for item in compatible if "explicit_action" in tags(item)]
@@ -2864,7 +3045,11 @@ class WebState:
                 recipe = shot["scene"].get("explicit_recipe")
                 if recipe and recipe.get("action_tags"):
                     recipe_tags = set(recipe["action_tags"])
-                    compatible = [item for item in compatible if tags(item) & recipe_tags]
+                    compatible = [item for item in compatible if recipe_tags.issubset(tags(item))]
+                compatible = [
+                    item for item in compatible
+                    if recipe_focus_compatible(item, recipe, "action")
+                ]
             else:
                 required = set(shot["scene"]["action"].get("requires_expression_tags", []))
                 if required:
