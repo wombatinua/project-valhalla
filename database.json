@@ -161,10 +161,11 @@
     "scene_defaults": {
       "wardrobe_categories": [
         "normal",
-        "glamour"
+        "luxury"
       ],
       "environment_categories": [
-        "normal"
+        "normal",
+        "luxury"
       ],
       "pools": {
         "interiors": [
@@ -5646,6 +5647,7 @@
     "upperwear": [
       {
         "id": "top_cotton_tee",
+        "catalog_category": "normal",
         "prompt": "fitted cotton T-shirt",
         "tags": [
           "casual",
@@ -5661,6 +5663,7 @@
       },
       {
         "id": "top_silk_blouse",
+        "catalog_category": "normal",
         "prompt": "silk blouse",
         "tags": [
           "elegant",
@@ -5676,6 +5679,7 @@
       },
       {
         "id": "top_crop",
+        "catalog_category": "normal",
         "prompt": "fitted crop top",
         "tags": [
           "casual",
@@ -5690,6 +5694,7 @@
       },
       {
         "id": "top_cashmere",
+        "catalog_category": "normal",
         "prompt": "soft cashmere sweater",
         "tags": [
           "everyday",
@@ -5703,6 +5708,7 @@
       },
       {
         "id": "top_sheer_blouse",
+        "catalog_category": "normal",
         "prompt": "sheer chiffon blouse",
         "tags": [
           "elegant",
@@ -5717,6 +5723,7 @@
       },
       {
         "id": "top_satin_camisole",
+        "catalog_category": "normal",
         "prompt": "satin camisole",
         "tags": [
           "boudoir",
@@ -5732,6 +5739,7 @@
       },
       {
         "id": "top_home_oversized_tee",
+        "catalog_category": "normal",
         "prompt": "soft oversized home T-shirt",
         "tags": [
           "home",
@@ -5747,6 +5755,7 @@
       },
       {
         "id": "top_ribbed_tank",
+        "catalog_category": "normal",
         "prompt": "close-fitting ribbed tank top",
         "tags": [
           "home",
@@ -5762,6 +5771,7 @@
       },
       {
         "id": "top_off_shoulder_knit",
+        "catalog_category": "normal",
         "prompt": "soft off-the-shoulder knit top",
         "tags": [
           "home",
@@ -5777,6 +5787,7 @@
       },
       {
         "id": "top_zip_hoodie",
+        "catalog_category": "normal",
         "prompt": "cropped zip-front hoodie",
         "tags": [
           "home",
@@ -5792,6 +5803,7 @@
       },
       {
         "id": "top_cardigan",
+        "catalog_category": "normal",
         "prompt": "soft fitted buttoned cardigan",
         "tags": [
           "home",
@@ -5807,6 +5819,7 @@
       },
       {
         "id": "top_denim_shirt",
+        "catalog_category": "normal",
         "prompt": "fitted denim shirt",
         "tags": [
           "casual",
@@ -5821,6 +5834,7 @@
       },
       {
         "id": "top_tied_white_shirt",
+        "catalog_category": "normal",
         "prompt": "white shirt tied above the waist",
         "tags": [
           "casual",
@@ -5834,6 +5848,7 @@
       },
       {
         "id": "top_open_blouse",
+        "catalog_category": "normal",
         "prompt": "partly unbuttoned fitted blouse",
         "tags": [
           "office",
@@ -5849,6 +5864,7 @@
       },
       {
         "id": "top_satin_halter",
+        "catalog_category": "normal",
         "prompt": "backless satin halter top",
         "tags": [
           "elegant",
@@ -5864,6 +5880,7 @@
       },
       {
         "id": "top_lace_crop",
+        "catalog_category": "normal",
         "prompt": "delicate lace crop top",
         "tags": [
           "lace",
@@ -5882,6 +5899,7 @@
       },
       {
         "id": "top_sheer_mesh",
+        "catalog_category": "normal",
         "prompt": "transparent sheer mesh long-sleeve top",
         "tags": [
           "sheer",
@@ -5899,6 +5917,7 @@
       },
       {
         "id": "top_corset",
+        "catalog_category": "normal",
         "prompt": "structured overbust corset top",
         "tags": [
           "corset",
@@ -5918,6 +5937,7 @@
       },
       {
         "id": "top_bustier",
+        "catalog_category": "normal",
         "prompt": "fitted satin bustier top",
         "tags": [
           "corset",
@@ -5937,6 +5957,7 @@
       },
       {
         "id": "top_leather_halter",
+        "catalog_category": "normal",
         "prompt": "fitted leather halter top",
         "tags": [
           "leather",
@@ -5951,6 +5972,7 @@
       },
       {
         "id": "top_plunge_body",
+        "catalog_category": "normal",
         "prompt": "extreme plunge-neck fitted top",
         "tags": [
           "erotic",
@@ -5965,6 +5987,7 @@
       },
       {
         "id": "top_sports_bra_style",
+        "catalog_category": "normal",
         "prompt": "supportive athletic crop top",
         "tags": [
           "sporty",
@@ -5980,6 +6003,7 @@
       },
       {
         "id": "top_fishnet_shirt",
+        "catalog_category": "normal",
         "prompt": "open-weave fishnet shirt",
         "tags": [
           "fishnet",
@@ -5995,6 +6019,7 @@
       },
       {
         "id": "top_sequin",
+        "catalog_category": "normal",
         "prompt": "sparkling sequin camisole",
         "tags": [
           "party",
@@ -6010,6 +6035,7 @@
       },
       {
         "id": "top_plain_tank",
+        "catalog_category": "normal",
         "prompt": "plain cotton tank top",
         "tags": [
           "normal_clothes",
@@ -6020,6 +6046,7 @@
       },
       {
         "id": "top_racerback_tank",
+        "catalog_category": "normal",
         "prompt": "simple racerback tank top",
         "tags": [
           "normal_clothes",
@@ -6030,6 +6057,7 @@
       },
       {
         "id": "top_spaghetti_tank",
+        "catalog_category": "normal",
         "prompt": "basic cotton spaghetti-strap top",
         "tags": [
           "normal_clothes",
@@ -6040,6 +6068,7 @@
       },
       {
         "id": "top_boxy_tshirt",
+        "catalog_category": "normal",
         "prompt": "plain boxy cotton T-shirt",
         "tags": [
           "normal_clothes",
@@ -6050,6 +6079,7 @@
       },
       {
         "id": "top_crewneck_tshirt",
+        "catalog_category": "normal",
         "prompt": "basic crew-neck T-shirt",
         "tags": [
           "normal_clothes",
@@ -6059,6 +6089,7 @@
       },
       {
         "id": "top_vneck_tshirt",
+        "catalog_category": "normal",
         "prompt": "simple V-neck cotton T-shirt",
         "tags": [
           "normal_clothes",
@@ -6068,6 +6099,7 @@
       },
       {
         "id": "top_longsleeve_tshirt",
+        "catalog_category": "normal",
         "prompt": "plain long-sleeve T-shirt",
         "tags": [
           "normal_clothes",
@@ -6078,6 +6110,7 @@
       },
       {
         "id": "top_basic_crop",
+        "catalog_category": "normal",
         "prompt": "simple cotton crop top",
         "tags": [
           "normal_clothes",
@@ -6087,6 +6120,7 @@
       },
       {
         "id": "top_ribbed_crop",
+        "catalog_category": "normal",
         "prompt": "basic ribbed crop top",
         "tags": [
           "normal_clothes",
@@ -6096,6 +6130,7 @@
       },
       {
         "id": "top_cotton_camisole",
+        "catalog_category": "normal",
         "prompt": "simple cotton camisole",
         "tags": [
           "normal_clothes",
@@ -6106,6 +6141,7 @@
       },
       {
         "id": "top_plain_sweatshirt",
+        "catalog_category": "normal",
         "prompt": "plain cotton sweatshirt",
         "tags": [
           "normal_clothes",
@@ -6116,6 +6152,7 @@
       },
       {
         "id": "top_pullover_hoodie",
+        "catalog_category": "normal",
         "prompt": "simple pullover hoodie",
         "tags": [
           "normal_clothes",
@@ -6126,6 +6163,7 @@
       },
       {
         "id": "top_flannel_shirt",
+        "catalog_category": "normal",
         "prompt": "casual checked flannel shirt",
         "tags": [
           "normal_clothes",
@@ -6135,6 +6173,7 @@
       },
       {
         "id": "top_cotton_button_shirt",
+        "catalog_category": "normal",
         "prompt": "plain cotton button-front shirt",
         "tags": [
           "normal_clothes",
@@ -6144,6 +6183,7 @@
       },
       {
         "id": "top_henley",
+        "catalog_category": "normal",
         "prompt": "simple fitted Henley top",
         "tags": [
           "normal_clothes",
@@ -6154,6 +6194,7 @@
       },
       {
         "id": "top_fitted_oxford_shirt",
+        "catalog_category": "normal",
         "prompt": "close-fitted cotton Oxford shirt",
         "tags": [
           "normal_clothes",
@@ -6164,6 +6205,7 @@
       },
       {
         "id": "top_stretch_button_shirt",
+        "catalog_category": "normal",
         "prompt": "stretch cotton button shirt fitted at the waist",
         "tags": [
           "normal_clothes",
@@ -6174,6 +6216,7 @@
       },
       {
         "id": "top_deep_v_tee",
+        "catalog_category": "normal",
         "prompt": "fitted deep-V cotton T-shirt",
         "tags": [
           "normal_clothes",
@@ -6184,6 +6227,7 @@
       },
       {
         "id": "top_scoop_neck_tee",
+        "catalog_category": "normal",
         "prompt": "close-fitting scoop-neck T-shirt",
         "tags": [
           "normal_clothes",
@@ -6194,6 +6238,7 @@
       },
       {
         "id": "top_fitted_baby_tee",
+        "catalog_category": "normal",
         "prompt": "short fitted baby T-shirt",
         "tags": [
           "normal_clothes",
@@ -6204,6 +6249,7 @@
       },
       {
         "id": "top_square_neck_tank",
+        "catalog_category": "normal",
         "prompt": "fitted square-neck tank top",
         "tags": [
           "normal_clothes",
@@ -6214,6 +6260,7 @@
       },
       {
         "id": "top_lowcut_ribbed_tank",
+        "catalog_category": "normal",
         "prompt": "low-cut fitted ribbed tank top",
         "tags": [
           "normal_clothes",
@@ -6225,6 +6272,7 @@
       },
       {
         "id": "top_cotton_halter",
+        "catalog_category": "normal",
         "prompt": "simple fitted cotton halter top",
         "tags": [
           "normal_clothes",
@@ -6235,6 +6283,7 @@
       },
       {
         "id": "top_one_shoulder_jersey",
+        "catalog_category": "normal",
         "prompt": "fitted one-shoulder jersey top",
         "tags": [
           "normal_clothes",
@@ -6245,6 +6294,7 @@
       },
       {
         "id": "top_wrap_crop_cotton",
+        "catalog_category": "normal",
         "prompt": "casual wrap-front cotton crop top",
         "tags": [
           "normal_clothes",
@@ -6255,6 +6305,7 @@
       },
       {
         "id": "top_tiefront_blouse_casual",
+        "catalog_category": "normal",
         "prompt": "casual tie-front fitted blouse",
         "tags": [
           "normal_clothes",
@@ -6265,6 +6316,7 @@
       },
       {
         "id": "top_bodysuit_scoop",
+        "catalog_category": "normal",
         "prompt": "smooth scoop-neck bodysuit-style top",
         "tags": [
           "normal_clothes",
@@ -6275,6 +6327,7 @@
       },
       {
         "id": "top_bodysuit_square",
+        "catalog_category": "normal",
         "prompt": "close-fitted square-neck bodysuit-style top",
         "tags": [
           "normal_clothes",
@@ -6285,6 +6338,7 @@
       },
       {
         "id": "top_offshoulder_cotton",
+        "catalog_category": "normal",
         "prompt": "simple fitted off-shoulder cotton top",
         "tags": [
           "normal_clothes",
@@ -6295,6 +6349,7 @@
       },
       {
         "id": "top_ribbed_henley_crop",
+        "catalog_category": "normal",
         "prompt": "fitted ribbed Henley crop top",
         "tags": [
           "normal_clothes",
@@ -6312,6 +6367,7 @@
       },
       {
         "id": "top_mockneck_sleeveless",
+        "catalog_category": "normal",
         "prompt": "fitted sleeveless mock-neck top",
         "tags": [
           "normal_clothes",
@@ -6328,6 +6384,7 @@
       },
       {
         "id": "top_boatneck_jersey",
+        "catalog_category": "normal",
         "prompt": "soft fitted boat-neck jersey top",
         "tags": [
           "normal_clothes",
@@ -6345,6 +6402,7 @@
       },
       {
         "id": "top_pointelle_cardigan",
+        "catalog_category": "normal",
         "prompt": "light fitted pointelle cardigan",
         "tags": [
           "normal_clothes",
@@ -6362,6 +6420,7 @@
       },
       {
         "id": "top_cropped_cardigan",
+        "catalog_category": "normal",
         "prompt": "simple cropped button cardigan",
         "tags": [
           "normal_clothes",
@@ -6379,6 +6438,7 @@
       },
       {
         "id": "top_fine_knit_polo",
+        "catalog_category": "normal",
         "prompt": "close-fitted fine-knit polo top",
         "tags": [
           "normal_clothes",
@@ -6395,6 +6455,7 @@
       },
       {
         "id": "top_waffle_longsleeve",
+        "catalog_category": "normal",
         "prompt": "soft fitted waffle-knit long-sleeve top",
         "tags": [
           "normal_clothes",
@@ -6412,6 +6473,7 @@
       },
       {
         "id": "top_cropped_sweatshirt",
+        "catalog_category": "normal",
         "prompt": "plain fitted cropped sweatshirt",
         "tags": [
           "normal_clothes",
@@ -6431,6 +6493,7 @@
       },
       {
         "id": "top_zip_ribbed_polo",
+        "catalog_category": "normal",
         "prompt": "fitted ribbed zip-collar top",
         "tags": [
           "normal_clothes",
@@ -6448,6 +6511,7 @@
       },
       {
         "id": "top_striped_breton",
+        "catalog_category": "normal",
         "prompt": "fitted striped Breton shirt",
         "tags": [
           "normal_clothes",
@@ -6462,6 +6526,7 @@
       },
       {
         "id": "top_chambray_shirt",
+        "catalog_category": "normal",
         "prompt": "soft fitted chambray shirt",
         "tags": [
           "normal_clothes",
@@ -6476,6 +6541,7 @@
       },
       {
         "id": "top_knotted_tee",
+        "catalog_category": "normal",
         "prompt": "fitted cotton T-shirt knotted at the waist",
         "tags": [
           "normal_clothes",
@@ -6493,6 +6559,7 @@
       },
       {
         "id": "top_asymmetric_ribbed",
+        "catalog_category": "normal",
         "prompt": "fitted asymmetric ribbed top",
         "tags": [
           "normal_clothes",
@@ -6510,6 +6577,7 @@
       },
       {
         "id": "top_lounge_brushed",
+        "catalog_category": "normal",
         "prompt": "soft brushed lounge top",
         "tags": [
           "normal_clothes",
@@ -6527,6 +6595,7 @@
       },
       {
         "id": "top_simple_01",
+        "catalog_category": "normal",
         "prompt": "plain crew-neck T-shirt",
         "tags": [
           "casual",
@@ -6544,6 +6613,7 @@
       },
       {
         "id": "top_simple_02",
+        "catalog_category": "normal",
         "prompt": "soft ribbed tank top",
         "tags": [
           "casual",
@@ -6561,6 +6631,7 @@
       },
       {
         "id": "top_simple_03",
+        "catalog_category": "normal",
         "prompt": "simple long-sleeve jersey top",
         "tags": [
           "casual",
@@ -6578,6 +6649,7 @@
       },
       {
         "id": "top_simple_04",
+        "catalog_category": "normal",
         "prompt": "relaxed cotton henley",
         "tags": [
           "casual",
@@ -6595,6 +6667,7 @@
       },
       {
         "id": "top_simple_05",
+        "catalog_category": "normal",
         "prompt": "basic fitted camisole",
         "tags": [
           "casual",
@@ -6612,6 +6685,7 @@
       },
       {
         "id": "top_simple_06",
+        "catalog_category": "normal",
         "prompt": "cropped everyday sweatshirt",
         "tags": [
           "casual",
@@ -6629,6 +6703,7 @@
       },
       {
         "id": "top_simple_07",
+        "catalog_category": "normal",
         "prompt": "plain scoop-neck top",
         "tags": [
           "casual",
@@ -6646,6 +6721,7 @@
       },
       {
         "id": "top_simple_08",
+        "catalog_category": "normal",
         "prompt": "light cotton button-up shirt",
         "tags": [
           "casual",
@@ -6663,6 +6739,7 @@
       },
       {
         "id": "top_simple_09",
+        "catalog_category": "normal",
         "prompt": "simple knit pullover",
         "tags": [
           "casual",
@@ -6680,6 +6757,7 @@
       },
       {
         "id": "top_simple_10",
+        "catalog_category": "normal",
         "prompt": "fitted mock-neck top",
         "tags": [
           "casual",
@@ -6699,6 +6777,7 @@
     "lowerwear": [
       {
         "id": "lower_blue_jeans",
+        "catalog_category": "normal",
         "prompt": "close-fitting jeans",
         "tags": [
           "casual",
@@ -6712,6 +6791,7 @@
       },
       {
         "id": "lower_tailored_trousers",
+        "catalog_category": "normal",
         "prompt": "tailored trousers",
         "tags": [
           "office",
@@ -6726,6 +6806,7 @@
       },
       {
         "id": "lower_pencil_skirt",
+        "catalog_category": "normal",
         "prompt": "fitted pencil skirt",
         "tags": [
           "office",
@@ -6740,6 +6821,7 @@
       },
       {
         "id": "lower_pleated_skirt",
+        "catalog_category": "normal",
         "prompt": "knee-length pleated skirt",
         "tags": [
           "everyday",
@@ -6753,6 +6835,7 @@
       },
       {
         "id": "lower_leather_skirt",
+        "catalog_category": "normal",
         "prompt": "short fitted leather skirt",
         "tags": [
           "erotic",
@@ -6766,6 +6849,7 @@
       },
       {
         "id": "lower_tailored_shorts",
+        "catalog_category": "normal",
         "prompt": "high-waisted tailored shorts",
         "tags": [
           "casual",
@@ -6779,6 +6863,7 @@
       },
       {
         "id": "lower_lounge_shorts",
+        "catalog_category": "normal",
         "prompt": "soft fitted lounge shorts",
         "tags": [
           "home",
@@ -6793,6 +6878,7 @@
       },
       {
         "id": "lower_pajama_shorts",
+        "catalog_category": "normal",
         "prompt": "silky pajama shorts",
         "tags": [
           "home",
@@ -6808,6 +6894,7 @@
       },
       {
         "id": "lower_yoga_leggings",
+        "catalog_category": "normal",
         "prompt": "high-waisted fitted yoga leggings",
         "reveals_cameltoe": true,
         "tags": [
@@ -6824,6 +6911,7 @@
       },
       {
         "id": "lower_sweatpants",
+        "catalog_category": "normal",
         "prompt": "low-rise soft lounge sweatpants",
         "tags": [
           "home",
@@ -6837,6 +6925,7 @@
       },
       {
         "id": "lower_denim_shorts",
+        "catalog_category": "normal",
         "prompt": "very short fitted denim shorts",
         "tags": [
           "casual",
@@ -6852,6 +6941,7 @@
       },
       {
         "id": "lower_mini_skirt",
+        "catalog_category": "normal",
         "prompt": "high-waisted mini skirt",
         "tags": [
           "casual",
@@ -6867,6 +6957,7 @@
       },
       {
         "id": "lower_pleated_mini",
+        "catalog_category": "normal",
         "prompt": "short pleated fashion skirt",
         "tags": [
           "casual",
@@ -6881,6 +6972,7 @@
       },
       {
         "id": "lower_satin_skirt",
+        "catalog_category": "normal",
         "prompt": "bias-cut satin midi skirt",
         "tags": [
           "silk",
@@ -6895,6 +6987,7 @@
       },
       {
         "id": "lower_slit_skirt",
+        "catalog_category": "normal",
         "prompt": "fitted long skirt with a very high thigh slit",
         "tags": [
           "elegant",
@@ -6909,6 +7002,7 @@
       },
       {
         "id": "lower_leather_shorts",
+        "catalog_category": "normal",
         "prompt": "tight leather micro-shorts",
         "tags": [
           "leather",
@@ -6922,6 +7016,7 @@
       },
       {
         "id": "lower_latex_skirt",
+        "catalog_category": "normal",
         "prompt": "glossy latex-look mini skirt",
         "tags": [
           "fetish",
@@ -6935,6 +7030,7 @@
       },
       {
         "id": "lower_sheer_skirt",
+        "catalog_category": "normal",
         "prompt": "transparent sheer maxi skirt",
         "tags": [
           "sheer",
@@ -6949,6 +7045,7 @@
       },
       {
         "id": "lower_wrap_sarong",
+        "catalog_category": "normal",
         "prompt": "short translucent wrap sarong",
         "tags": [
           "swimwear",
@@ -6964,6 +7061,7 @@
       },
       {
         "id": "lower_riding_pants",
+        "catalog_category": "normal",
         "prompt": "fitted elegant riding trousers",
         "tags": [
           "outdoor",
@@ -6977,6 +7075,7 @@
       },
       {
         "id": "lower_cargo_pants",
+        "catalog_category": "normal",
         "prompt": "low-rise fitted cargo trousers",
         "tags": [
           "casual",
@@ -6991,6 +7090,7 @@
       },
       {
         "id": "lower_micro_skirt",
+        "catalog_category": "normal",
         "prompt": "extremely short fitted micro skirt",
         "tags": [
           "erotic",
@@ -7004,6 +7104,7 @@
       },
       {
         "id": "lower_straight_jeans",
+        "catalog_category": "normal",
         "prompt": "straight-leg blue jeans",
         "tags": [
           "normal_clothes",
@@ -7013,6 +7114,7 @@
       },
       {
         "id": "lower_relaxed_jeans",
+        "catalog_category": "normal",
         "prompt": "relaxed-fit denim jeans",
         "tags": [
           "normal_clothes",
@@ -7022,6 +7124,7 @@
       },
       {
         "id": "lower_highwaist_jeans",
+        "catalog_category": "normal",
         "prompt": "plain high-waisted jeans",
         "tags": [
           "normal_clothes",
@@ -7031,6 +7134,7 @@
       },
       {
         "id": "lower_cutoff_denim_shorts",
+        "catalog_category": "normal",
         "prompt": "casual cutoff denim shorts",
         "tags": [
           "normal_clothes",
@@ -7040,6 +7144,7 @@
       },
       {
         "id": "lower_relaxed_denim_shorts",
+        "catalog_category": "normal",
         "prompt": "relaxed denim shorts",
         "tags": [
           "normal_clothes",
@@ -7049,6 +7154,7 @@
       },
       {
         "id": "lower_cotton_shorts",
+        "catalog_category": "normal",
         "prompt": "plain cotton shorts",
         "tags": [
           "normal_clothes",
@@ -7059,6 +7165,7 @@
       },
       {
         "id": "lower_jersey_shorts",
+        "catalog_category": "normal",
         "prompt": "soft jersey lounge shorts",
         "tags": [
           "normal_clothes",
@@ -7069,6 +7176,7 @@
       },
       {
         "id": "lower_bike_shorts",
+        "catalog_category": "normal",
         "prompt": "basic fitted bike shorts",
         "reveals_cameltoe": true,
         "tags": [
@@ -7079,6 +7187,7 @@
       },
       {
         "id": "lower_denim_skirt",
+        "catalog_category": "normal",
         "prompt": "simple denim skirt",
         "tags": [
           "normal_clothes",
@@ -7088,6 +7197,7 @@
       },
       {
         "id": "lower_denim_mini_skirt",
+        "catalog_category": "normal",
         "prompt": "casual denim mini skirt",
         "tags": [
           "normal_clothes",
@@ -7097,6 +7207,7 @@
       },
       {
         "id": "lower_cotton_mini_skirt",
+        "catalog_category": "normal",
         "prompt": "plain cotton mini skirt",
         "tags": [
           "normal_clothes",
@@ -7106,6 +7217,7 @@
       },
       {
         "id": "lower_aline_skirt",
+        "catalog_category": "normal",
         "prompt": "simple A-line skirt",
         "tags": [
           "normal_clothes",
@@ -7115,6 +7227,7 @@
       },
       {
         "id": "lower_jersey_skirt",
+        "catalog_category": "normal",
         "prompt": "soft casual jersey skirt",
         "tags": [
           "normal_clothes",
@@ -7125,6 +7238,7 @@
       },
       {
         "id": "lower_plain_joggers",
+        "catalog_category": "normal",
         "prompt": "plain cotton joggers",
         "tags": [
           "normal_clothes",
@@ -7135,6 +7249,7 @@
       },
       {
         "id": "lower_skinny_blue_jeans",
+        "catalog_category": "normal",
         "prompt": "tight skinny blue jeans",
         "tags": [
           "normal_clothes",
@@ -7145,6 +7260,7 @@
       },
       {
         "id": "lower_skinny_black_jeans",
+        "catalog_category": "normal",
         "prompt": "tight black skinny jeans",
         "tags": [
           "normal_clothes",
@@ -7155,6 +7271,7 @@
       },
       {
         "id": "lower_lowrise_jeans",
+        "catalog_category": "normal",
         "prompt": "close-fitting low-rise jeans",
         "tags": [
           "normal_clothes",
@@ -7165,6 +7282,7 @@
       },
       {
         "id": "lower_highrise_sculpt_jeans",
+        "catalog_category": "normal",
         "prompt": "high-rise body-sculpting jeans",
         "reveals_cameltoe": true,
         "tags": [
@@ -7176,6 +7294,7 @@
       },
       {
         "id": "lower_denim_hotpants",
+        "catalog_category": "normal",
         "prompt": "ultra-short fitted denim hot pants",
         "tags": [
           "normal_clothes",
@@ -7186,6 +7305,7 @@
       },
       {
         "id": "lower_highcut_denim_shorts",
+        "catalog_category": "normal",
         "prompt": "high-cut close-fitting denim shorts",
         "tags": [
           "normal_clothes",
@@ -7196,6 +7316,7 @@
       },
       {
         "id": "lower_stretch_denim_mini",
+        "catalog_category": "normal",
         "prompt": "tight stretch-denim mini skirt",
         "tags": [
           "normal_clothes",
@@ -7206,6 +7327,7 @@
       },
       {
         "id": "lower_cotton_micro_mini",
+        "catalog_category": "normal",
         "prompt": "ultra-short fitted cotton mini skirt",
         "tags": [
           "normal_clothes",
@@ -7216,6 +7338,7 @@
       },
       {
         "id": "lower_jersey_micro_skirt",
+        "catalog_category": "normal",
         "prompt": "very short body-hugging jersey skirt",
         "tags": [
           "normal_clothes",
@@ -7226,6 +7349,7 @@
       },
       {
         "id": "lower_pleated_micro_casual",
+        "catalog_category": "normal",
         "prompt": "ultra-short casual pleated skirt",
         "tags": [
           "normal_clothes",
@@ -7236,6 +7360,7 @@
       },
       {
         "id": "lower_ribbed_leggings",
+        "catalog_category": "normal",
         "prompt": "body-contouring ribbed leggings",
         "reveals_cameltoe": true,
         "tags": [
@@ -7248,6 +7373,7 @@
       },
       {
         "id": "lower_flared_leggings",
+        "catalog_category": "normal",
         "prompt": "close-fitted flared leggings",
         "reveals_cameltoe": true,
         "tags": [
@@ -7259,6 +7385,7 @@
       },
       {
         "id": "lower_shaping_bike_shorts",
+        "catalog_category": "normal",
         "prompt": "body-shaping high-waisted bike shorts",
         "reveals_cameltoe": true,
         "tags": [
@@ -7271,6 +7398,7 @@
       },
       {
         "id": "lower_mom_jeans",
+        "catalog_category": "normal",
         "prompt": "casual high-waisted mom jeans",
         "tags": [
           "normal_clothes",
@@ -7286,6 +7414,7 @@
       },
       {
         "id": "lower_bootcut_jeans",
+        "catalog_category": "normal",
         "prompt": "fitted bootcut denim jeans",
         "tags": [
           "normal_clothes",
@@ -7300,6 +7429,7 @@
       },
       {
         "id": "lower_cropped_jeans",
+        "catalog_category": "normal",
         "prompt": "slim cropped ankle jeans",
         "tags": [
           "normal_clothes",
@@ -7315,6 +7445,7 @@
       },
       {
         "id": "lower_denim_culottes",
+        "catalog_category": "normal",
         "prompt": "casual cropped denim culottes",
         "tags": [
           "normal_clothes",
@@ -7329,6 +7460,7 @@
       },
       {
         "id": "lower_corduroy_mini",
+        "catalog_category": "normal",
         "prompt": "simple fitted corduroy mini skirt",
         "tags": [
           "normal_clothes",
@@ -7345,6 +7477,7 @@
       },
       {
         "id": "lower_buttonfront_denim_skirt",
+        "catalog_category": "normal",
         "prompt": "short button-front denim skirt",
         "tags": [
           "normal_clothes",
@@ -7361,6 +7494,7 @@
       },
       {
         "id": "lower_wrap_cotton_mini",
+        "catalog_category": "normal",
         "prompt": "short fitted cotton wrap skirt",
         "tags": [
           "normal_clothes",
@@ -7378,6 +7512,7 @@
       },
       {
         "id": "lower_knit_mini_skirt",
+        "catalog_category": "normal",
         "prompt": "soft fitted knit mini skirt",
         "tags": [
           "normal_clothes",
@@ -7396,6 +7531,7 @@
       },
       {
         "id": "lower_paperbag_shorts",
+        "catalog_category": "normal",
         "prompt": "casual high-waisted paperbag shorts",
         "tags": [
           "normal_clothes",
@@ -7411,6 +7547,7 @@
       },
       {
         "id": "lower_running_shorts",
+        "catalog_category": "normal",
         "prompt": "simple fitted running shorts",
         "tags": [
           "normal_clothes",
@@ -7429,6 +7566,7 @@
       },
       {
         "id": "lower_lounge_dolphin_shorts",
+        "catalog_category": "normal",
         "prompt": "soft cotton dolphin lounge shorts",
         "tags": [
           "normal_clothes",
@@ -7447,6 +7585,7 @@
       },
       {
         "id": "lower_velour_lounge_shorts",
+        "catalog_category": "normal",
         "prompt": "close-fitting velour lounge shorts",
         "tags": [
           "normal_clothes",
@@ -7464,6 +7603,7 @@
       },
       {
         "id": "lower_smooth_yoga_leggings",
+        "catalog_category": "normal",
         "prompt": "smooth high-waisted yoga leggings",
         "reveals_cameltoe": true,
         "tags": [
@@ -7483,6 +7623,7 @@
       },
       {
         "id": "lower_foldover_leggings",
+        "catalog_category": "normal",
         "prompt": "fitted fold-over waist leggings",
         "reveals_cameltoe": true,
         "tags": [
@@ -7501,6 +7642,7 @@
       },
       {
         "id": "bottom_simple_01",
+        "catalog_category": "normal",
         "prompt": "straight-leg everyday jeans",
         "tags": [
           "casual",
@@ -7518,6 +7660,7 @@
       },
       {
         "id": "bottom_simple_02",
+        "catalog_category": "normal",
         "prompt": "plain lightweight jersey shorts",
         "tags": [
           "casual",
@@ -7535,6 +7678,7 @@
       },
       {
         "id": "bottom_simple_03",
+        "catalog_category": "normal",
         "prompt": "soft lounge shorts",
         "tags": [
           "casual",
@@ -7552,6 +7696,7 @@
       },
       {
         "id": "bottom_simple_04",
+        "catalog_category": "normal",
         "prompt": "simple fitted leggings",
         "tags": [
           "casual",
@@ -7569,6 +7714,7 @@
       },
       {
         "id": "bottom_simple_05",
+        "catalog_category": "normal",
         "prompt": "casual denim skirt",
         "tags": [
           "casual",
@@ -7586,6 +7732,7 @@
       },
       {
         "id": "bottom_simple_06",
+        "catalog_category": "normal",
         "prompt": "plain knee-length skirt",
         "tags": [
           "casual",
@@ -7603,6 +7750,7 @@
       },
       {
         "id": "bottom_simple_07",
+        "catalog_category": "normal",
         "prompt": "relaxed jersey trousers",
         "tags": [
           "casual",
@@ -7620,6 +7768,7 @@
       },
       {
         "id": "bottom_simple_08",
+        "catalog_category": "normal",
         "prompt": "high-waisted cotton shorts",
         "tags": [
           "casual",
@@ -7637,6 +7786,7 @@
       },
       {
         "id": "bottom_simple_09",
+        "catalog_category": "normal",
         "prompt": "simple pleated skirt",
         "tags": [
           "casual",
@@ -7654,6 +7804,7 @@
       },
       {
         "id": "bottom_simple_10",
+        "catalog_category": "normal",
         "prompt": "comfortable drawstring pants",
         "tags": [
           "casual",
@@ -7673,6 +7824,7 @@
     "full_body": [
       {
         "id": "dress_sundress",
+        "catalog_category": "normal",
         "prompt": "light fitted sundress",
         "tags": [
           "casual",
@@ -7691,6 +7843,7 @@
       },
       {
         "id": "dress_wrap",
+        "catalog_category": "normal",
         "prompt": "elegant wrap dress",
         "tags": [
           "everyday",
@@ -7708,6 +7861,7 @@
       },
       {
         "id": "dress_cocktail",
+        "catalog_category": "normal",
         "prompt": "fitted cocktail dress",
         "tags": [
           "elegant",
@@ -7727,6 +7881,7 @@
       },
       {
         "id": "dress_evening",
+        "catalog_category": "normal",
         "prompt": "floor-length evening gown",
         "tags": [
           "elegant",
@@ -7745,6 +7900,7 @@
       },
       {
         "id": "dress_slip",
+        "catalog_category": "normal",
         "prompt": "silk slip dress",
         "tags": [
           "silk",
@@ -7764,6 +7920,7 @@
       },
       {
         "id": "dress_bodycon",
+        "catalog_category": "normal",
         "prompt": "close-fitting bodycon mini dress",
         "tags": [
           "erotic",
@@ -7781,6 +7938,7 @@
       },
       {
         "id": "dress_sheer_robe",
+        "catalog_category": "normal",
         "prompt": "sheer lace robe",
       "tags": [
         "sheer",
@@ -7805,6 +7963,7 @@
       },
       {
       "id": "dress_satin_robe",
+      "catalog_category": "normal",
         "prompt": "short satin robe",
       "tags": [
         "silk",
@@ -7828,6 +7987,7 @@
       },
       {
         "id": "dress_home_tshirt",
+        "catalog_category": "normal",
         "prompt": "soft oversized T-shirt dress",
         "tags": [
           "home",
@@ -7847,6 +8007,7 @@
       },
       {
         "id": "dress_knit_home",
+        "catalog_category": "normal",
         "prompt": "soft fitted knit lounge dress",
         "tags": [
           "home",
@@ -7866,6 +8027,7 @@
       },
       {
         "id": "dress_shirt",
+        "catalog_category": "normal",
         "prompt": "fitted button-front shirt dress",
         "tags": [
           "everyday",
@@ -7885,6 +8047,7 @@
       },
       {
         "id": "dress_sweater",
+        "catalog_category": "normal",
         "prompt": "short off-the-shoulder sweater dress",
         "tags": [
           "home",
@@ -7904,6 +8067,7 @@
       },
       {
         "id": "dress_summer_maxi",
+        "catalog_category": "normal",
         "prompt": "flowing backless summer maxi dress",
         "tags": [
           "outdoor",
@@ -7923,6 +8087,7 @@
       },
       {
         "id": "dress_linen",
+        "catalog_category": "normal",
         "prompt": "light belted linen dress",
         "tags": [
           "outdoor",
@@ -7942,6 +8107,7 @@
       },
       {
         "id": "dress_lace_mini",
+        "catalog_category": "normal",
         "prompt": "short fitted lace dress",
         "tags": [
           "lace",
@@ -7964,6 +8130,7 @@
       },
       {
         "id": "dress_mesh_mini",
+        "catalog_category": "normal",
         "prompt": "transparent mesh mini dress",
         "tags": [
           "sheer",
@@ -7985,6 +8152,7 @@
       },
       {
         "id": "dress_sequin_mini",
+        "catalog_category": "normal",
         "prompt": "sparkling backless sequin mini dress",
         "tags": [
           "party",
@@ -8004,6 +8172,7 @@
       },
       {
         "id": "dress_velvet",
+        "catalog_category": "normal",
         "prompt": "deep-plunge velvet cocktail dress",
         "tags": [
           "elegant",
@@ -8023,6 +8192,7 @@
       },
       {
         "id": "dress_satin_cowl",
+        "catalog_category": "normal",
         "prompt": "backless satin cowl-neck dress",
         "tags": [
           "silk",
@@ -8042,6 +8212,7 @@
       },
       {
       "id": "robe_terry_bath",
+      "catalog_category": "normal",
         "prompt": "plush loosely belted terry bathrobe",
       "tags": [
         "home",
@@ -8063,6 +8234,7 @@
       },
       {
       "id": "robe_silk_long",
+      "catalog_category": "normal",
         "prompt": "long flowing silk robe",
       "tags": [
         "silk",
@@ -8088,6 +8260,7 @@
       },
       {
       "id": "robe_lace_open",
+      "catalog_category": "normal",
         "prompt": "open-front transparent lace robe",
       "tags": [
         "lace",
@@ -8113,6 +8286,7 @@
       },
       {
         "id": "nightgown_satin",
+        "catalog_category": "normal",
         "prompt": "long satin nightgown with a high slit",
         "tags": [
           "home",
@@ -8133,6 +8307,7 @@
       },
       {
         "id": "nightgown_sheer",
+        "catalog_category": "normal",
         "prompt": "transparent chiffon babydoll nightgown",
         "tags": [
           "home",
@@ -8156,6 +8331,7 @@
       },
       {
         "id": "bodysuit_lace",
+        "catalog_category": "normal",
         "prompt": "deep-plunge lace bodysuit",
         "tags": [
           "lace",
@@ -8180,6 +8356,7 @@
       },
       {
         "id": "bodysuit_sheer",
+        "catalog_category": "normal",
         "prompt": "transparent sheer mesh bodysuit",
         "tags": [
           "sheer",
@@ -8202,6 +8379,7 @@
       },
       {
         "id": "bodysuit_strappy",
+        "catalog_category": "normal",
         "prompt": "strappy cutout lingerie bodysuit",
         "tags": [
           "lingerie",
@@ -8223,6 +8401,7 @@
       },
       {
         "id": "bodysuit_leather",
+        "catalog_category": "normal",
         "prompt": "fitted leather-look zip-front bodysuit",
         "tags": [
           "leather",
@@ -8240,6 +8419,7 @@
       },
       {
         "id": "swimsuit_classic",
+        "catalog_category": "normal",
         "prompt": "elegant high-cut one-piece swimsuit",
         "tags": [
           "swimwear",
@@ -8259,6 +8439,7 @@
       },
       {
         "id": "swimsuit_plunge",
+        "catalog_category": "normal",
         "prompt": "extreme-plunge high-cut one-piece swimsuit",
         "tags": [
           "swimwear",
@@ -8278,6 +8459,7 @@
       },
       {
         "id": "swimsuit_cutout",
+        "catalog_category": "normal",
         "prompt": "dramatic cutout monokini",
         "tags": [
           "swimwear",
@@ -8297,6 +8479,7 @@
       },
       {
         "id": "swimsuit_micro",
+        "catalog_category": "normal",
         "prompt": "minimal micro one-piece swimsuit",
         "tags": [
           "swimwear",
@@ -8316,6 +8499,7 @@
       },
       {
         "id": "catsuit_fishnet",
+        "catalog_category": "normal",
         "prompt": "open-weave fishnet body stocking",
         "tags": [
           "fishnet",
@@ -8335,6 +8519,7 @@
       },
       {
         "id": "catsuit_lace",
+        "catalog_category": "normal",
         "prompt": "full-body floral lace catsuit",
         "tags": [
           "lace",
@@ -8357,6 +8542,7 @@
       },
       {
         "id": "dress_casual_bodycon_mini",
+        "catalog_category": "normal",
         "prompt": "simple body-hugging cotton mini dress",
         "tags": [
           "normal_clothes",
@@ -8371,6 +8557,7 @@
       },
       {
         "id": "dress_ribbed_tank_mini",
+        "catalog_category": "normal",
         "prompt": "close-fitting ribbed tank mini dress",
         "tags": [
           "normal_clothes",
@@ -8386,6 +8573,7 @@
       },
       {
         "id": "dress_scoopneck_shaping",
+        "catalog_category": "normal",
         "prompt": "body-shaping scoop-neck jersey dress",
         "tags": [
           "normal_clothes",
@@ -8400,6 +8588,7 @@
       },
       {
         "id": "dress_square_neck_mini",
+        "catalog_category": "normal",
         "prompt": "fitted square-neck casual mini dress",
         "tags": [
           "normal_clothes",
@@ -8414,6 +8603,7 @@
       },
       {
         "id": "dress_cotton_shirt_mini",
+        "catalog_category": "normal",
         "prompt": "short fitted cotton shirt dress",
         "tags": [
           "normal_clothes",
@@ -8428,6 +8618,7 @@
       },
       {
         "id": "dress_tshirt_bodycon",
+        "catalog_category": "normal",
         "prompt": "close-fitting short T-shirt dress",
         "tags": [
           "normal_clothes",
@@ -8443,6 +8634,7 @@
       },
       {
         "id": "dress_wrap_jersey_mini",
+        "catalog_category": "normal",
         "prompt": "simple fitted wrap-front jersey mini dress",
         "tags": [
           "normal_clothes",
@@ -8457,6 +8649,7 @@
       },
       {
         "id": "dress_offshoulder_knit_mini",
+        "catalog_category": "normal",
         "prompt": "casual off-shoulder fitted knit mini dress",
         "tags": [
           "normal_clothes",
@@ -8472,6 +8665,7 @@
       },
       {
         "id": "dress_denim_fitted_mini",
+        "catalog_category": "normal",
         "prompt": "short fitted denim dress",
         "tags": [
           "normal_clothes",
@@ -8486,6 +8680,7 @@
       },
       {
         "id": "dress_halter_cotton_mini",
+        "catalog_category": "normal",
         "prompt": "simple body-hugging cotton halter mini dress",
         "tags": [
           "normal_clothes",
@@ -8500,6 +8695,7 @@
       },
       {
         "id": "dress_ribbed_polo_mini",
+        "catalog_category": "normal",
         "prompt": "fitted ribbed polo mini dress",
         "tags": [
           "normal_clothes",
@@ -8521,6 +8717,7 @@
       },
       {
         "id": "dress_buttonfront_jersey",
+        "catalog_category": "normal",
         "prompt": "short fitted button-front jersey dress",
         "tags": [
           "normal_clothes",
@@ -8543,6 +8740,7 @@
       },
       {
         "id": "dress_knit_sweater_mini",
+        "catalog_category": "normal",
         "prompt": "soft close-fitting sweater mini dress",
         "tags": [
           "normal_clothes",
@@ -8565,6 +8763,7 @@
       },
       {
         "id": "dress_denim_buttonfront",
+        "catalog_category": "normal",
         "prompt": "short fitted button-front denim dress",
         "tags": [
           "normal_clothes",
@@ -8585,6 +8784,7 @@
       },
       {
         "id": "dress_cotton_cami_mini",
+        "catalog_category": "normal",
         "prompt": "simple fitted cotton camisole mini dress",
         "tags": [
           "normal_clothes",
@@ -8607,6 +8807,7 @@
       },
       {
         "id": "dress_long_sleeve_jersey_mini",
+        "catalog_category": "normal",
         "prompt": "close-fitting long-sleeve jersey mini dress",
         "tags": [
           "normal_clothes",
@@ -8628,6 +8829,7 @@
       },
       {
         "id": "dress_scoop_tank_midi",
+        "catalog_category": "normal",
         "prompt": "fitted scoop-neck cotton midi dress",
         "tags": [
           "normal_clothes",
@@ -8649,6 +8851,7 @@
       },
       {
         "id": "dress_casual_ruched_mini",
+        "catalog_category": "normal",
         "prompt": "simple ruched jersey mini dress",
         "tags": [
           "normal_clothes",
@@ -8670,6 +8873,7 @@
       },
       {
         "id": "dress_hooded_sweatshirt_mini",
+        "catalog_category": "normal",
         "prompt": "fitted hooded sweatshirt mini dress",
         "tags": [
           "normal_clothes",
@@ -8693,6 +8897,7 @@
       },
       {
         "id": "dress_cotton_wrap_day",
+        "catalog_category": "normal",
         "prompt": "short casual cotton wrap dress",
         "tags": [
           "normal_clothes",
@@ -8714,6 +8919,7 @@
       },
       {
         "id": "dress_simple_01",
+        "catalog_category": "normal",
         "prompt": "simple cotton T-shirt dress",
         "tags": [
           "dress",
@@ -8731,6 +8937,7 @@
       },
       {
         "id": "dress_simple_02",
+        "catalog_category": "normal",
         "prompt": "plain fitted jersey dress",
         "tags": [
           "dress",
@@ -8748,6 +8955,7 @@
       },
       {
         "id": "dress_simple_03",
+        "catalog_category": "normal",
         "prompt": "casual button-front dress",
         "tags": [
           "dress",
@@ -8765,6 +8973,7 @@
       },
       {
         "id": "dress_simple_04",
+        "catalog_category": "normal",
         "prompt": "soft ribbed midi dress",
         "tags": [
           "dress",
@@ -8782,6 +8991,7 @@
       },
       {
         "id": "dress_simple_05",
+        "catalog_category": "normal",
         "prompt": "minimal sleeveless dress",
         "tags": [
           "dress",
@@ -8799,6 +9009,7 @@
       },
       {
         "id": "dress_simple_06",
+        "catalog_category": "normal",
         "prompt": "simple wrap dress",
         "tags": [
           "dress",
@@ -8816,6 +9027,7 @@
       },
       {
         "id": "dress_simple_07",
+        "catalog_category": "normal",
         "prompt": "relaxed sweater dress",
         "tags": [
           "dress",
@@ -8833,6 +9045,7 @@
       },
       {
         "id": "dress_simple_08",
+        "catalog_category": "normal",
         "prompt": "plain tank dress",
         "tags": [
           "dress",
@@ -8850,6 +9063,7 @@
       },
       {
         "id": "dress_simple_09",
+        "catalog_category": "normal",
         "prompt": "casual denim dress",
         "tags": [
           "dress",
@@ -8867,6 +9081,7 @@
       },
       {
         "id": "dress_simple_10",
+        "catalog_category": "normal",
         "prompt": "clean-lined knit dress",
         "tags": [
           "dress",
@@ -8886,6 +9101,7 @@
     "outerwear": [
       {
         "id": "outer_blazer",
+        "catalog_category": "normal",
         "prompt": "tailored blazer",
         "tags": [
           "office",
@@ -8899,6 +9115,7 @@
       },
       {
         "id": "outer_leather_jacket",
+        "catalog_category": "normal",
         "prompt": "fitted leather jacket",
         "tags": [
           "casual",
@@ -8911,6 +9128,7 @@
       },
       {
         "id": "outer_trench",
+        "catalog_category": "normal",
         "prompt": "elegant belted trench coat",
         "tags": [
           "everyday",
@@ -8924,6 +9142,7 @@
       },
       {
         "id": "outer_satin_kimono",
+        "catalog_category": "luxury",
         "prompt": "flowing satin kimono",
         "tags": [
           "home",
@@ -8942,6 +9161,7 @@
       },
       {
         "id": "outer_sheer_robe",
+        "catalog_category": "normal",
         "prompt": "transparent floor-length chiffon robe",
         "tags": [
           "home",
@@ -8959,6 +9179,7 @@
       },
       {
         "id": "outer_lace_robe",
+        "catalog_category": "normal",
         "prompt": "delicate open-front lace robe",
         "tags": [
           "home",
@@ -8975,6 +9196,7 @@
       },
       {
         "id": "outer_cashmere_cardigan",
+        "catalog_category": "normal",
         "prompt": "soft oversized cashmere cardigan",
         "tags": [
           "home",
@@ -8990,6 +9212,7 @@
       },
       {
         "id": "outer_denim_jacket",
+        "catalog_category": "normal",
         "prompt": "cropped fitted denim jacket",
         "tags": [
           "casual",
@@ -9003,6 +9226,7 @@
       },
       {
         "id": "outer_faux_fur",
+        "catalog_category": "luxury",
         "prompt": "plush faux-fur evening wrap",
         "tags": [
           "elegant",
@@ -9018,6 +9242,7 @@
       },
       {
         "id": "outer_silk_shawl",
+        "catalog_category": "normal",
         "prompt": "light silk shoulder shawl",
         "tags": [
           "elegant",
@@ -9034,6 +9259,7 @@
       },
       {
         "id": "outer_pool_coverup",
+        "catalog_category": "normal",
         "prompt": "sheer flowing poolside cover-up",
         "tags": [
           "swimwear",
@@ -9049,6 +9275,7 @@
       },
       {
         "id": "outer_simple_01",
+        "catalog_category": "normal",
         "prompt": "plain zip hoodie",
         "tags": [
           "casual",
@@ -9065,6 +9292,7 @@
       },
       {
         "id": "outer_simple_02",
+        "catalog_category": "normal",
         "prompt": "light everyday cardigan",
         "tags": [
           "casual",
@@ -9081,6 +9309,7 @@
       },
       {
         "id": "outer_simple_03",
+        "catalog_category": "normal",
         "prompt": "simple denim jacket",
         "tags": [
           "casual",
@@ -9097,6 +9326,7 @@
       },
       {
         "id": "outer_simple_04",
+        "catalog_category": "normal",
         "prompt": "unstructured cotton blazer",
         "tags": [
           "casual",
@@ -9113,6 +9343,7 @@
       },
       {
         "id": "outer_simple_05",
+        "catalog_category": "normal",
         "prompt": "soft lounge robe",
         "tags": [
           "casual",
@@ -9129,6 +9360,7 @@
       },
       {
         "id": "outer_simple_06",
+        "catalog_category": "normal",
         "prompt": "light rain jacket",
         "tags": [
           "casual",
@@ -9145,6 +9377,7 @@
       },
       {
         "id": "outer_simple_07",
+        "catalog_category": "normal",
         "prompt": "plain track jacket",
         "tags": [
           "casual",
@@ -9161,6 +9394,7 @@
       },
       {
         "id": "outer_simple_08",
+        "catalog_category": "normal",
         "prompt": "simple knitted cardigan",
         "tags": [
           "casual",
@@ -9179,6 +9413,7 @@
     "bra": [
       {
         "id": "bra_tshirt",
+        "catalog_category": "normal",
         "prompt": "smooth fitted bra",
         "tags": [
           "everyday"
@@ -9195,6 +9430,7 @@
       },
       {
         "id": "bra_balconette_lace",
+        "catalog_category": "normal",
         "prompt": "lace balconette bra",
         "tags": [
           "lace",
@@ -9214,6 +9450,7 @@
       },
       {
         "id": "bra_silk_triangle",
+        "catalog_category": "normal",
         "prompt": "silk triangle bra",
         "tags": [
           "silk",
@@ -9231,6 +9468,7 @@
       },
       {
         "id": "bra_sheer",
+        "catalog_category": "normal",
         "prompt": "sheer mesh bra",
         "tags": [
           "sheer",
@@ -9249,6 +9487,7 @@
       },
       {
         "id": "bra_longline",
+        "catalog_category": "normal",
         "prompt": "structured longline bra",
         "tags": [
           "elegant",
@@ -9266,6 +9505,7 @@
       },
       {
         "id": "bra_cotton_triangle",
+        "catalog_category": "normal",
         "prompt": "soft cotton triangle bra",
         "tags": [
           "everyday",
@@ -9284,6 +9524,7 @@
       },
       {
         "id": "bra_seamless",
+        "catalog_category": "normal",
         "prompt": "seamless lightly padded bra",
         "tags": [
           "everyday"
@@ -9300,6 +9541,7 @@
       },
       {
         "id": "bra_sports",
+        "catalog_category": "normal",
         "prompt": "fitted sports bra",
         "tags": [
           "sporty",
@@ -9319,6 +9561,7 @@
       },
       {
         "id": "bra_soft_bralette",
+        "catalog_category": "normal",
         "prompt": "soft unlined bralette",
         "tags": [
           "home",
@@ -9338,6 +9581,7 @@
       },
       {
         "id": "bra_lace_bralette",
+        "catalog_category": "normal",
         "prompt": "delicate lace bralette",
         "tags": [
           "lace",
@@ -9358,6 +9602,7 @@
       },
       {
         "id": "bra_pushup_lace",
+        "catalog_category": "normal",
         "prompt": "structured lace push-up bra",
         "tags": [
           "lace",
@@ -9378,6 +9623,7 @@
       },
       {
         "id": "bra_demi_cup",
+        "catalog_category": "normal",
         "prompt": "low-cut demi-cup bra",
         "tags": [
           "lingerie",
@@ -9396,6 +9642,7 @@
       },
       {
         "id": "bra_plunge",
+        "catalog_category": "normal",
         "prompt": "extreme-plunge bra",
         "tags": [
           "lingerie",
@@ -9414,6 +9661,7 @@
       },
       {
         "id": "bra_satin_balconette",
+        "catalog_category": "normal",
         "prompt": "smooth satin balconette bra",
         "tags": [
           "silk",
@@ -9433,6 +9681,7 @@
       },
       {
         "id": "bra_embroidered",
+        "catalog_category": "normal",
         "prompt": "embroidered tulle underwire bra",
         "tags": [
           "sheer",
@@ -9452,6 +9701,7 @@
       },
       {
         "id": "bra_mesh_balconette",
+        "catalog_category": "normal",
         "prompt": "transparent mesh balconette bra",
         "tags": [
           "sheer",
@@ -9470,6 +9720,7 @@
       },
       {
         "id": "bra_open_cup",
+        "catalog_category": "normal",
         "prompt": "open-cup underwire bra exposing the breasts",
         "tags": [
           "lingerie",
@@ -9488,6 +9739,7 @@
       },
       {
         "id": "bra_quarter_cup",
+        "catalog_category": "normal",
         "prompt": "minimal quarter-cup bra",
         "tags": [
           "lingerie",
@@ -9506,6 +9758,7 @@
       },
       {
         "id": "bra_strappy_cage",
+        "catalog_category": "normal",
         "prompt": "strappy cage bra",
         "tags": [
           "strappy",
@@ -9525,6 +9778,7 @@
       },
       {
         "id": "bra_leather",
+        "catalog_category": "normal",
         "prompt": "structured leather bra",
         "tags": [
           "leather",
@@ -9542,6 +9796,7 @@
       },
       {
         "id": "bra_vinyl",
+        "catalog_category": "normal",
         "prompt": "glossy vinyl bra",
         "tags": [
           "fetish",
@@ -9560,6 +9815,7 @@
       },
       {
         "id": "bra_front_clasp",
+        "catalog_category": "normal",
         "prompt": "deep-cleavage front-clasp bra",
         "tags": [
           "lingerie",
@@ -9578,6 +9834,7 @@
       },
       {
         "id": "bra_longline_lace",
+        "catalog_category": "normal",
         "prompt": "boned longline lace bra",
         "tags": [
           "lace",
@@ -9598,6 +9855,7 @@
       },
       {
         "id": "bra_pearl_detail",
+        "catalog_category": "luxury",
         "prompt": "sheer bra decorated with delicate pearl straps",
         "tags": [
           "sheer",
@@ -9617,6 +9875,7 @@
       },
       {
         "id": "bra_simple_01",
+        "catalog_category": "normal",
         "prompt": "plain cotton bra",
         "tags": [
           "everyday",
@@ -9633,6 +9892,7 @@
       },
       {
         "id": "bra_simple_02",
+        "catalog_category": "normal",
         "prompt": "smooth everyday T-shirt bra",
         "tags": [
           "everyday",
@@ -9649,6 +9909,7 @@
       },
       {
         "id": "bra_simple_03",
+        "catalog_category": "normal",
         "prompt": "simple wireless bra",
         "tags": [
           "everyday",
@@ -9665,6 +9926,7 @@
       },
       {
         "id": "bra_simple_04",
+        "catalog_category": "normal",
         "prompt": "minimal triangle bra",
         "tags": [
           "everyday",
@@ -9681,6 +9943,7 @@
       },
       {
         "id": "bra_simple_05",
+        "catalog_category": "normal",
         "prompt": "soft ribbed bralette",
         "tags": [
           "everyday",
@@ -9697,6 +9960,7 @@
       },
       {
         "id": "bra_simple_06",
+        "catalog_category": "normal",
         "prompt": "plain demi-cup bra",
         "tags": [
           "everyday",
@@ -9713,6 +9977,7 @@
       },
       {
         "id": "bra_simple_07",
+        "catalog_category": "normal",
         "prompt": "simple balconette bra",
         "tags": [
           "everyday",
@@ -9729,6 +9994,7 @@
       },
       {
         "id": "bra_simple_08",
+        "catalog_category": "normal",
         "prompt": "lightly lined everyday bra",
         "tags": [
           "everyday",
@@ -9747,6 +10013,7 @@
     "panties": [
       {
         "id": "panties_brief",
+        "catalog_category": "normal",
         "prompt": "smooth fitted panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -9764,6 +10031,7 @@
       },
       {
         "id": "panties_lace",
+        "catalog_category": "normal",
         "prompt": "delicate lace panties",
         "tags": [
           "lace",
@@ -9783,6 +10051,7 @@
       },
       {
         "id": "panties_silk",
+        "catalog_category": "normal",
         "prompt": "silk panties",
         "tags": [
           "silk",
@@ -9800,6 +10069,7 @@
       },
       {
         "id": "panties_sheer",
+        "catalog_category": "normal",
         "prompt": "sheer mesh panties",
         "tags": [
           "sheer",
@@ -9818,6 +10088,7 @@
       },
       {
         "id": "panties_thong",
+        "catalog_category": "normal",
         "prompt": "minimal lace thong",
         "tags": [
           "lace",
@@ -9836,6 +10107,7 @@
       },
       {
         "id": "panties_cotton_bikini",
+        "catalog_category": "normal",
         "prompt": "soft cotton bikini panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -9855,6 +10127,7 @@
       },
       {
         "id": "panties_seamless",
+        "catalog_category": "normal",
         "prompt": "seamless low-rise panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -9872,6 +10145,7 @@
       },
       {
         "id": "panties_hipster",
+        "catalog_category": "normal",
         "prompt": "soft fitted hipster panties",
         "tags": [
           "everyday",
@@ -9890,6 +10164,7 @@
       },
       {
         "id": "panties_boyshort",
+        "catalog_category": "normal",
         "prompt": "close-fitting boyshort panties",
         "tags": [
           "home",
@@ -9908,6 +10183,7 @@
       },
       {
         "id": "panties_sport",
+        "catalog_category": "normal",
         "prompt": "athletic seamless briefs",
         "reveals_cameltoe": true,
         "tags": [
@@ -9927,6 +10203,7 @@
       },
       {
         "id": "panties_high_waist",
+        "catalog_category": "normal",
         "prompt": "high-waisted shaping panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -9945,6 +10222,7 @@
       },
       {
         "id": "panties_french_lace",
+        "catalog_category": "normal",
         "prompt": "high-waisted French lace panties",
         "tags": [
           "lace",
@@ -9964,6 +10242,7 @@
       },
       {
         "id": "panties_lace_cheeky",
+        "catalog_category": "normal",
         "prompt": "cheeky-cut lace panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -9984,6 +10263,7 @@
       },
       {
         "id": "panties_brazilian",
+        "catalog_category": "normal",
         "prompt": "Brazilian-cut lace panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -10004,6 +10284,7 @@
       },
       {
         "id": "panties_tanga",
+        "catalog_category": "normal",
         "prompt": "high-cut tanga panties",
         "tags": [
           "lingerie",
@@ -10022,6 +10303,7 @@
       },
       {
         "id": "panties_gstring",
+        "catalog_category": "normal",
         "prompt": "minimal G-string",
         "tags": [
           "lingerie",
@@ -10040,6 +10322,7 @@
       },
       {
         "id": "panties_micro_thong",
+        "catalog_category": "normal",
         "prompt": "extremely minimal micro thong",
         "tags": [
           "lingerie",
@@ -10058,6 +10341,7 @@
       },
       {
         "id": "panties_satin_thong",
+        "catalog_category": "normal",
         "prompt": "smooth satin thong",
         "tags": [
           "silk",
@@ -10077,6 +10361,7 @@
       },
       {
         "id": "panties_silk_tap",
+        "catalog_category": "normal",
         "prompt": "loose silk tap panties",
         "tags": [
           "silk",
@@ -10096,6 +10381,7 @@
       },
       {
         "id": "panties_mesh_bikini",
+        "catalog_category": "normal",
         "prompt": "transparent mesh bikini panties",
         "tags": [
           "sheer",
@@ -10114,6 +10400,7 @@
       },
       {
         "id": "panties_mesh_thong",
+        "catalog_category": "normal",
         "prompt": "transparent mesh thong",
         "tags": [
           "sheer",
@@ -10132,6 +10419,7 @@
       },
       {
         "id": "panties_strappy",
+        "catalog_category": "normal",
         "prompt": "multi-strap cutout panties",
         "tags": [
           "strappy",
@@ -10151,6 +10439,7 @@
       },
       {
         "id": "panties_crotchless_lace",
+        "catalog_category": "normal",
         "prompt": "crotchless lace panties",
         "tags": [
           "lace",
@@ -10171,6 +10460,7 @@
       },
       {
         "id": "panties_open_back",
+        "catalog_category": "normal",
         "prompt": "open-back strappy panties",
         "tags": [
           "strappy",
@@ -10190,6 +10480,7 @@
       },
       {
         "id": "panties_leather",
+        "catalog_category": "normal",
         "prompt": "minimal leather panties",
         "tags": [
           "leather",
@@ -10207,6 +10498,7 @@
       },
       {
         "id": "panties_vinyl",
+        "catalog_category": "normal",
         "prompt": "glossy vinyl thong",
         "tags": [
           "fetish",
@@ -10225,6 +10517,7 @@
       },
       {
         "id": "panties_pearl_string",
+        "catalog_category": "luxury",
         "prompt": "delicate pearl-string thong",
         "tags": [
           "luxury",
@@ -10244,6 +10537,7 @@
       },
       {
         "id": "panties_ruffled",
+        "catalog_category": "normal",
         "prompt": "playful ruffled lace panties",
         "tags": [
           "lace",
@@ -10263,6 +10557,7 @@
       },
       {
         "id": "panties_leopard_thong",
+        "catalog_category": "normal",
         "prompt": "leopard-print thong",
         "tags": [
           "lingerie",
@@ -10278,6 +10573,7 @@
       },
       {
         "id": "panties_lace_bikini",
+        "catalog_category": "normal",
         "prompt": "fine floral-lace bikini panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -10292,6 +10588,7 @@
       },
       {
         "id": "panties_lace_thong_narrow",
+        "catalog_category": "normal",
         "prompt": "narrow delicate lace thong",
         "tags": [
           "lace",
@@ -10305,6 +10602,7 @@
       },
       {
         "id": "panties_lace_tanga_highcut",
+        "catalog_category": "normal",
         "prompt": "high-cut floral-lace tanga panties",
         "tags": [
           "lace",
@@ -10318,6 +10616,7 @@
       },
       {
         "id": "panties_lace_lowrise",
+        "catalog_category": "normal",
         "prompt": "low-rise scalloped lace panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -10332,6 +10631,7 @@
       },
       {
         "id": "panties_lace_highleg",
+        "catalog_category": "normal",
         "prompt": "high-leg transparent lace panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -10347,6 +10647,7 @@
       },
       {
         "id": "panties_lace_string",
+        "catalog_category": "normal",
         "prompt": "thin side-string lace panties",
         "tags": [
           "lace",
@@ -10360,6 +10661,7 @@
       },
       {
         "id": "panties_lace_bow",
+        "catalog_category": "normal",
         "prompt": "lace panties with small side bows",
         "tags": [
           "lace",
@@ -10373,6 +10675,7 @@
       },
       {
         "id": "panties_lace_embroidered",
+        "catalog_category": "normal",
         "prompt": "embroidered lace mesh panties",
         "tags": [
           "lace",
@@ -10387,6 +10690,7 @@
       },
       {
         "id": "panties_lace_vfront",
+        "catalog_category": "normal",
         "prompt": "low V-front lace panties",
         "tags": [
           "lace",
@@ -10400,6 +10704,7 @@
       },
       {
         "id": "panties_lace_cheeky_bow",
+        "catalog_category": "normal",
         "prompt": "cheeky lace panties with a back bow",
         "tags": [
           "lace",
@@ -10413,6 +10718,7 @@
       },
       {
         "id": "panties_sheer_lace_brazilian",
+        "catalog_category": "normal",
         "prompt": "sheer Brazilian lace panties",
         "tags": [
           "lace",
@@ -10427,6 +10733,7 @@
       },
       {
         "id": "panties_cotton_thong",
+        "catalog_category": "normal",
         "prompt": "simple cotton thong",
         "reveals_cameltoe": true,
         "tags": [
@@ -10441,6 +10748,7 @@
       },
       {
         "id": "panties_ribbed_bikini",
+        "catalog_category": "normal",
         "prompt": "soft ribbed bikini panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -10454,6 +10762,7 @@
       },
       {
         "id": "panties_modal_cheeky",
+        "catalog_category": "normal",
         "prompt": "soft modal cheeky panties",
         "reveals_cameltoe": true,
         "tags": [
@@ -10467,6 +10776,7 @@
       },
       {
         "id": "panties_satin_bikini",
+        "catalog_category": "normal",
         "prompt": "smooth satin bikini panties",
         "tags": [
           "silk",
@@ -10480,6 +10790,7 @@
       },
       {
         "id": "panties_simple_01",
+        "catalog_category": "normal",
         "prompt": "plain cotton briefs",
         "tags": [
           "everyday"
@@ -10495,6 +10806,7 @@
       },
       {
         "id": "panties_simple_02",
+        "catalog_category": "normal",
         "prompt": "simple bikini panties",
         "tags": [
           "everyday"
@@ -10510,6 +10822,7 @@
       },
       {
         "id": "panties_simple_03",
+        "catalog_category": "normal",
         "prompt": "smooth hipster panties",
         "tags": [
           "everyday"
@@ -10525,6 +10838,7 @@
       },
       {
         "id": "panties_simple_04",
+        "catalog_category": "normal",
         "prompt": "soft high-waisted panties",
         "tags": [
           "everyday"
@@ -10540,6 +10854,7 @@
       },
       {
         "id": "panties_simple_05",
+        "catalog_category": "normal",
         "prompt": "minimal seamless thong",
         "tags": [
           "everyday"
@@ -10555,6 +10870,7 @@
       },
       {
         "id": "panties_simple_06",
+        "catalog_category": "normal",
         "prompt": "plain cheeky panties",
         "tags": [
           "everyday"
@@ -10570,6 +10886,7 @@
       },
       {
         "id": "panties_simple_07",
+        "catalog_category": "normal",
         "prompt": "simple boyshort panties",
         "tags": [
           "everyday"
@@ -10585,6 +10902,7 @@
       },
       {
         "id": "panties_simple_08",
+        "catalog_category": "normal",
         "prompt": "soft ribbed panties",
         "tags": [
           "everyday"
@@ -10600,6 +10918,7 @@
       },
       {
         "id": "panties_simple_09",
+        "catalog_category": "normal",
         "prompt": "minimal high-cut panties",
         "tags": [
           "everyday"
@@ -10615,6 +10934,7 @@
       },
       {
         "id": "panties_simple_10",
+        "catalog_category": "normal",
         "prompt": "smooth low-rise panties",
         "tags": [
           "everyday"
@@ -10632,6 +10952,7 @@
     "legwear": [
       {
         "id": "legwear_sheer_pantyhose",
+        "catalog_category": "normal",
         "prompt": "sheer pantyhose",
         "tags": [
           "pantyhose",
@@ -10646,6 +10967,7 @@
       },
       {
         "id": "legwear_opaque_tights",
+        "catalog_category": "normal",
         "prompt": "opaque tights",
         "tags": [
           "pantyhose",
@@ -10659,6 +10981,7 @@
       },
       {
         "id": "legwear_lace_stockings",
+        "catalog_category": "normal",
         "prompt": "lace-top thigh-high stockings",
         "tags": [
           "stockings",
@@ -10676,6 +10999,7 @@
       },
       {
         "id": "legwear_silk_stockings",
+        "catalog_category": "normal",
         "prompt": "silky thigh-high stockings",
         "tags": [
           "stockings",
@@ -10693,6 +11017,7 @@
       },
       {
         "id": "legwear_fishnet",
+        "catalog_category": "normal",
         "prompt": "fine fishnet stockings",
         "tags": [
           "stockings",
@@ -10705,6 +11030,7 @@
       },
       {
         "id": "legwear_garter_stockings",
+        "catalog_category": "normal",
         "prompt": "stockings attached to a garter belt",
         "tags": [
           "stockings",
@@ -10719,6 +11045,7 @@
       },
       {
         "id": "legwear_ultrasheer_pantyhose",
+        "catalog_category": "normal",
         "prompt": "ultra-sheer glossy pantyhose",
         "tags": [
           "pantyhose",
@@ -10734,6 +11061,7 @@
       },
       {
         "id": "legwear_backseam_pantyhose",
+        "catalog_category": "normal",
         "prompt": "sheer back-seam pantyhose",
         "tags": [
           "pantyhose",
@@ -10748,6 +11076,7 @@
       },
       {
         "id": "legwear_highwaist_pantyhose",
+        "catalog_category": "normal",
         "prompt": "silky high-waisted pantyhose",
         "tags": [
           "pantyhose",
@@ -10762,6 +11091,7 @@
       },
       {
         "id": "legwear_open_pantyhose",
+        "catalog_category": "normal",
         "prompt": "open-crotch sheer pantyhose",
         "tags": [
           "pantyhose",
@@ -10777,6 +11107,7 @@
       },
       {
         "id": "legwear_fishnet_pantyhose",
+        "catalog_category": "normal",
         "prompt": "classic fine fishnet pantyhose",
         "tags": [
           "pantyhose",
@@ -10791,6 +11122,7 @@
       },
       {
         "id": "legwear_large_fishnet",
+        "catalog_category": "normal",
         "prompt": "bold wide-mesh fishnet tights",
         "tags": [
           "pantyhose",
@@ -10805,6 +11137,7 @@
       },
       {
         "id": "legwear_rhinestone_fishnet",
+        "catalog_category": "luxury",
         "prompt": "rhinestone-studded fishnet tights",
         "tags": [
           "pantyhose",
@@ -10820,6 +11153,7 @@
       },
       {
         "id": "legwear_floral_lace_tights",
+        "catalog_category": "normal",
         "prompt": "intricate floral lace tights",
         "tags": [
           "pantyhose",
@@ -10835,6 +11169,7 @@
       },
       {
         "id": "legwear_dot_tights",
+        "catalog_category": "normal",
         "prompt": "sheer polka-dot tights",
         "tags": [
           "pantyhose",
@@ -10848,6 +11183,7 @@
       },
       {
         "id": "legwear_bow_tights",
+        "catalog_category": "normal",
         "prompt": "sheer tights with satin bows at the back",
         "tags": [
           "pantyhose",
@@ -10862,6 +11198,7 @@
       },
       {
         "id": "legwear_sheer_thighhigh",
+        "catalog_category": "normal",
         "prompt": "minimal sheer thigh-high stockings",
         "tags": [
           "stockings",
@@ -10877,6 +11214,7 @@
       },
       {
         "id": "legwear_satinband_thighhigh",
+        "catalog_category": "normal",
         "prompt": "thigh-high stockings with wide satin bands",
         "tags": [
           "stockings",
@@ -10893,6 +11231,7 @@
       },
       {
         "id": "legwear_bow_thighhigh",
+        "catalog_category": "normal",
         "prompt": "thigh-high stockings finished with small bows",
         "tags": [
           "stockings",
@@ -10909,6 +11248,7 @@
       },
       {
         "id": "legwear_fishnet_thighhigh",
+        "catalog_category": "normal",
         "prompt": "fishnet thigh-high stockings",
         "tags": [
           "stockings",
@@ -10924,6 +11264,7 @@
       },
       {
         "id": "legwear_wide_lace_thighhigh",
+        "catalog_category": "normal",
         "prompt": "thigh-high stockings with broad floral lace tops",
         "tags": [
           "stockings",
@@ -10943,6 +11284,7 @@
       },
       {
         "id": "legwear_backseam_stockings",
+        "catalog_category": "normal",
         "prompt": "vintage back-seam garter stockings",
         "tags": [
           "stockings",
@@ -10958,6 +11300,7 @@
       },
       {
         "id": "legwear_glossy_stockings",
+        "catalog_category": "normal",
         "prompt": "glossy high-shine thigh stockings",
         "tags": [
           "stockings",
@@ -10972,6 +11315,7 @@
       },
       {
         "id": "legwear_white_kneesocks",
+        "catalog_category": "normal",
         "prompt": "soft white knee-high socks",
         "tags": [
           "socks",
@@ -10986,6 +11330,7 @@
       },
       {
         "id": "legwear_ribbed_kneesocks",
+        "catalog_category": "normal",
         "prompt": "ribbed knee-high socks",
         "tags": [
           "socks",
@@ -11001,6 +11346,7 @@
       },
       {
         "id": "legwear_overknee_socks",
+        "catalog_category": "normal",
         "prompt": "soft over-the-knee socks",
         "tags": [
           "socks",
@@ -11017,6 +11363,7 @@
       },
       {
         "id": "legwear_slouch_socks",
+        "catalog_category": "normal",
         "prompt": "casually slouched ankle socks",
         "tags": [
           "socks",
@@ -11032,6 +11379,7 @@
       },
       {
         "id": "legwear_lace_anklets",
+        "catalog_category": "normal",
         "prompt": "delicate lace-trimmed ankle socks",
         "tags": [
           "socks",
@@ -11047,6 +11395,7 @@
       },
       {
         "id": "legwear_cashmere_socks",
+        "catalog_category": "luxury",
         "prompt": "luxuriously soft cashmere knee socks",
         "tags": [
           "socks",
@@ -11063,6 +11412,7 @@
       },
       {
         "id": "legwear_leather_thighs",
+        "catalog_category": "normal",
         "prompt": "fitted leather thigh-high stockings",
         "tags": [
           "stockings",
@@ -11078,6 +11428,7 @@
       },
       {
         "id": "legwear_vinyl_thighs",
+        "catalog_category": "normal",
         "prompt": "glossy vinyl thigh-high stockings",
         "tags": [
           "stockings",
@@ -11092,6 +11443,7 @@
       },
       {
         "id": "legwear_simple_01",
+        "catalog_category": "normal",
         "prompt": "plain ankle socks",
         "tags": [
           "socks",
@@ -11108,6 +11460,7 @@
       },
       {
         "id": "legwear_simple_02",
+        "catalog_category": "normal",
         "prompt": "soft knee-high socks",
         "tags": [
           "socks",
@@ -11124,6 +11477,7 @@
       },
       {
         "id": "legwear_simple_03",
+        "catalog_category": "normal",
         "prompt": "simple opaque tights",
         "tags": [
           "socks",
@@ -11140,6 +11494,7 @@
       },
       {
         "id": "legwear_simple_04",
+        "catalog_category": "normal",
         "prompt": "plain sheer pantyhose",
         "tags": [
           "socks",
@@ -11156,6 +11511,7 @@
       },
       {
         "id": "legwear_simple_05",
+        "catalog_category": "normal",
         "prompt": "basic thigh-high stockings",
         "tags": [
           "socks",
@@ -11172,6 +11528,7 @@
       },
       {
         "id": "legwear_simple_06",
+        "catalog_category": "normal",
         "prompt": "ribbed crew socks",
         "tags": [
           "socks",
@@ -11188,6 +11545,7 @@
       },
       {
         "id": "legwear_simple_07",
+        "catalog_category": "normal",
         "prompt": "soft over-knee socks",
         "tags": [
           "socks",
@@ -11204,6 +11562,7 @@
       },
       {
         "id": "legwear_simple_08",
+        "catalog_category": "normal",
         "prompt": "minimal sheer stockings",
         "tags": [
           "socks",
@@ -11222,6 +11581,7 @@
     "footwear": [
       {
         "id": "shoes_sneakers",
+        "catalog_category": "normal",
         "prompt": "clean low-top sneakers",
         "tags": [
           "casual",
@@ -11236,6 +11596,7 @@
       },
       {
         "id": "shoes_pumps",
+        "catalog_category": "normal",
         "prompt": "classic high-heeled pumps",
         "tags": [
           "elegant",
@@ -11249,6 +11610,7 @@
       },
       {
         "id": "shoes_stilettos",
+        "catalog_category": "normal",
         "prompt": "slender stiletto heels",
         "tags": [
           "elegant",
@@ -11262,6 +11624,7 @@
       },
       {
         "id": "shoes_ankle_boots",
+        "catalog_category": "normal",
         "prompt": "heeled ankle boots",
         "tags": [
           "casual",
@@ -11274,6 +11637,7 @@
       },
       {
         "id": "shoes_strappy_heels",
+        "catalog_category": "normal",
         "prompt": "delicate strappy heels",
         "tags": [
           "boudoir",
@@ -11287,6 +11651,7 @@
       },
       {
         "id": "shoes_kitten_heels",
+        "catalog_category": "normal",
         "prompt": "delicate pointed kitten heels",
         "tags": [
           "elegant",
@@ -11301,6 +11666,7 @@
       },
       {
         "id": "shoes_slingback",
+        "catalog_category": "normal",
         "prompt": "elegant slingback heels",
         "tags": [
           "elegant",
@@ -11315,6 +11681,7 @@
       },
       {
         "id": "shoes_platform_pumps",
+        "catalog_category": "normal",
         "prompt": "high platform pumps",
         "tags": [
           "elegant",
@@ -11329,6 +11696,7 @@
       },
       {
         "id": "shoes_platform_stilettos",
+        "catalog_category": "normal",
         "prompt": "extreme platform stiletto heels",
         "tags": [
           "erotic",
@@ -11344,6 +11712,7 @@
       },
       {
         "id": "shoes_peep_toe",
+        "catalog_category": "normal",
         "prompt": "high peep-toe heels",
         "tags": [
           "elegant",
@@ -11358,6 +11727,7 @@
       },
       {
         "id": "shoes_mule_heels",
+        "catalog_category": "normal",
         "prompt": "open-back high-heeled mules",
         "tags": [
           "home",
@@ -11373,6 +11743,7 @@
       },
       {
         "id": "shoes_boudoir_mules",
+        "catalog_category": "luxury",
         "prompt": "feather-trimmed boudoir mules",
         "tags": [
           "boudoir",
@@ -11388,6 +11759,7 @@
       },
       {
         "id": "shoes_clear_heels",
+        "catalog_category": "normal",
         "prompt": "transparent high platform heels",
         "tags": [
           "erotic",
@@ -11400,6 +11772,7 @@
       },
       {
         "id": "shoes_laceup_heels",
+        "catalog_category": "normal",
         "prompt": "lace-up high heels wrapping around the ankles",
         "tags": [
           "elegant",
@@ -11413,6 +11786,7 @@
       },
       {
         "id": "shoes_tbar_heels",
+        "catalog_category": "normal",
         "prompt": "vintage T-bar high heels",
         "tags": [
           "elegant",
@@ -11426,6 +11800,7 @@
       },
       {
         "id": "shoes_thigh_boots",
+        "catalog_category": "normal",
         "prompt": "high-heeled thigh-high boots",
         "tags": [
           "erotic",
@@ -11440,6 +11815,7 @@
       },
       {
         "id": "shoes_knee_boots",
+        "catalog_category": "normal",
         "prompt": "fitted high-heeled knee boots",
         "tags": [
           "outdoor",
@@ -11454,6 +11830,7 @@
       },
       {
         "id": "shoes_heeled_sandals",
+        "catalog_category": "normal",
         "prompt": "minimal high-heeled sandals",
         "tags": [
           "outdoor",
@@ -11469,6 +11846,7 @@
       },
       {
         "id": "shoes_espadrilles",
+        "catalog_category": "normal",
         "prompt": "high wedge espadrilles",
         "tags": [
           "outdoor",
@@ -11483,6 +11861,7 @@
       },
       {
         "id": "shoes_ballet_flats",
+        "catalog_category": "normal",
         "prompt": "delicate ballet flats",
         "tags": [
           "home",
@@ -11497,6 +11876,7 @@
       },
       {
         "id": "shoes_barefoot",
+        "catalog_category": "normal",
         "prompt": "bare feet with neatly polished toes",
         "tags": [
           "home",
@@ -11507,6 +11887,7 @@
       },
       {
         "id": "shoes_satin_slippers",
+        "catalog_category": "normal",
         "prompt": "delicate satin bedroom slippers",
         "tags": [
           "home",
@@ -11521,6 +11902,7 @@
       },
       {
         "id": "shoes_canvas_sneakers",
+        "catalog_category": "normal",
         "prompt": "simple low-top canvas sneakers",
         "tags": [
           "normal_clothes",
@@ -11536,6 +11918,7 @@
       },
       {
         "id": "shoes_retro_trainers",
+        "catalog_category": "normal",
         "prompt": "clean retro casual trainers",
         "tags": [
           "normal_clothes",
@@ -11552,6 +11935,7 @@
       },
       {
         "id": "shoes_slipon_sneakers",
+        "catalog_category": "normal",
         "prompt": "plain canvas slip-on sneakers",
         "tags": [
           "normal_clothes",
@@ -11567,6 +11951,7 @@
       },
       {
         "id": "shoes_casual_loafers",
+        "catalog_category": "normal",
         "prompt": "simple flat casual loafers",
         "tags": [
           "normal_clothes",
@@ -11582,6 +11967,7 @@
       },
       {
         "id": "shoes_maryjane_flats",
+        "catalog_category": "normal",
         "prompt": "simple flat Mary Jane shoes",
         "tags": [
           "normal_clothes",
@@ -11597,6 +11983,7 @@
       },
       {
         "id": "shoes_flat_sandals",
+        "catalog_category": "normal",
         "prompt": "minimal flat leather sandals",
         "tags": [
           "normal_clothes",
@@ -11613,6 +12000,7 @@
       },
       {
         "id": "shoes_casual_ankle_boots",
+        "catalog_category": "normal",
         "prompt": "simple low-heeled ankle boots",
         "tags": [
           "normal_clothes",
@@ -11628,6 +12016,7 @@
       },
       {
         "id": "shoes_house_slides",
+        "catalog_category": "normal",
         "prompt": "simple soft house slides",
         "tags": [
           "normal_clothes",
@@ -11644,6 +12033,7 @@
       },
       {
         "id": "shoes_simple_01",
+        "catalog_category": "normal",
         "prompt": "plain white canvas sneakers",
         "tags": [
           "casual",
@@ -11661,6 +12051,7 @@
       },
       {
         "id": "shoes_simple_02",
+        "catalog_category": "normal",
         "prompt": "simple black ballet flats",
         "tags": [
           "casual",
@@ -11678,6 +12069,7 @@
       },
       {
         "id": "shoes_simple_03",
+        "catalog_category": "normal",
         "prompt": "low block-heel pumps",
         "tags": [
           "casual",
@@ -11695,6 +12087,7 @@
       },
       {
         "id": "shoes_simple_04",
+        "catalog_category": "normal",
         "prompt": "minimal leather loafers",
         "tags": [
           "casual",
@@ -11712,6 +12105,7 @@
       },
       {
         "id": "shoes_simple_05",
+        "catalog_category": "normal",
         "prompt": "soft house slippers",
         "tags": [
           "casual",
@@ -11729,6 +12123,7 @@
       },
       {
         "id": "shoes_simple_06",
+        "catalog_category": "normal",
         "prompt": "basic ankle boots",
         "tags": [
           "casual",
@@ -11746,6 +12141,7 @@
       },
       {
         "id": "shoes_simple_07",
+        "catalog_category": "normal",
         "prompt": "simple flat sandals",
         "tags": [
           "casual",
@@ -11763,6 +12159,7 @@
       },
       {
         "id": "shoes_simple_08",
+        "catalog_category": "normal",
         "prompt": "clean running shoes",
         "tags": [
           "casual",
@@ -11780,6 +12177,7 @@
       },
       {
         "id": "shoes_simple_09",
+        "catalog_category": "normal",
         "prompt": "low kitten heels",
         "tags": [
           "casual",
@@ -11797,6 +12195,7 @@
       },
       {
         "id": "shoes_simple_10",
+        "catalog_category": "normal",
         "prompt": "plain court shoes",
         "tags": [
           "casual",
@@ -11814,6 +12213,7 @@
       },
       {
         "id": "shoes_simple_11",
+        "catalog_category": "normal",
         "prompt": "casual slip-on sneakers",
         "tags": [
           "casual",
@@ -11831,6 +12231,7 @@
       },
       {
         "id": "shoes_simple_12",
+        "catalog_category": "normal",
         "prompt": "simple suede flats",
         "tags": [
           "casual",
@@ -11848,6 +12249,7 @@
       },
       {
         "id": "shoes_simple_13",
+        "catalog_category": "normal",
         "prompt": "minimal strappy heels",
         "tags": [
           "casual",
@@ -11865,6 +12267,7 @@
       },
       {
         "id": "shoes_simple_14",
+        "catalog_category": "normal",
         "prompt": "comfortable platform sandals",
         "tags": [
           "casual",
@@ -11882,6 +12285,7 @@
       },
       {
         "id": "shoes_simple_15",
+        "catalog_category": "normal",
         "prompt": "plain leather sneakers",
         "tags": [
           "casual",
@@ -11899,6 +12303,7 @@
       },
       {
         "id": "shoes_simple_16",
+        "catalog_category": "normal",
         "prompt": "soft moccasin slippers",
         "tags": [
           "casual",
@@ -11916,6 +12321,7 @@
       },
       {
         "id": "shoes_simple_17",
+        "catalog_category": "normal",
         "prompt": "simple heeled ankle boots",
         "tags": [
           "casual",
@@ -11933,6 +12339,7 @@
       },
       {
         "id": "shoes_simple_18",
+        "catalog_category": "normal",
         "prompt": "basic rubber slides",
         "tags": [
           "casual",
@@ -11952,6 +12359,7 @@
     "accessories": [
       {
         "id": "accessory_pearl_necklace",
+        "catalog_category": "normal",
         "prompt": "delicate pearl necklace",
         "tags": [
           "elegant",
@@ -11964,6 +12372,7 @@
       },
       {
         "id": "accessory_choker",
+        "catalog_category": "normal",
         "prompt": "slim velvet choker",
         "tags": [
           "boudoir",
@@ -11976,6 +12385,7 @@
       },
       {
         "id": "accessory_earrings",
+        "catalog_category": "normal",
         "prompt": "elegant drop earrings",
         "tags": [
           "elegant"
@@ -11983,6 +12393,7 @@
       },
       {
         "id": "accessory_garter_belt",
+        "catalog_category": "normal",
         "prompt": "lace garter belt",
         "tags": [
           "garter",
@@ -12000,6 +12411,7 @@
       },
       {
         "id": "accessory_body_chain",
+        "catalog_category": "luxury",
         "prompt": "delicate gold body chain tracing the waist",
         "tags": [
           "erotic",
@@ -12013,6 +12425,7 @@
       },
       {
         "id": "accessory_anklet",
+        "catalog_category": "normal",
         "prompt": "fine gleaming ankle chain",
         "tags": [
           "casual",
@@ -12026,6 +12439,7 @@
       },
       {
         "id": "accessory_hoop_earrings",
+        "catalog_category": "normal",
         "prompt": "polished oversized hoop earrings",
         "tags": [
           "casual",
@@ -12039,6 +12453,7 @@
       },
       {
         "id": "accessory_diamond_studs",
+        "catalog_category": "luxury",
         "prompt": "small brilliant diamond stud earrings",
         "tags": [
           "elegant",
@@ -12048,6 +12463,7 @@
       },
       {
         "id": "accessory_layered_necklaces",
+        "catalog_category": "normal",
         "prompt": "layered fine necklaces",
         "tags": [
           "casual",
@@ -12061,6 +12477,7 @@
       },
       {
         "id": "accessory_silk_hair_ribbon",
+        "catalog_category": "normal",
         "prompt": "silk ribbon tied elegantly in her hair",
         "tags": [
           "romantic",
@@ -12077,6 +12494,7 @@
       },
       {
         "id": "accessory_wide_brim_hat",
+        "catalog_category": "normal",
         "prompt": "elegant wide-brim sun hat",
         "tags": [
           "outdoor",
@@ -12092,6 +12510,7 @@
       },
       {
         "id": "accessory_sunglasses",
+        "catalog_category": "normal",
         "prompt": "luxury cat-eye sunglasses",
         "tags": [
           "outdoor",
@@ -12108,6 +12527,7 @@
       },
       {
         "id": "accessory_opera_gloves",
+        "catalog_category": "normal",
         "prompt": "long satin opera gloves",
         "tags": [
           "formal",
@@ -12123,6 +12543,7 @@
       },
       {
         "id": "accessory_lace_gloves",
+        "catalog_category": "normal",
         "prompt": "delicate wrist-length lace gloves",
         "tags": [
           "boudoir",
@@ -12137,6 +12558,7 @@
       },
       {
         "id": "accessory_waist_chain",
+        "catalog_category": "normal",
         "prompt": "fine jeweled chain resting low on the hips",
         "tags": [
           "erotic",
@@ -12150,6 +12572,7 @@
       },
       {
         "id": "accessory_leg_garters",
+        "catalog_category": "normal",
         "prompt": "matching decorative lace thigh garters",
         "tags": [
           "garter",
@@ -12169,6 +12592,7 @@
       },
       {
         "id": "accessory_leather_choker",
+        "catalog_category": "normal",
         "prompt": "sleek fitted leather choker",
         "tags": [
           "fetish",
@@ -12182,6 +12606,7 @@
       },
       {
         "id": "accessory_pearl_body_chain",
+        "catalog_category": "luxury",
         "prompt": "luxurious strands of pearls draped across the torso",
         "tags": [
           "boudoir",
@@ -12195,6 +12620,7 @@
       },
       {
         "id": "accessory_simple_01",
+        "catalog_category": "normal",
         "prompt": "small hoop earrings",
         "tags": [
           "everyday"
@@ -12210,6 +12636,7 @@
       },
       {
         "id": "accessory_simple_02",
+        "catalog_category": "normal",
         "prompt": "fine chain necklace",
         "tags": [
           "everyday"
@@ -12225,6 +12652,7 @@
       },
       {
         "id": "accessory_simple_03",
+        "catalog_category": "normal",
         "prompt": "simple wristwatch",
         "tags": [
           "everyday"
@@ -12240,6 +12668,7 @@
       },
       {
         "id": "accessory_simple_04",
+        "catalog_category": "normal",
         "prompt": "thin leather belt",
         "tags": [
           "everyday"
@@ -12255,6 +12684,7 @@
       },
       {
         "id": "accessory_simple_05",
+        "catalog_category": "normal",
         "prompt": "minimal stud earrings",
         "tags": [
           "everyday"
@@ -12270,6 +12700,7 @@
       },
       {
         "id": "accessory_simple_06",
+        "catalog_category": "normal",
         "prompt": "soft fabric headband",
         "tags": [
           "everyday"
@@ -12285,6 +12716,7 @@
       },
       {
         "id": "accessory_simple_07",
+        "catalog_category": "normal",
         "prompt": "delicate ankle chain",
         "tags": [
           "everyday"
@@ -12300,6 +12732,7 @@
       },
       {
         "id": "accessory_simple_08",
+        "catalog_category": "normal",
         "prompt": "plain hair clip",
         "tags": [
           "everyday"
@@ -12318,7 +12751,8 @@
   "outfit_templates": [
     {
       "id": "template_everyday_casual",
-      "wardrobe_category": "normal",
+      "catalog_category": "normal",
+      "catalog_category": "normal",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -12413,7 +12847,8 @@
     },
     {
       "id": "template_office_elegant",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -12512,7 +12947,8 @@
     },
     {
       "id": "template_cocktail_dress",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -12595,7 +13031,8 @@
     },
     {
       "id": "template_evening_gown",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -12677,7 +13114,8 @@
     },
     {
       "id": "template_romantic_bedroom",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -12751,7 +13189,8 @@
     },
     {
       "id": "template_classic_boudoir",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "bra": {
@@ -12843,7 +13282,8 @@
     },
     {
       "id": "template_stockings_garter",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "slots": {
         "bra": {
           "catalog": "bra",
@@ -12933,7 +13373,8 @@
     },
     {
       "id": "template_progressive_undressing",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -13048,7 +13489,8 @@
     },
     {
       "id": "template_nude_studio",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -13102,7 +13544,8 @@
     },
     {
       "id": "template_explicit_solo",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -13201,7 +13644,8 @@
     },
     {
       "id": "template_cozy_home",
-      "wardrobe_category": "normal",
+      "catalog_category": "normal",
+      "catalog_category": "normal",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -13287,7 +13731,8 @@
     },
     {
       "id": "template_sexy_casual_dress",
-      "wardrobe_category": "normal",
+      "catalog_category": "normal",
+      "catalog_category": "normal",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -13378,7 +13823,8 @@
     },
     {
       "id": "template_bathrobe_private",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -13447,7 +13893,8 @@
     },
     {
       "id": "template_private_garden",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -13513,7 +13960,8 @@
     },
     {
       "id": "template_poolside_swimwear",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -13574,7 +14022,8 @@
     },
     {
       "id": "template_luxury_lingerie",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "bra": {
@@ -13661,7 +14110,8 @@
     },
     {
       "id": "template_fishnet_fetish",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -13737,7 +14187,8 @@
     },
     {
       "id": "template_leather_editorial",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "slots": {
         "upperwear": {
           "catalog": "upperwear",
@@ -13823,7 +14274,8 @@
     },
     {
       "id": "template_playful_socks",
-      "wardrobe_category": "glamour",
+      "catalog_category": "luxury",
+      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -17502,6 +17954,7 @@
   "interiors": [
     {
       "id": "interior_modern_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a refined modern bedroom",
       "tags": [
         "indoor",
@@ -17511,6 +17964,7 @@
     },
     {
       "id": "interior_hotel_suite",
+      "catalog_category": "luxury",
       "prompt": "inside an elegant luxury hotel suite",
       "tags": [
         "indoor",
@@ -17520,6 +17974,7 @@
     },
     {
       "id": "interior_photo_studio",
+      "catalog_category": "normal",
       "prompt": "inside a professional minimalist photo studio",
       "tags": [
         "indoor",
@@ -17528,6 +17983,7 @@
     },
     {
       "id": "interior_living_room",
+      "catalog_category": "normal",
       "prompt": "inside a stylish contemporary living room",
       "tags": [
         "indoor",
@@ -17536,6 +17992,7 @@
     },
     {
       "id": "interior_loft",
+      "catalog_category": "normal",
       "prompt": "inside a spacious sunlit loft",
       "tags": [
         "indoor",
@@ -17545,6 +18002,7 @@
     },
     {
       "id": "interior_boudoir_room",
+      "catalog_category": "luxury",
       "prompt": "inside a luxurious intimate boudoir room",
       "tags": [
         "indoor",
@@ -17555,6 +18013,7 @@
     },
     {
       "id": "interior_master_bedroom",
+      "catalog_category": "luxury",
       "prompt": "inside a spacious private master bedroom with layered linens",
       "tags": [
         "indoor",
@@ -17565,6 +18024,7 @@
     },
     {
       "id": "interior_cottage_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a cozy secluded cottage bedroom",
       "tags": [
         "indoor",
@@ -17575,6 +18035,7 @@
     },
     {
       "id": "interior_attic_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a warm private attic bedroom beneath timber beams",
       "tags": [
         "indoor",
@@ -17585,6 +18046,7 @@
     },
     {
       "id": "interior_villa_suite",
+      "catalog_category": "luxury",
       "prompt": "inside an opulent private villa suite",
       "tags": [
         "indoor",
@@ -17595,6 +18057,7 @@
     },
     {
       "id": "interior_penthouse_lounge",
+      "catalog_category": "luxury",
       "prompt": "inside a secluded luxury penthouse lounge",
       "tags": [
         "indoor",
@@ -17605,6 +18068,7 @@
     },
     {
       "id": "interior_fireplace_lounge",
+      "catalog_category": "normal",
       "prompt": "inside a private lounge warmed by a modern fireplace",
       "tags": [
         "indoor",
@@ -17615,6 +18079,7 @@
     },
     {
       "id": "interior_sunroom",
+      "catalog_category": "normal",
       "prompt": "inside a bright private sunroom filled with soft daylight",
       "tags": [
         "indoor",
@@ -17625,6 +18090,7 @@
     },
     {
       "id": "interior_conservatory",
+      "catalog_category": "luxury",
       "prompt": "inside a secluded glass conservatory surrounded by greenery",
       "tags": [
         "indoor",
@@ -17636,6 +18102,7 @@
     },
     {
       "id": "interior_luxury_bathroom",
+      "catalog_category": "luxury",
       "prompt": "inside a luxurious private marble bathroom",
       "tags": [
         "indoor",
@@ -17646,6 +18113,7 @@
     },
     {
       "id": "interior_rain_shower",
+      "catalog_category": "luxury",
       "prompt": "inside a private spa bathroom with a glass rain shower",
       "tags": [
         "indoor",
@@ -17657,6 +18125,7 @@
     },
     {
       "id": "interior_private_kitchen",
+      "catalog_category": "normal",
       "prompt": "inside a stylish private designer kitchen",
       "tags": [
         "indoor",
@@ -17667,6 +18136,7 @@
     },
     {
       "id": "interior_private_pool",
+      "catalog_category": "luxury",
       "prompt": "beside a secluded indoor villa pool",
       "tags": [
         "indoor",
@@ -17678,6 +18148,7 @@
     },
     {
       "id": "interior_small_apartment_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a small everyday apartment bedroom",
       "weight": 1.25,
       "tags": [
@@ -17691,6 +18162,7 @@
     },
     {
       "id": "interior_ordinary_apartment_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside an ordinary lived-in apartment bedroom",
       "weight": 1.25,
       "tags": [
@@ -17704,6 +18176,7 @@
     },
     {
       "id": "interior_rental_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a simple rented apartment bedroom",
       "weight": 1.2,
       "tags": [
@@ -17717,6 +18190,7 @@
     },
     {
       "id": "interior_spare_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a modest private spare bedroom",
       "weight": 1.15,
       "tags": [
@@ -17729,6 +18203,7 @@
     },
     {
       "id": "interior_suburban_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a normal suburban home bedroom",
       "weight": 1.2,
       "tags": [
@@ -17741,6 +18216,7 @@
     },
     {
       "id": "interior_older_apartment_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a tidy older apartment bedroom",
       "weight": 1.15,
       "tags": [
@@ -17754,6 +18230,7 @@
     },
     {
       "id": "interior_compact_studio_apartment",
+      "catalog_category": "normal",
       "prompt": "inside a compact one-room studio apartment",
       "weight": 1.25,
       "tags": [
@@ -17769,6 +18246,7 @@
     },
     {
       "id": "interior_simple_studio_flat",
+      "catalog_category": "normal",
       "prompt": "inside a simple open-plan studio flat",
       "weight": 1.2,
       "tags": [
@@ -17784,6 +18262,7 @@
     },
     {
       "id": "interior_small_apartment_living_room",
+      "catalog_category": "normal",
       "prompt": "inside a small everyday apartment living room",
       "weight": 1.25,
       "tags": [
@@ -17797,6 +18276,7 @@
     },
     {
       "id": "interior_ordinary_living_room",
+      "catalog_category": "normal",
       "prompt": "inside an ordinary comfortable home living room",
       "weight": 1.25,
       "tags": [
@@ -17809,6 +18289,7 @@
     },
     {
       "id": "interior_rental_living_room",
+      "catalog_category": "normal",
       "prompt": "inside a modest rented apartment living room",
       "weight": 1.2,
       "tags": [
@@ -17822,6 +18303,7 @@
     },
     {
       "id": "interior_older_apartment_living_room",
+      "catalog_category": "normal",
       "prompt": "inside a tidy older apartment living room",
       "weight": 1.15,
       "tags": [
@@ -17835,6 +18317,7 @@
     },
     {
       "id": "interior_compact_apartment_kitchen",
+      "catalog_category": "normal",
       "prompt": "inside a compact everyday apartment kitchen",
       "weight": 1.2,
       "tags": [
@@ -17848,6 +18331,7 @@
     },
     {
       "id": "interior_ordinary_home_kitchen",
+      "catalog_category": "normal",
       "prompt": "inside an ordinary practical home kitchen",
       "weight": 1.2,
       "tags": [
@@ -17860,6 +18344,7 @@
     },
     {
       "id": "interior_small_apartment_bathroom",
+      "catalog_category": "normal",
       "prompt": "inside a small clean apartment bathroom",
       "weight": 1.15,
       "tags": [
@@ -17873,6 +18358,7 @@
     },
     {
       "id": "interior_ordinary_home_bathroom",
+      "catalog_category": "normal",
       "prompt": "inside an ordinary tiled home bathroom",
       "weight": 1.15,
       "tags": [
@@ -17885,6 +18371,7 @@
     },
     {
       "id": "interior_apartment_home_office",
+      "catalog_category": "normal",
       "prompt": "inside a simple private home office",
       "tags": [
         "indoor",
@@ -17895,6 +18382,7 @@
     },
     {
       "id": "interior_apartment_hallway",
+      "catalog_category": "normal",
       "prompt": "inside a quiet private apartment hallway",
       "tags": [
         "indoor",
@@ -17905,6 +18393,7 @@
     },
     {
       "id": "interior_garden_patio",
+      "catalog_category": "normal",
       "prompt": "on a secluded private garden patio screened by greenery",
       "tags": [
         "outdoor",
@@ -17915,6 +18404,7 @@
     },
     {
       "id": "interior_private_lawn",
+      "catalog_category": "normal",
       "prompt": "on a secluded manicured private lawn",
       "tags": [
         "outdoor",
@@ -17925,6 +18415,7 @@
     },
     {
       "id": "interior_flower_garden",
+      "catalog_category": "normal",
       "prompt": "in a hidden private flower garden in full bloom",
       "tags": [
         "outdoor",
@@ -17936,6 +18427,7 @@
     },
     {
       "id": "interior_forest_clearing",
+      "catalog_category": "normal",
       "prompt": "in a secluded sunlit forest clearing far from any path",
       "tags": [
         "outdoor",
@@ -17946,6 +18438,7 @@
     },
     {
       "id": "interior_lakeside_cabin_deck",
+      "catalog_category": "normal",
       "prompt": "on the private deck of a remote lakeside cabin",
       "tags": [
         "outdoor",
@@ -17956,6 +18449,7 @@
     },
     {
       "id": "interior_apartment_compact_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a compact ordinary apartment bedroom",
       "tags": [
         "indoor",
@@ -17966,6 +18460,7 @@
     },
     {
       "id": "interior_apartment_sunny_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a sunny rented apartment bedroom",
       "tags": [
         "indoor",
@@ -17977,6 +18472,7 @@
     },
     {
       "id": "interior_apartment_minimal_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a simple minimalist apartment bedroom",
       "tags": [
         "indoor",
@@ -17987,6 +18483,7 @@
     },
     {
       "id": "interior_apartment_attic_bedroom",
+      "catalog_category": "normal",
       "prompt": "inside a private attic apartment bedroom",
       "tags": [
         "indoor",
@@ -17998,6 +18495,7 @@
     },
     {
       "id": "interior_apartment_studio_flat",
+      "catalog_category": "normal",
       "prompt": "inside an open-plan studio flat",
       "tags": [
         "indoor",
@@ -18008,6 +18506,7 @@
     },
     {
       "id": "interior_apartment_small_living_room",
+      "catalog_category": "normal",
       "prompt": "inside a small lived-in apartment living room",
       "tags": [
         "indoor",
@@ -18018,6 +18517,7 @@
     },
     {
       "id": "interior_apartment_modern_living_room",
+      "catalog_category": "normal",
       "prompt": "inside a clean modern apartment living room",
       "tags": [
         "indoor",
@@ -18028,6 +18528,7 @@
     },
     {
       "id": "interior_apartment_vintage_living_room",
+      "catalog_category": "normal",
       "prompt": "inside a modest vintage apartment living room",
       "tags": [
         "indoor",
@@ -18038,6 +18539,7 @@
     },
     {
       "id": "interior_apartment_loft_living_room",
+      "catalog_category": "normal",
       "prompt": "inside a private brick-walled loft living room",
       "tags": [
         "indoor",
@@ -18048,6 +18550,7 @@
     },
     {
       "id": "interior_apartment_kitchen",
+      "catalog_category": "normal",
       "prompt": "inside a simple private apartment kitchen",
       "tags": [
         "indoor",
@@ -18058,6 +18561,7 @@
     },
     {
       "id": "interior_apartment_breakfast_nook",
+      "catalog_category": "normal",
       "prompt": "inside a bright apartment breakfast nook",
       "tags": [
         "indoor",
@@ -18069,6 +18573,7 @@
     },
     {
       "id": "interior_apartment_entryway",
+      "catalog_category": "normal",
       "prompt": "inside a tidy apartment entryway",
       "tags": [
         "indoor",
@@ -18079,6 +18584,7 @@
     },
     {
       "id": "interior_apartment_bathroom",
+      "catalog_category": "normal",
       "prompt": "inside a clean ordinary apartment bathroom",
       "tags": [
         "indoor",
@@ -18089,6 +18595,7 @@
     },
     {
       "id": "interior_apartment_tile_bathroom",
+      "catalog_category": "normal",
       "prompt": "inside a small softly lit tiled bathroom",
       "tags": [
         "indoor",
@@ -18099,6 +18606,7 @@
     },
     {
       "id": "interior_apartment_laundry",
+      "catalog_category": "normal",
       "prompt": "inside a private apartment laundry room",
       "tags": [
         "indoor",
@@ -18108,6 +18616,7 @@
     },
     {
       "id": "interior_apartment_dressing_room",
+      "catalog_category": "normal",
       "prompt": "inside a modest private dressing room",
       "tags": [
         "indoor",
@@ -18117,6 +18626,7 @@
     },
     {
       "id": "interior_apartment_walkin_closet",
+      "catalog_category": "normal",
       "prompt": "inside a compact private walk-in closet",
       "tags": [
         "indoor",
@@ -18126,6 +18636,7 @@
     },
     {
       "id": "interior_apartment_balcony",
+      "catalog_category": "normal",
       "prompt": "on a secluded apartment balcony",
       "tags": [
         "outdoor",
@@ -18136,6 +18647,7 @@
     },
     {
       "id": "interior_apartment_basement_studio",
+      "catalog_category": "normal",
       "prompt": "inside a plain private basement photo set",
       "tags": [
         "indoor",
@@ -18145,6 +18657,7 @@
     },
     {
       "id": "interior_apartment_paper_backdrop",
+      "catalog_category": "normal",
       "prompt": "inside a simple studio with a seamless paper backdrop",
       "tags": [
         "indoor",
@@ -18154,6 +18667,7 @@
     },
     {
       "id": "interior_apartment_curtain_set",
+      "catalog_category": "normal",
       "prompt": "inside a minimal private set with plain curtains",
       "tags": [
         "indoor",
@@ -18163,6 +18677,7 @@
     },
     {
       "id": "interior_apartment_daylight_set",
+      "catalog_category": "normal",
       "prompt": "inside a small daylight photo studio",
       "tags": [
         "indoor",
@@ -18175,6 +18690,7 @@
   "furniture": [
     {
       "id": "furniture_bed",
+      "catalog_category": "normal",
       "prompt": "beside a neatly made bed",
       "tags": [
         "bed",
@@ -18189,6 +18705,7 @@
     },
     {
       "id": "furniture_sofa",
+      "catalog_category": "normal",
       "prompt": "beside an elegant sofa",
       "tags": [
         "sofa",
@@ -18208,6 +18725,7 @@
     },
     {
       "id": "furniture_chair",
+      "catalog_category": "normal",
       "prompt": "beside a modern chair",
       "tags": [
         "chair",
@@ -18227,6 +18745,7 @@
     },
     {
       "id": "furniture_armchair",
+      "catalog_category": "normal",
       "prompt": "beside a plush armchair",
       "tags": [
         "chair",
@@ -18245,6 +18764,7 @@
     },
     {
       "id": "furniture_wall",
+      "catalog_category": "normal",
       "prompt": "beside a clean interior wall",
       "tags": [
         "wall",
@@ -18256,6 +18776,7 @@
     },
     {
       "id": "furniture_floor",
+      "catalog_category": "normal",
       "prompt": "on a clean soft floor",
       "tags": [
         "floor",
@@ -18268,6 +18789,7 @@
     },
     {
       "id": "furniture_simple_double_bed",
+      "catalog_category": "normal",
       "prompt": "on a simple double bed with cotton sheets",
       "tags": [
         "bed",
@@ -18283,6 +18805,7 @@
     },
     {
       "id": "furniture_unmade_home_bed",
+      "catalog_category": "normal",
       "prompt": "on a casually unmade everyday bed",
       "tags": [
         "bed",
@@ -18298,6 +18821,7 @@
     },
     {
       "id": "furniture_compact_fabric_sofa",
+      "catalog_category": "normal",
       "prompt": "on a compact fabric sofa",
       "tags": [
         "sofa",
@@ -18313,6 +18837,7 @@
     },
     {
       "id": "furniture_worn_home_sofa",
+      "catalog_category": "normal",
       "prompt": "on a comfortable slightly worn home sofa",
       "tags": [
         "sofa",
@@ -18328,6 +18853,7 @@
     },
     {
       "id": "furniture_simple_wooden_chair",
+      "catalog_category": "normal",
       "prompt": "beside a simple wooden chair",
       "tags": [
         "chair",
@@ -18347,6 +18873,7 @@
     },
     {
       "id": "furniture_small_home_armchair",
+      "catalog_category": "normal",
       "prompt": "in a small comfortable home armchair",
       "tags": [
         "chair",
@@ -18366,6 +18893,7 @@
     },
     {
       "id": "furniture_thin_apartment_rug",
+      "catalog_category": "normal",
       "prompt": "on a simple woven apartment rug",
       "tags": [
         "floor",
@@ -18381,6 +18909,7 @@
     },
     {
       "id": "furniture_laminate_counter",
+      "catalog_category": "normal",
       "prompt": "beside a clean laminate kitchen counter",
       "tags": [
         "counter",
@@ -18394,6 +18923,7 @@
     },
     {
       "id": "furniture_standard_bathtub",
+      "catalog_category": "normal",
       "prompt": "in a standard built-in bathtub",
       "tags": [
         "bathtub",
@@ -18408,6 +18938,7 @@
     },
     {
       "id": "furniture_tiled_shower_wall",
+      "catalog_category": "normal",
       "prompt": "against a clean tiled shower wall",
       "tags": [
         "wall",
@@ -18421,6 +18952,7 @@
     },
     {
       "id": "furniture_narrow_windowsill",
+      "catalog_category": "normal",
       "prompt": "beside a narrow apartment windowsill",
       "tags": [
         "window",
@@ -18434,6 +18966,7 @@
     },
     {
       "id": "furniture_canopy_bed",
+      "catalog_category": "luxury",
       "prompt": "on a luxurious canopy bed with rumpled linen sheets",
       "tags": [
         "bed",
@@ -18451,6 +18984,7 @@
     },
     {
       "id": "furniture_velvet_bed",
+      "catalog_category": "luxury",
       "prompt": "on a deep velvet-upholstered bed with satin sheets",
       "tags": [
         "bed",
@@ -18467,6 +19001,7 @@
     },
     {
       "id": "furniture_chaise",
+      "catalog_category": "luxury",
       "prompt": "on an elegant curved chaise longue",
       "tags": [
         "sofa",
@@ -18488,6 +19023,7 @@
     },
     {
       "id": "furniture_sectional_sofa",
+      "catalog_category": "normal",
       "prompt": "on a broad soft sectional sofa",
       "tags": [
         "sofa",
@@ -18502,6 +19038,7 @@
     },
     {
       "id": "furniture_velvet_armchair",
+      "catalog_category": "luxury",
       "prompt": "in a deep velvet armchair",
       "tags": [
         "chair",
@@ -18522,6 +19059,7 @@
     },
     {
       "id": "furniture_bathtub",
+      "catalog_category": "normal",
       "prompt": "in a deep freestanding bathtub",
       "tags": [
         "bathtub",
@@ -18535,6 +19073,7 @@
     },
     {
       "id": "furniture_shower_wall",
+      "catalog_category": "normal",
       "prompt": "against the misted glass wall of a rain shower",
       "tags": [
         "wall",
@@ -18547,6 +19086,7 @@
     },
     {
       "id": "furniture_kitchen_counter",
+      "catalog_category": "normal",
       "prompt": "beside a clean apartment kitchen counter",
       "tags": [
         "counter",
@@ -18558,6 +19098,7 @@
     },
     {
       "id": "furniture_windowsill",
+      "catalog_category": "normal",
       "prompt": "on a broad private windowsill",
       "tags": [
         "sitting_surface",
@@ -18570,6 +19111,7 @@
     },
     {
       "id": "furniture_soft_rug",
+      "catalog_category": "normal",
       "prompt": "on a thick plush rug",
       "tags": [
         "floor",
@@ -18584,6 +19126,7 @@
     },
     {
       "id": "furniture_pool_edge_indoor",
+      "catalog_category": "normal",
       "prompt": "seated on the smooth edge of the private pool",
       "tags": [
         "pool_edge",
@@ -18596,6 +19139,7 @@
     },
     {
       "id": "furniture_garden_bench",
+      "catalog_category": "normal",
       "prompt": "on a secluded wrought-iron garden bench",
       "tags": [
         "bench",
@@ -18608,6 +19152,7 @@
     },
     {
       "id": "furniture_sun_lounger",
+      "catalog_category": "normal",
       "prompt": "on a cushioned private sun lounger",
       "tags": [
         "lounger",
@@ -18623,6 +19168,7 @@
     },
     {
       "id": "furniture_picnic_blanket",
+      "catalog_category": "normal",
       "prompt": "on a soft blanket spread over the private lawn",
       "tags": [
         "blanket",
@@ -18638,6 +19184,7 @@
     },
     {
       "id": "furniture_garden_wall",
+      "catalog_category": "normal",
       "prompt": "against a secluded ivy-covered garden wall",
       "tags": [
         "wall",
@@ -18650,6 +19197,7 @@
     },
     {
       "id": "furniture_tree_trunk",
+      "catalog_category": "normal",
       "prompt": "beside a broad tree trunk in the secluded clearing",
       "tags": [
         "tree",
@@ -18662,6 +19210,7 @@
     },
     {
       "id": "furniture_cabin_deck",
+      "catalog_category": "normal",
       "prompt": "on the timber deck beside a private cabin",
       "tags": [
         "floor",
@@ -18675,6 +19224,7 @@
     },
     {
       "id": "furniture_simple_mattress",
+      "catalog_category": "normal",
       "prompt": "on a simple neatly covered mattress",
       "tags": [
         "bed",
@@ -18689,6 +19239,7 @@
     },
     {
       "id": "furniture_bed_edge",
+      "catalog_category": "normal",
       "prompt": "on the edge of an ordinary bed",
       "tags": [
         "bed",
@@ -18702,6 +19253,7 @@
     },
     {
       "id": "furniture_small_sofa",
+      "catalog_category": "normal",
       "prompt": "on a compact everyday sofa",
       "tags": [
         "sofa",
@@ -18716,6 +19268,7 @@
     },
     {
       "id": "furniture_floor_cushion",
+      "catalog_category": "normal",
       "prompt": "on a large floor cushion",
       "tags": [
         "floor",
@@ -18730,6 +19283,7 @@
     },
     {
       "id": "furniture_plain_wall",
+      "catalog_category": "normal",
       "prompt": "against a clean plain wall",
       "tags": [
         "wall",
@@ -18741,6 +19295,7 @@
     },
     {
       "id": "furniture_breakfast_chair",
+      "catalog_category": "normal",
       "prompt": "on a simple breakfast chair",
       "tags": [
         "chair",
@@ -18752,6 +19307,7 @@
     },
     {
       "id": "furniture_bath_mat",
+      "catalog_category": "normal",
       "prompt": "on a clean soft bathroom mat",
       "tags": [
         "floor",
@@ -18766,6 +19322,7 @@
     },
     {
       "id": "furniture_studio_floor",
+      "catalog_category": "normal",
       "prompt": "on a clean seamless studio floor",
       "tags": [
         "floor",
@@ -18779,6 +19336,7 @@
     },
     {
       "id": "furniture_window_ledge",
+      "catalog_category": "normal",
       "prompt": "beside a broad private window ledge",
       "tags": [
         "window",

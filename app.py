@@ -395,9 +395,9 @@ def validate_database(db: dict[str, Any]) -> None:
         prompt_owners[normalized] = item["id"]
 
     for template in db["outfit_templates"]:
-        if template.get("wardrobe_category") not in {"normal", "glamour"}:
+        if template.get("catalog_category") not in CATALOG_CATEGORIES:
             raise AppError(
-                f"Template {template['id']} wardrobe_category must be normal or glamour"
+                f"Template {template['id']} catalog_category must be normal or luxury"
             )
         slots = template.get("slots")
         stages = template.get("stages")
@@ -443,21 +443,31 @@ def validate_database(db: dict[str, Any]) -> None:
             if unknown_slots:
                 raise AppError(f"Template {template['id']} stage has unknown slots: {sorted(unknown_slots)}")
 
+    categorized = list(db["outfit_templates"]) + list(db["interiors"]) + list(db["furniture"])
+    categorized.extend(
+        item for values in db["garments"].values() for item in values
+    )
+    for item in categorized:
+        if catalog_category(item) not in CATALOG_CATEGORIES:
+            raise AppError(
+                f"{item['id']} catalog category must be normal or luxury"
+            )
+
     scene_defaults = settings.get("scene_defaults")
     if not isinstance(scene_defaults, dict):
         raise AppError("settings.scene_defaults must be an object")
     category_specs = {
         "wardrobe_categories": (
-            {"normal", "glamour"},
+            CATALOG_CATEGORIES,
             {
-                template["wardrobe_category"] for template in db["outfit_templates"]
+                template["catalog_category"] for template in db["outfit_templates"]
                 if not template.get("disabled", False)
             },
         ),
         "environment_categories": (
-            {"normal", "luxury"},
+            CATALOG_CATEGORIES,
             {
-                "luxury" if "luxury" in tags(interior) else "normal"
+                catalog_category(interior)
                 for interior in db["interiors"] if not interior.get("disabled", False)
             },
         ),
@@ -592,6 +602,35 @@ def tags(item: dict[str, Any]) -> set[str]:
     return set(item.get("tags", []))
 
 
+CATALOG_CATEGORIES = {"normal", "luxury"}
+
+
+def catalog_category(item: dict[str, Any]) -> str:
+    """Return one common production tier for wardrobe, sets and surfaces."""
+    return item.get("catalog_category", "")
+
+
+def category_allows(parent: dict[str, Any], child: dict[str, Any]) -> bool:
+    """Normal parents are strict; luxury parents may use sensible base pieces."""
+    return catalog_category(parent) == "luxury" or catalog_category(child) == "normal"
+
+
+def apply_preferred_pool(
+    candidates: list[dict[str, Any]], preferred_ids: Iterable[str]
+) -> list[dict[str, Any]]:
+    """Use the curated pool when applicable, otherwise preserve category fallback."""
+    preferred = set(preferred_ids)
+    pooled = [item for item in candidates if item["id"] in preferred]
+    return pooled or candidates
+
+
+def prefer_catalog_category(
+    candidates: list[dict[str, Any]], category: str
+) -> list[dict[str, Any]]:
+    preferred = [item for item in candidates if catalog_category(item) == category]
+    return preferred or candidates
+
+
 def hands_required(item: dict[str, Any] | None) -> int:
     return int((item or {}).get("hands_required", 0))
 
@@ -599,6 +638,15 @@ def hands_required(item: dict[str, Any] | None) -> int:
 def validate_outfit_layers(db: dict[str, Any], outfit: dict[str, Any]) -> None:
     template_id = outfit["template"]["id"]
     garments = outfit["garments"]
+    incompatible_categories = [
+        item["id"] for item in garments.values()
+        if not category_allows(outfit["template"], item)
+    ]
+    if incompatible_categories:
+        raise AppError(
+            f"Normal outfit {template_id} cannot contain luxury garments: "
+            f"{sorted(incompatible_categories)}"
+        )
     for rule in db["settings"].get("garment_layer_rules", []):
         if template_id not in rule["template_ids"]:
             continue
@@ -832,7 +880,7 @@ class Composer:
         candidates = [
             template for template in self.db["outfit_templates"]
             if not template.get("disabled", False)
-            and template["wardrobe_category"] in allowed
+            and template["catalog_category"] in allowed
         ]
         return weighted_choice(self.rng, candidates)
 
@@ -846,6 +894,8 @@ class Composer:
             candidates = list(self.db["garments"][rule["catalog"]])
             candidates = [
                 item for item in candidates
+                if category_allows(template, item)
+                and not item.get("disabled", False)
                 if garment_allowed_by_layer_rules(
                     self.db, template["id"], slot, item["id"]
                 )
@@ -865,6 +915,8 @@ class Composer:
                     item for item in candidates
                     if set(item.get("mix_tags", item.get("tags", []))) & group_tags[match_group]
                 ]
+            if set(self.db["settings"]["scene_defaults"]["wardrobe_categories"]) == {"luxury"}:
+                candidates = prefer_catalog_category(candidates, "luxury")
             choice = weighted_choice(self.rng, candidates)
             selected[slot] = choice
             if match_group:
@@ -1006,23 +1058,26 @@ class Composer:
                 interiors = [
                     interior for interior in self.db["interiors"]
                     if not interior.get("disabled", False)
-                    and ("luxury" if "luxury" in tags(interior) else "normal")
-                    in allowed_environments
+                    and catalog_category(interior) in allowed_environments
                 ]
                 scene_pools = self.db["settings"]["scene_defaults"].get("pools", {})
                 if scene_pools.get("interiors"):
-                    allowed_ids = set(scene_pools["interiors"])
-                    interiors = [item for item in interiors if item["id"] in allowed_ids]
+                    interiors = apply_preferred_pool(interiors, scene_pools["interiors"])
                 interior = weighted_choice(self.rng, interiors)
                 furniture_candidates = [
                     item for item in self.db["furniture"]
                     if compatible_with_requirements(item, tags(interior))
+                    and category_allows(interior, item)
                 ]
-                if scene_pools.get("furniture"):
-                    allowed_ids = set(scene_pools["furniture"])
-                    furniture_candidates = [
-                        item for item in furniture_candidates if item["id"] in allowed_ids
-                    ]
+                strict_luxury_environment = allowed_environments == {"luxury"}
+                if strict_luxury_environment:
+                    furniture_candidates = prefer_catalog_category(
+                        furniture_candidates, "luxury"
+                    )
+                elif scene_pools.get("furniture"):
+                    furniture_candidates = apply_preferred_pool(
+                        furniture_candidates, scene_pools["furniture"]
+                    )
                 mood_candidates = self.db["moods"]
                 if scene_pools.get("moods"):
                     allowed_ids = set(scene_pools["moods"])
@@ -1065,14 +1120,20 @@ class Composer:
             item for item in self.db["furniture"]
             if not item.get("disabled", False)
             and compatible_with_requirements(item, tags(fixed["interior"]))
+            and category_allows(fixed["interior"], item)
         ]
         scene_pools = self.db["settings"]["scene_defaults"].get("pools", {})
-        if not overrides.get("furniture") and scene_pools.get("furniture"):
-            default_furniture = set(scene_pools["furniture"])
-            furniture_candidates = [
-                item for item in furniture_candidates
-                if item["id"] in default_furniture
-            ]
+        strict_luxury_environment = set(
+            self.db["settings"]["scene_defaults"]["environment_categories"]
+        ) == {"luxury"}
+        if not overrides.get("furniture") and strict_luxury_environment:
+            furniture_candidates = prefer_catalog_category(
+                furniture_candidates, "luxury"
+            )
+        elif not overrides.get("furniture") and scene_pools.get("furniture"):
+            furniture_candidates = apply_preferred_pool(
+                furniture_candidates, scene_pools["furniture"]
+            )
         if overrides.get("furniture"):
             furniture_candidates = [item for item in furniture_candidates if item["id"] == overrides["furniture"]]
         furniture = choose("furniture", furniture_candidates)
@@ -1372,6 +1433,11 @@ class Composer:
 
     def validate_scene_rules(self, scene: dict[str, Any]) -> None:
         self.validate_outfit_environment(scene["outfit"], scene["interior"])
+        if not category_allows(scene["interior"], scene["furniture"]):
+            raise AppError(
+                f"Normal environment {scene['interior']['id']} cannot use luxury "
+                f"surface {scene['furniture']['id']}"
+            )
         flattened = self.scene_items(scene)
         ids = {item["id"] for item in flattened}
         all_tags = set().union(*(tags(item) for item in flattened))
@@ -2754,7 +2820,7 @@ class WebState:
                     item, template["id"],
                     {
                         candidate["id"] for candidate in db["outfit_templates"]
-                        if candidate["wardrobe_category"] in set(
+                        if candidate["catalog_category"] in set(
                             db["settings"]["scene_defaults"]["wardrobe_categories"]
                         )
                     },
@@ -2767,6 +2833,7 @@ class WebState:
             candidates = [
                 item for item in db["garments"][rule["catalog"]]
                 if not item.get("disabled", False)
+                and category_allows(template, item)
                 and set(rule.get("required_tags", [])).issubset(tags(item))
                 and (
                     not rule.get("required_any_tags")
@@ -2900,6 +2967,7 @@ class WebState:
                 and (
                     key == "furniture"
                     and compatible_with_requirements(item, tags(context["interior"]))
+                    and category_allows(context["interior"], item)
                     or key == "editorial_role"
                     or key not in {"furniture", "editorial_role"}
                     and shot["stage"]["level"] in item.get("allowed_levels", [shot["stage"]["level"]])
@@ -3276,12 +3344,16 @@ class WebState:
                 interiors = [
                     item for item in db["interiors"]
                     if not item.get("disabled", False)
+                    and catalog_category(item) in set(
+                        db["settings"]["scene_defaults"]["environment_categories"]
+                    )
                 ]
                 context["interior"] = weighted_choice(record["rng"], interiors)
                 furniture = [
                     item for item in db["furniture"]
                     if not item.get("disabled", False)
                     and compatible_with_requirements(item, tags(context["interior"]))
+                    and category_allows(context["interior"], item)
                 ]
                 context["furniture"] = weighted_choice(record["rng"], furniture)
                 context["mood"] = weighted_choice(
@@ -3372,6 +3444,7 @@ class WebState:
                     excluded_tags = set(rule.get("excludes_tags", []))
                     if (
                         garment not in db["garments"][rule["catalog"]]
+                        or not category_allows(outfit["template"], garment)
                         or not required_tags.issubset(tags(garment))
                         or (required_any and not required_any & tags(garment))
                         or excluded_tags & tags(garment)
@@ -3425,6 +3498,7 @@ class WebState:
                     item for item in db["furniture"]
                     if not item.get("disabled", False)
                     and compatible_with_requirements(item, tags(context["interior"]))
+                    and category_allows(context["interior"], item)
                 ]
                 if context["furniture"] not in furniture:
                     context["furniture"] = weighted_choice(record["rng"], furniture)

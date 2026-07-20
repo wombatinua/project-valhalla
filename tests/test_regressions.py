@@ -1,3 +1,4 @@
+import copy
 import time
 import tempfile
 import unittest
@@ -17,6 +18,44 @@ def director_fields(payload):
 
 
 class CatalogQualityTests(unittest.TestCase):
+    def test_wardrobe_environment_and_surface_catalogs_use_one_explicit_category(self):
+        database, _ = app.load_database()
+        items = list(database["outfit_templates"])
+        items.extend(database["interiors"])
+        items.extend(database["furniture"])
+        items.extend(
+            item for values in database["garments"].values() for item in values
+        )
+        self.assertGreater(len(items), 500)
+        self.assertTrue(all(item.get("catalog_category") in {"normal", "luxury"} for item in items))
+        self.assertFalse(any("wardrobe_category" in item for item in items))
+
+    def test_scene_default_categories_reliably_isolate_normal_and_luxury(self):
+        database, _ = app.load_database()
+        for category in ("normal", "luxury"):
+            configured = copy.deepcopy(database)
+            defaults = configured["settings"]["scene_defaults"]
+            defaults["wardrobe_categories"] = [category]
+            defaults["environment_categories"] = [category]
+            app.validate_database(configured)
+            selected_garment_categories = set()
+            selected_surface_categories = set()
+            for seed in range(60):
+                context = app.Composer(configured, app.random.Random(seed)).fixed_context()
+                self.assertEqual(app.catalog_category(context["outfit"]["template"]), category)
+                self.assertEqual(app.catalog_category(context["interior"]), category)
+                self.assertTrue(app.category_allows(context["interior"], context["furniture"]))
+                selected_surface_categories.add(app.catalog_category(context["furniture"]))
+                for garment in context["outfit"]["garments"].values():
+                    self.assertTrue(app.category_allows(context["outfit"]["template"], garment))
+                    selected_garment_categories.add(app.catalog_category(garment))
+            if category == "normal":
+                self.assertEqual(selected_garment_categories, {"normal"})
+                self.assertEqual(selected_surface_categories, {"normal"})
+            else:
+                self.assertIn("luxury", selected_garment_categories)
+                self.assertIn("luxury", selected_surface_categories)
+
     def test_age_catalog_contains_only_three_explicit_adult_presets(self):
         database, _ = app.load_database()
         ages = database["human_model_parts"]["age"]
