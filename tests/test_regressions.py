@@ -15,15 +15,28 @@ def director_fields(payload):
     }
 
 
-class DatabaseExpansionTests(unittest.TestCase):
-    def test_catalog_is_tripled_and_curated_everyday_sets_are_present(self):
+class CatalogQualityTests(unittest.TestCase):
+    def test_age_catalog_contains_only_three_explicit_adult_presets(self):
         database, _ = app.load_database()
-        self.assertGreaterEqual(sum(1 for _ in app.iter_content_items(database)), 2703)
-        self.assertGreaterEqual(len(database["interiors"]), 123)
-        self.assertGreaterEqual(len(database["poses"]), 240)
-        self.assertGreaterEqual(len(database["actions"]), 177)
+        ages = database["human_model_parts"]["age"]
+        self.assertEqual(
+            [(item["id"], item["prompt"]) for item in ages],
+            [
+                ("girl_21", "21-year-old girl"),
+                ("girl_22", "22-year-old girl"),
+                ("girl_23", "23-year-old girl"),
+            ],
+        )
+        self.assertTrue(all("adult" in app.tags(item) for item in ages))
+
+    def test_catalog_has_large_unique_curated_collections(self):
+        database, _ = app.load_database()
+        self.assertGreaterEqual(sum(1 for _ in app.iter_content_items(database)), 1100)
+        self.assertGreaterEqual(len(database["interiors"]), 60)
+        self.assertGreaterEqual(len(database["poses"]), 100)
+        self.assertGreaterEqual(len(database["actions"]), 79)
         self.assertGreaterEqual(
-            sum(len(items) for items in database["garments"].values()), 1026
+            sum(len(items) for items in database["garments"].values()), 430
         )
         ids = {item["id"] for item in app.iter_content_items(database)}
         self.assertIn("interior_apartment_compact_bedroom", ids)
@@ -31,15 +44,34 @@ class DatabaseExpansionTests(unittest.TestCase):
         self.assertIn("shoes_simple_01", ids)
         self.assertIn("action_curated_20", ids)
 
-    def test_expansion_preserves_modifier_relationships(self):
+    def test_catalog_has_no_mechanical_variants_and_modifier_refs_are_valid(self):
         database, _ = app.load_database()
+        items = list(app.iter_content_items(database))
+        self.assertFalse(any(item.get("expansion_source") for item in items))
+        self.assertFalse(any(item.get("expansion_variant") for item in items))
+        garment_ids = {
+            item["id"] for values in database["garments"].values() for item in values
+        }
         for modifier in database["patterns"] + database["fabric_textures"]:
             allowed = set(modifier["allowed_garment_ids"])
-            for original in list(allowed):
-                if original.endswith(("_studio", "_editorial")):
-                    continue
-                self.assertIn(f"{original}_studio", allowed)
-                self.assertIn(f"{original}_editorial", allowed)
+            self.assertTrue(allowed)
+            self.assertTrue(allowed.issubset(garment_ids))
+        pattern_garments = set().union(*(
+            set(item["allowed_garment_ids"]) for item in database["patterns"]
+        ))
+        texture_garments = set().union(*(
+            set(item["allowed_garment_ids"])
+            for item in database["fabric_textures"]
+        ))
+        self.assertGreaterEqual(len(pattern_garments), 200)
+        self.assertGreaterEqual(len(texture_garments), 220)
+        self.assertGreaterEqual(
+            sum(item_id.startswith("panties_") for item_id in pattern_garments), 20
+        )
+        self.assertGreaterEqual(
+            sum("surface_texture_target" in item for item in database["furniture"]),
+            20,
+        )
 
     def test_catalog_prompts_are_unique_and_model_friendly(self):
         database, _ = app.load_database()
@@ -51,6 +83,20 @@ class DatabaseExpansionTests(unittest.TestCase):
         self.assertEqual(len(prompts), len(set(prompts)))
         self.assertLessEqual(max(len(prompt.split()) for prompt in prompts), 48)
         self.assertFalse(any("production variation" in prompt for prompt in prompts))
+
+    def test_base_negative_prompt_contains_only_minimal_anatomy_terms(self):
+        database, _ = app.load_database()
+        negative = database["prompt_defaults"]["negative_prompt"]
+        self.assertEqual(
+            negative,
+            "extra limbs, missing limbs, fused limbs, malformed hands, extra fingers, "
+            "fused fingers, malformed feet, extra toes, malformed anatomy, distorted face",
+        )
+        for removed in (
+            "man", "male", "dildo", "vibrator", "sex toy", "multiple people",
+            "low quality", "blurry", "watermark", "text",
+        ):
+            self.assertNotIn(removed, negative.split(", "))
 
 
 class DirectorRegressionTests(unittest.TestCase):
@@ -104,25 +150,81 @@ class DirectorRegressionTests(unittest.TestCase):
                 scene = shot["scene"]
                 for field, ids in allowed.items():
                     self.assertIn(scene[field]["id"], ids, (seed, field))
-                for field in (
-                    "pose", "action", "expression", "shot_size",
-                    "camera_angle", "framing", "focus_target",
-                ):
-                    self.assertFalse(
-                        scene[field]["id"].endswith(("_studio", "_editorial")),
-                        (seed, field, scene[field]["id"]),
-                    )
-                for garment in scene["outfit"]["garments"].values():
-                    self.assertFalse(
-                        garment["id"].endswith(("_studio", "_editorial"))
-                    )
 
-    def test_production_variants_remain_available_in_director(self):
+    def test_compiled_prompt_contains_only_current_frame_visual_instructions(self):
+        state, storyboard_id = self.make_storyboard(count=12)
+        prompts = [
+            shot["positive_prompt"]
+            for shot in state.storyboard_payload(
+                state.get_storyboard(storyboard_id)
+            )["shots"]
+        ]
+        temporal_placeholders = (
+            "clothing continuity",
+            "clothing state remains consistent",
+            "wearing the listed",
+            "listed retained",
+        )
+        self.assertFalse(
+            any(term in prompt for prompt in prompts for term in temporal_placeholders)
+        )
+        self.assertFalse(any("complete intact body" in prompt for prompt in prompts))
+        self.assertFalse(
+            any("two legs" in prompt or "two feet" in prompt for prompt in prompts)
+        )
+        explicit_negatives = [
+            shot["negative_prompt"].split(", ")
+            for shot in state.storyboard_payload(
+                state.get_storyboard(storyboard_id)
+            )["shots"]
+            if shot["stage"]["level"] == "explicit"
+        ]
+        self.assertTrue(explicit_negatives)
+        self.assertTrue(
+            all("clothes" not in terms and "underwear" not in terms for terms in explicit_negatives)
+        )
+
+    def test_director_camera_options_are_unique_real_presets(self):
         state, storyboard_id = self.make_storyboard()
         fields = director_fields(state.director_payload(storyboard_id, 1))
-        camera_ids = {item["id"] for item in fields["shot.camera_angle"]["options"]}
-        self.assertTrue(any(item.endswith("_studio") for item in camera_ids))
-        self.assertTrue(any(item.endswith("_editorial") for item in camera_ids))
+        options = fields["shot.camera_angle"]["options"]
+        self.assertEqual(len(options), len({item["id"] for item in options}))
+        self.assertEqual(len(options), len({item["prompt"] for item in options}))
+
+    def test_surface_color_and_texture_are_composed_and_director_editable(self):
+        state, storyboard_id = self.make_storyboard(count=12, prompt_seed=0)
+        record = state.get_storyboard(storyboard_id)
+        position = next(
+            index for index, shot in enumerate(record["shots"], 1)
+            if shot["scene"]["furniture"].get("surface_texture_target")
+        )
+        payload = state.director_payload(storyboard_id, position)
+        fields = director_fields(payload)
+        self.assertIn("shot.surface_color", fields)
+        self.assertIn("shot.surface_texture", fields)
+        color = next(
+            option for option in fields["shot.surface_color"]["options"]
+            if option["id"] and option["id"] != fields["shot.surface_color"]["value"]
+        )
+        texture = next(
+            option for option in fields["shot.surface_texture"]["options"]
+            if option["id"] and option["id"] != fields["shot.surface_texture"]["value"]
+        )
+        state.update_director(
+            storyboard_id,
+            {"shot": position, "field": "shot.surface_color", "value": color["id"]},
+        )
+        state.update_director(
+            storyboard_id,
+            {"shot": position, "field": "shot.surface_texture", "value": texture["id"]},
+        )
+        rendered = state.storyboard_payload(state.get_storyboard(storyboard_id))["shots"][position - 1]
+        self.assertIn(color["prompt"], rendered["positive_prompt"])
+        self.assertIn(texture["prompt"], rendered["positive_prompt"])
+        imported = state.import_storyboard(state.export_storyboard(storyboard_id))
+        imported_shot = state.get_storyboard(imported["id"])["shots"][position - 1]["scene"]
+        self.assertEqual(imported_shot["surface_color"]["id"], color["id"])
+        self.assertEqual(imported_shot["surface_texture"]["id"], texture["id"])
 
     def test_amateur_style_does_not_reduce_explicit_direction(self):
         poses, actions, recipes, plateau_kinds = set(), set(), set(), set()
@@ -140,11 +242,6 @@ class DirectorRegressionTests(unittest.TestCase):
                 plateau_kinds.add(scene["stage"].get("plateau_kind"))
                 if scene.get("explicit_recipe"):
                     recipes.add(scene["explicit_recipe"]["id"])
-                    self.assertFalse(
-                        scene["explicit_recipe"]["id"].endswith(
-                            ("_studio", "_editorial")
-                        )
-                    )
         self.assertGreaterEqual(len(poses), 35)
         self.assertGreaterEqual(len(actions), 30)
         self.assertGreaterEqual(len(recipes), 8)
@@ -170,6 +267,9 @@ class DirectorRegressionTests(unittest.TestCase):
         self.assertEqual(job["total"], 1)
         self.assertEqual(job["logs"][0]["type"], "queued")
         self.assertEqual(job["logs"][0]["total"], 1)
+        self.assertNotIn("attempt", job)
+        self.assertNotIn("retrying", job)
+        self.assertNotIn("last_error", job)
 
     def test_new_variation_changes_only_the_shot_inference_seed(self):
         state, storyboard_id = self.make_storyboard()
@@ -244,6 +344,20 @@ class DirectorRegressionTests(unittest.TestCase):
         )
         self.assertEqual(director_fields(updated)["human.hair_color"]["custom"], "")
 
+    def test_random_director_value_uses_a_compatible_nonempty_option(self):
+        state, storyboard_id = self.make_storyboard()
+        before = director_fields(state.director_payload(storyboard_id, 1))
+        field = before["shot.pose"]
+        compatible = {option["id"] for option in field["options"] if option["id"]}
+        updated = state.update_director(
+            storyboard_id,
+            {"shot": 1, "field": "shot.pose", "value": "__director_random__"},
+        )
+        selected = director_fields(updated)["shot.pose"]["value"]
+        self.assertIn(selected, compatible)
+        if len(compatible) > 1:
+            self.assertNotEqual(selected, field["value"])
+
     def test_custom_values_survive_export_import_and_reroll(self):
         state, storyboard_id = self.make_storyboard()
         state.update_director(
@@ -273,11 +387,11 @@ class DirectorRegressionTests(unittest.TestCase):
 
     def test_compiler_preserves_stage_and_visible_garments(self):
         anchors = {
-            "covered": "breasts and nipples fully covered by clothing",
-            "lingerie": "breasts and nipples covered by the bra",
+            "covered": "opaque upper-body clothing fully covering both breasts",
+            "lingerie": "opaque bra, lingerie top, or upper garment fully covering both breasts",
             "topless": "topless, bare breasts and visible nipples",
             "nude": "fully nude body",
-            "explicit": "explicit adult nudity",
+            "explicit": "explicit adult pose",
         }
         state, storyboard_id = self.make_storyboard(count=12, prompt_seed=8800)
         record = state.get_storyboard(storyboard_id)
@@ -286,10 +400,186 @@ class DirectorRegressionTests(unittest.TestCase):
             scene = shot["scene"]
             positive = rendered["positive_prompt"].casefold()
             self.assertIn(anchors[scene["stage"]["level"]], positive)
+            self.assertEqual(
+                len(rendered["selected_ids"]), len(set(rendered["selected_ids"]))
+            )
             for slot in scene["stage"].get("visible_slots", []):
                 garment = scene["outfit"]["garments"].get(slot)
                 if garment:
                     self.assertIn(garment["prompt"].casefold(), positive)
+
+    def test_compiler_prioritizes_persistent_visual_identity(self):
+        state, storyboard_id = self.make_storyboard(count=8, prompt_seed=4141)
+        record = state.get_storyboard(storyboard_id)
+        shot = record["shots"][0]
+        scene = shot["scene"]
+        positive = state.storyboard_payload(record)["shots"][0]["positive_prompt"].casefold()
+        first_visible_garment = next(
+            scene["outfit"]["garments"][slot]
+            for slot in scene["outfit"]["template"]["slots"]
+            if slot in set(scene["stage"].get("visible_slots", []))
+            and slot in scene["outfit"]["garments"]
+        )
+        positions = [
+            positive.index("single subject"),
+            positive.index(scene["human"]["ethnic_appearance"]["prompt"].casefold()),
+            positive.index(first_visible_garment["prompt"].casefold()),
+            positive.index(scene["interior"]["prompt"].casefold()),
+            positive.index(scene["pose"]["prompt"].casefold()),
+            positive.index(scene["shot_size"]["prompt"].casefold()),
+        ]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_covered_chest_blocks_nipple_clipping_without_losing_bust_shape(self):
+        state, storyboard_id = self.make_storyboard(count=12, prompt_seed=24680)
+        record = state.get_storyboard(storyboard_id)
+        payload = state.storyboard_payload(record)
+        covered = [
+            (raw["scene"], rendered)
+            for raw, rendered in zip(record["shots"], payload["shots"])
+            if raw["scene"]["stage"]["level"] in {"covered", "lingerie"}
+        ]
+        self.assertTrue(covered)
+        for scene, rendered in covered:
+            positive = rendered["positive_prompt"].casefold()
+            negative = rendered["negative_prompt"].casefold()
+            self.assertIn("unbroken opaque fabric over the entire bust", positive)
+            self.assertIn("no visible nipples or nipple protrusion", positive)
+            self.assertIn("bust", positive)
+            self.assertIn("nipples clipping through clothing", negative)
+            self.assertIn("nipple outline through clothes", negative)
+
+    def test_extremely_large_breasts_keep_their_scale_under_clothing(self):
+        state, storyboard_id = self.make_storyboard(count=12, prompt_seed=24680)
+        state.update_director(
+            storyboard_id,
+            {
+                "shot": 1,
+                "field": "human.breast_size",
+                "value": "breasts_extremely_large",
+            },
+        )
+        shots = state.storyboard_payload(state.get_storyboard(storyboard_id))["shots"]
+        covered = next(
+            shot for shot in shots if shot["stage"]["level"] in {"covered", "lingerie"}
+        )
+        nude = next(
+            shot for shot in shots if shot["stage"]["level"] in {"nude", "explicit"}
+        )
+        self.assertIn(
+            "extremely large heavy natural breasts under opaque clothing:1.55",
+            covered["positive_prompt"],
+        )
+        self.assertIn("enormous wide deep projecting clothed bust:1.5", covered["positive_prompt"])
+        self.assertIn("breasts completely covered", covered["positive_prompt"])
+        self.assertIn("extremely large heavy natural breasts", nude["positive_prompt"])
+        self.assertNotIn("under opaque clothing", nude["positive_prompt"])
+
+    def test_dress_templates_only_offer_physically_compatible_bra_layers(self):
+        state, storyboard_id = self.make_storyboard(count=8, prompt_seed=7788)
+        state.update_director(
+            storyboard_id,
+            {
+                "shot": 1,
+                "field": "outfit.template",
+                "value": "template_sexy_casual_dress",
+            },
+        )
+        fields = director_fields(state.director_payload(storyboard_id, 1))
+        bra_ids = {option["id"] for option in fields["outfit.garments.bra"]["options"]}
+        dress_ids = {
+            option["id"] for option in fields["outfit.garments.full_body"]["options"]
+        }
+        self.assertIn("bra_tshirt", bra_ids)
+        self.assertNotIn("bra_sports", bra_ids)
+        self.assertNotIn("bra_longline", bra_ids)
+        self.assertIn("dress_tshirt_bodycon", dress_ids)
+        self.assertNotIn("dress_offshoulder_knit_mini", dress_ids)
+        with self.assertRaises(app.AppError):
+            state.update_director(
+                storyboard_id,
+                {
+                    "shot": 1,
+                    "field": "outfit.garments.bra",
+                    "value": "bra_sports",
+                },
+            )
+
+    def test_resolved_outfits_always_pass_layer_validation(self):
+        database, _ = app.load_database()
+        composer = app.Composer(database, app.random.Random(9911))
+        protected = {
+            template_id
+            for rule in database["settings"]["garment_layer_rules"]
+            for template_id in rule["template_ids"]
+        }
+        for template in database["outfit_templates"]:
+            if template["id"] not in protected:
+                continue
+            for _ in range(50):
+                app.validate_outfit_layers(
+                    database,
+                    composer.choose_outfit(template),
+                )
+
+    def test_prop_is_directly_editable_with_only_compatible_options(self):
+        state, storyboard_id = self.make_storyboard(count=12, prompt_seed=13579)
+        payload = state.director_payload(storyboard_id, 1)
+        field = director_fields(payload)["shot.prop"]
+        compatible = [option for option in field["options"] if option["id"]]
+        self.assertTrue(compatible)
+        selected = compatible[0]
+        updated = state.update_director(
+            storyboard_id,
+            {"shot": 1, "field": "shot.prop", "value": selected["id"]},
+        )
+        self.assertEqual(director_fields(updated)["shot.prop"]["value"], selected["id"])
+        rendered = state.storyboard_payload(state.get_storyboard(storyboard_id))["shots"][0]
+        self.assertIn(selected["prompt"], rendered["positive_prompt"])
+
+    def test_garment_transition_can_be_changed_disabled_and_customized(self):
+        state, storyboard_id = self.make_storyboard(count=12, prompt_seed=24680)
+        record = state.get_storyboard(storyboard_id)
+        position = next(
+            index for index, shot in enumerate(record["shots"], 1)
+            if shot["scene"].get("garment_transition")
+        )
+        field = director_fields(state.director_payload(storyboard_id, position))[
+            "shot.garment_transition"
+        ]
+        alternative = next(
+            option for option in field["options"]
+            if option["id"] and option["id"] != field["value"]
+        )
+        state.update_director(
+            storyboard_id,
+            {
+                "shot": position,
+                "field": "shot.garment_transition",
+                "value": alternative["id"],
+            },
+        )
+        rendered = state.storyboard_payload(state.get_storyboard(storyboard_id))["shots"][position - 1]
+        self.assertIn(alternative["prompt"], rendered["positive_prompt"])
+        disabled = state.update_director(
+            storyboard_id,
+            {"shot": position, "field": "shot.garment_transition", "value": ""},
+        )
+        self.assertIn("shot.garment_transition", director_fields(disabled))
+        self.assertNotIn(alternative["prompt"], state.storyboard_payload(
+            state.get_storyboard(storyboard_id)
+        )["shots"][position - 1]["positive_prompt"])
+        state.update_director(
+            storyboard_id,
+            {
+                "shot": position,
+                "field": "shot.garment_transition",
+                "custom_value": "carefully sliding the dress down",
+            },
+        )
+        self.assertIn("carefully sliding the dress down", state.storyboard_payload(
+            state.get_storyboard(storyboard_id)
+        )["shots"][position - 1]["positive_prompt"])
 
     def test_legacy_prompt_profile_is_ignored_without_truncation(self):
         state = app.WebState()
@@ -452,6 +742,20 @@ class OutputDeletionRegressionTests(unittest.TestCase):
                 with self.assertRaisesRegex(app.AppError, "still being written"):
                     app.delete_output_image(name)
                 self.assertTrue(target.exists())
+
+
+class FrontendContractTests(unittest.TestCase):
+    def test_storyboard_render_mode_uses_synchronized_split_buttons(self):
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        javascript = (root / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertNotIn('name="fast"', html)
+        self.assertEqual(html.count("data-render-mode"), 2)
+        self.assertIn("Preview storyboard", html)
+        self.assertIn("Render storyboard", html)
+        self.assertIn("state.renderMode === 'preview'", javascript)
+        self.assertNotIn("retry_count", html)
+        self.assertNotIn("retry_count", javascript)
 
 
 class RenderLifecycleRegressionTests(unittest.TestCase):

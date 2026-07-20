@@ -153,6 +153,13 @@ def validate_database(db: dict[str, Any]) -> None:
         value = garment_modifiers.get(field, 0)
         if not isinstance(value, (int, float)) or not 0 <= value <= 1:
             raise AppError(f"settings.garment_modifiers.{field} must be between 0 and 1")
+    surface_modifiers = settings.get("surface_modifiers", {})
+    if not isinstance(surface_modifiers, dict):
+        raise AppError("settings.surface_modifiers must be an object")
+    for field in ("color_chance", "texture_chance"):
+        value = surface_modifiers.get(field, 0)
+        if not isinstance(value, (int, float)) or not 0 <= value <= 1:
+            raise AppError(f"settings.surface_modifiers.{field} must be between 0 and 1")
 
     ids: set[str] = set()
     index: dict[str, dict[str, Any]] = {}
@@ -233,6 +240,31 @@ def validate_database(db: dict[str, Any]) -> None:
     }
     if not enabled_color_ids:
         raise AppError("colors must contain at least one enabled item")
+    surface_pool_sections = {
+        "colors": {item["id"] for item in db["colors"] if not item.get("disabled", False)},
+        "textures": {
+            item["id"] for item in db["fabric_textures"]
+            if not item.get("disabled", False)
+        },
+    }
+    for field, available in surface_pool_sections.items():
+        values = surface_modifiers.get(field)
+        if (
+            not isinstance(values, list) or not values
+            or not all(isinstance(value, str) for value in values)
+            or len(values) != len(set(values))
+            or not set(values).issubset(available)
+        ):
+            raise AppError(
+                f"settings.surface_modifiers.{field} must be a non-empty unique "
+                "list of enabled modifier IDs"
+            )
+    for furniture in db["furniture"]:
+        for field in ("surface_color_target", "surface_texture_target"):
+            if field in furniture and (
+                not isinstance(furniture[field], str) or not furniture[field].strip()
+            ):
+                raise AppError(f"furniture.{furniture['id']}.{field} must be non-empty text")
     for section, values in db["human_model_parts"].items():
         if not any(not item.get("disabled", False) for item in values):
             raise AppError(f"human_model_parts.{section} must contain at least one enabled item")
@@ -249,6 +281,34 @@ def validate_database(db: dict[str, Any]) -> None:
     garment_ids = {
         item["id"] for values in db["garments"].values() for item in values
     }
+    template_ids = {item["id"] for item in db["outfit_templates"]}
+    layer_rules = settings.get("garment_layer_rules", [])
+    if not isinstance(layer_rules, list):
+        raise AppError("settings.garment_layer_rules must be a list")
+    for rule in layer_rules:
+        if not isinstance(rule, dict) or not isinstance(rule.get("id"), str):
+            raise AppError("Every garment layer rule needs a string id")
+        for field, available in (
+            ("template_ids", template_ids),
+            ("allowed_outer_ids", garment_ids),
+            ("allowed_inner_ids", garment_ids),
+        ):
+            values = rule.get(field)
+            if (
+                not isinstance(values, list) or not values
+                or not all(isinstance(value, str) and value for value in values)
+                or len(values) != len(set(values))
+                or not set(values).issubset(available)
+            ):
+                raise AppError(
+                    f"settings.garment_layer_rules.{rule['id']}.{field} must "
+                    "reference unique existing IDs"
+                )
+        for field in ("outer_slot", "inner_slot"):
+            if not isinstance(rule.get(field), str) or not rule[field]:
+                raise AppError(
+                    f"settings.garment_layer_rules.{rule['id']}.{field} must be text"
+                )
     for section in ("patterns", "fabric_textures"):
         for item in db[section]:
             allowed = item.get("allowed_garment_ids")
@@ -508,13 +568,52 @@ def tags(item: dict[str, Any]) -> set[str]:
     return set(item.get("tags", []))
 
 
-def base_catalog_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Keep production variants in Director, not in casual automatic direction."""
-    base = [
-        item for item in items
-        if not item["id"].endswith(("_studio", "_editorial"))
+def validate_outfit_layers(db: dict[str, Any], outfit: dict[str, Any]) -> None:
+    template_id = outfit["template"]["id"]
+    garments = outfit["garments"]
+    for rule in db["settings"].get("garment_layer_rules", []):
+        if template_id not in rule["template_ids"]:
+            continue
+        outer = garments.get(rule["outer_slot"])
+        inner = garments.get(rule["inner_slot"])
+        if not outer or not inner:
+            continue
+        if (
+            outer["id"] not in rule["allowed_outer_ids"]
+            or inner["id"] not in rule["allowed_inner_ids"]
+        ):
+            raise AppError(
+                f"Garment layers {inner['id']} under {outer['id']} are incompatible"
+            )
+
+
+def garment_allowed_by_layer_rules(
+    db: dict[str, Any], template_id: str, slot: str, garment_id: str
+) -> bool:
+    for rule in db["settings"].get("garment_layer_rules", []):
+        if template_id not in rule["template_ids"]:
+            continue
+        if slot == rule["outer_slot"] and garment_id not in rule["allowed_outer_ids"]:
+            return False
+        if slot == rule["inner_slot"] and garment_id not in rule["allowed_inner_ids"]:
+            return False
+    return True
+
+
+def surface_modifier_candidates(
+    db: dict[str, Any], furniture: dict[str, Any], kind: str
+) -> list[dict[str, Any]]:
+    if kind not in {"color", "texture"}:
+        raise AppError(f"Unknown surface modifier kind: {kind}")
+    if not furniture.get(f"surface_{kind}_target"):
+        return []
+    settings = db["settings"].get("surface_modifiers", {})
+    ids = set(settings.get("colors" if kind == "color" else "textures", []))
+    section = "colors" if kind == "color" else "fabric_textures"
+    return [
+        item for item in db[section]
+        if item["id"] in ids and not item.get("disabled", False)
     ]
-    return base or items
 
 
 def compatible_with_requirements(item: dict[str, Any], available_tags: set[str]) -> bool:
@@ -606,8 +705,38 @@ class Composer:
             if not item.get("disabled", False)
             and garment["id"] in item["allowed_garment_ids"]
         ]
-        candidates = base_catalog_items(candidates)
         return weighted_choice(self.rng, candidates) if candidates else None
+
+    def surface_style(
+        self,
+        fixed: dict[str, Any],
+        furniture: dict[str, Any],
+        overrides: dict[str, str],
+    ) -> dict[str, dict[str, Any] | None]:
+        styles = fixed.setdefault("surface_styles", {})
+        if furniture["id"] not in styles:
+            settings = self.db["settings"].get("surface_modifiers", {})
+            style: dict[str, dict[str, Any] | None] = {}
+            for kind in ("color", "texture"):
+                candidates = surface_modifier_candidates(self.db, furniture, kind)
+                chance = float(settings.get(f"{kind}_chance", 0))
+                style[f"surface_{kind}"] = (
+                    weighted_choice(self.rng, candidates)
+                    if candidates and self.rng.random() < chance else None
+                )
+            styles[furniture["id"]] = style
+        style = dict(styles[furniture["id"]])
+        for kind in ("color", "texture"):
+            key = f"surface_{kind}"
+            if key not in overrides:
+                continue
+            wanted = overrides[key]
+            candidates = surface_modifier_candidates(self.db, furniture, kind)
+            selected = next((item for item in candidates if item["id"] == wanted), None)
+            if selected is None:
+                raise AppError(f"Surface {kind} is incompatible with {furniture['id']}")
+            style[key] = selected
+        return style
 
     def choose_human(
         self,
@@ -640,7 +769,6 @@ class Composer:
                 if default_pools.get(category):
                     allowed_ids = set(default_pools[category])
                     candidates = [item for item in candidates if item["id"] in allowed_ids]
-                    candidates = base_catalog_items(candidates)
                 human[category] = self.rng.sample(candidates, k=min(count, len(candidates)))
                 for item in human[category]:
                     selected_tags |= tags(item)
@@ -653,7 +781,6 @@ class Composer:
             if category not in overrides and default_pools.get(category):
                 allowed_ids = set(default_pools[category])
                 candidates = [item for item in candidates if item["id"] in allowed_ids]
-                candidates = base_catalog_items(candidates)
             if category in overrides:
                 choice = overrides[category]
                 if choice not in candidates:
@@ -688,9 +815,13 @@ class Composer:
             required = bool(rule.get("required", False))
             if not required and self.rng.random() > float(rule.get("chance", 1)):
                 continue
-            candidates = base_catalog_items(
-                list(self.db["garments"][rule["catalog"]])
-            )
+            candidates = list(self.db["garments"][rule["catalog"]])
+            candidates = [
+                item for item in candidates
+                if garment_allowed_by_layer_rules(
+                    self.db, template["id"], slot, item["id"]
+                )
+            ]
             required_tags = set(rule.get("required_tags", []))
             if required_tags:
                 candidates = [item for item in candidates if required_tags.issubset(tags(item))]
@@ -718,6 +849,11 @@ class Composer:
                 if occupied_slot in occupied and occupied[occupied_slot] != item["id"]:
                     raise AppError(f"Outfit slot conflict: {occupied[occupied_slot]} and {item['id']}")
                 occupied[occupied_slot] = item["id"]
+
+        validate_outfit_layers(
+            self.db,
+            {"template": template, "garments": selected},
+        )
 
         assigned_colors: dict[str, dict[str, Any]] = {}
         grouped_slots: dict[str, list[str]] = {}
@@ -884,9 +1020,8 @@ class Composer:
             ]
         if overrides.get("furniture"):
             furniture_candidates = [item for item in furniture_candidates if item["id"] == overrides["furniture"]]
-        else:
-            furniture_candidates = base_catalog_items(furniture_candidates)
         furniture = choose("furniture", furniture_candidates)
+        surface_style = self.surface_style(fixed, furniture, overrides)
         available_tags = set(stage.get("body_visibility", [])) | {stage["level"]}
         available_tags |= set(stage.get("visible_slots", []))
         available_tags |= tags(furniture) | tags(fixed["interior"])
@@ -897,8 +1032,6 @@ class Composer:
                 recipes = [item for item in recipes if item.get("plateau_kind") == stage["plateau_kind"]]
             if overrides.get("explicit_recipe"):
                 recipes = [item for item in recipes if item["id"] == overrides["explicit_recipe"]]
-            else:
-                recipes = base_catalog_items(recipes)
             if recipes:
                 recipe = choose("explicit_recipe", recipes)
                 available_tags |= tags(recipe)
@@ -929,8 +1062,6 @@ class Composer:
             poses = [item for item in poses if required & tags(item)]
         if overrides.get("pose"):
             poses = [item for item in poses if item["id"] == overrides["pose"]]
-        else:
-            poses = base_catalog_items(poses)
         pose = choose("pose", poses)
         action_tags = available_tags | tags(pose)
         actions = [
@@ -958,12 +1089,26 @@ class Composer:
             actions = [item for item in actions if required & tags(item)]
         if overrides.get("action"):
             actions = [item for item in actions if item["id"] == overrides["action"]]
-        else:
-            actions = base_catalog_items(actions)
         action = choose("action", actions)
         prop = None
         required_prop_tags = set(action.get("requires_prop_tags", []))
-        if required_prop_tags:
+        if "prop" in overrides:
+            if overrides["prop"]:
+                candidates = [
+                    item for item in self.db["props"]
+                    if item["id"] == overrides["prop"]
+                    and not item.get("disabled", False)
+                    and compatible_with_requirements(
+                        item, available_tags | tags(action)
+                    )
+                    and (not required_prop_tags or required_prop_tags.issubset(tags(item)))
+                ]
+                if not candidates:
+                    raise AppError("Selected prop is incompatible with this shot")
+                prop = candidates[0]
+            elif required_prop_tags:
+                raise AppError("This action requires a compatible prop")
+        elif required_prop_tags:
             candidates = [item for item in self.db["props"] if required_prop_tags.issubset(tags(item))]
             prop = weighted_choice(self.rng, candidates)
         elif self.rng.random() < 0.18:
@@ -979,7 +1124,7 @@ class Composer:
                 candidates = casual_props or candidates
             if candidates:
                 prop = weighted_choice(self.rng, candidates)
-        expression_candidates = base_catalog_items(list(self.db["expressions"]))
+        expression_candidates = list(self.db["expressions"])
         required_expression_tags = set(action.get("requires_expression_tags", []))
         if required_expression_tags:
             expression_candidates = [
@@ -1042,18 +1187,16 @@ class Composer:
             wanted = overrides.get(key) or recipe_refs.get(key)
             if wanted:
                 candidates = [item for item in candidates if item["id"] == wanted]
-            else:
-                candidates = base_catalog_items(candidates)
-                if key == "framing":
-                    casual_framings = {
-                        "framing_centered", "framing_tight_crop",
-                        "framing_environmental",
-                    }
-                    casual = [
-                        item for item in candidates
-                        if item["id"] in casual_framings
-                    ]
-                    candidates = casual or candidates
+            elif key == "framing":
+                casual_framings = {
+                    "framing_centered", "framing_tight_crop",
+                    "framing_environmental",
+                }
+                casual = [
+                    item for item in candidates
+                    if item["id"] in casual_framings
+                ]
+                candidates = casual or candidates
             camera[key] = choose(key, candidates)
             camera_tags |= tags(camera[key])
         intensity = overrides.get("intensity") or (recipe.get("intensity", "explicit") if recipe else {
@@ -1061,6 +1204,7 @@ class Composer:
         }.get(stage["level"], "fashion"))
         return {
             "furniture": furniture,
+            **surface_style,
             "pose": pose,
             "action": action,
             "prop": prop,
@@ -1122,6 +1266,10 @@ class Composer:
                 if slot in visible_slots
             )
         flattened.extend([scene[key] for key in ("interior", "furniture", "pose", "action", "expression", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target")])
+        flattened.extend(
+            scene[key] for key in ("surface_color", "surface_texture")
+            if scene.get(key)
+        )
         if scene.get("explicit_recipe"):
             flattened.append(scene["explicit_recipe"])
         if scene.get("prop"):
@@ -1211,9 +1359,16 @@ def human_fragments(
         for key in ("breast_size", "breast_shape"):
             override = custom.get(f"human.{key}")
             if override:
-                fragments.append(
-                    f"{override}, expressed through clothing only, chest fully covered by clothing"
-                )
+                if key == "breast_size":
+                    fragments.append(
+                        f"({override} visibly shaping the opaque clothing:1.35), "
+                        "clothed bust volume clearly matching that size, breasts completely covered"
+                    )
+                else:
+                    fragments.append(
+                        f"{override}, expressed through clothing only, "
+                        "breasts completely covered by opaque clothing"
+                    )
             elif human[key].get("covered_prompt"):
                 fragments.append(human[key]["covered_prompt"])
     if "nipples" in visibility:
@@ -1270,53 +1425,27 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     # explicitly in vocabulary image models reliably understand.
     stage_anchors = {
         "covered": (
-            "wearing the listed outfit, clothing continuity, breasts and nipples "
-            "fully covered by clothing"
+            "(opaque upper-body clothing fully covering both breasts while conforming "
+            "to their actual size:1.3), unbroken opaque fabric over the entire bust, "
+            "no visible nipples or nipple protrusion through the fabric"
         ),
         "lingerie": (
-            "wearing the listed lingerie, lingerie continuity, breasts and nipples "
-            "covered by the bra"
+            "(opaque bra, lingerie top, or upper garment fully covering both breasts "
+            "while conforming to their actual size:1.3), unbroken opaque fabric over "
+            "the entire bust, no visible nipples or nipple protrusion through fabric"
         ),
-        "topless": "topless, bare breasts and visible nipples, lower garments retained",
-        "nude": "fully nude body, no clothing except the listed retained accessories",
-        "explicit": "explicit adult nudity, clothing state remains consistent",
+        "topless": "topless, bare breasts and visible nipples, lower-body garments visible",
+        "nude": "fully nude body, bare breasts, visible nipples, pubic area and genitals visible",
+        "explicit": "explicit adult pose, bare breasts, visible nipples, pubic area and genitals visible",
     }
     stage_anchor = stage_anchors.get(stage.get("level"), "")
     if stage_anchor:
         fragments.append(stage_anchor)
-    # Compiler v2 keeps the subject first, then establishes editorial intent and camera.
-    for key in ("editorial_role", "shot_size", "camera_angle", "framing", "focus_target"):
-        item = scene.get(key)
-        if item:
-            fragments.append(shot_prompt(key, item))
-    stage_custom = custom.get("shot.stage")
-    if stage_custom:
-        fragments.append(stage_custom)
-    elif xxx_prompt:
-        fragments.append(xxx_prompt)
-    if scene.get("explicit_recipe"):
-        fragments.append(custom.get("shot.explicit_recipe") or scene["explicit_recipe"]["prompt"])
-    if scene.get("intensity"):
-        fragments.append(custom.get("shot.intensity") or f"{scene['intensity']} visual intensity")
-    if scene.get("garment_transition"):
-        fragments.append(custom.get("shot.garment_transition") or scene["garment_transition"]["prompt"])
-    for key in ("pose", "action", "prop"):
-        item = scene.get(key)
-        if item:
-            fragments.append(custom.get(f"shot.{key}") or item["prompt"])
+    # Stateless image inference pays more attention to earlier tokens. Keep the
+    # persistent visual identity before transient direction and camera grammar.
     fragments.extend(
         human_fragments(scene["human"], visibility, covered_chest, custom)
     )
-    if stage_custom:
-        fragments.append(stage_custom)
-    elif xxx_prompt:
-        fragments.append(xxx_prompt)
-    if scene.get("explicit_recipe"):
-        fragments.append(custom.get("shot.explicit_recipe") or scene["explicit_recipe"]["prompt"])
-    if scene.get("intensity"):
-        fragments.append(custom.get("shot.intensity") or f"{scene['intensity']} visual intensity")
-    if scene.get("garment_transition"):
-        fragments.append(custom.get("shot.garment_transition") or scene["garment_transition"]["prompt"])
     visible_slots = set(stage.get("visible_slots", []))
     outfit = scene["outfit"]
     if custom.get("outfit.template"):
@@ -1336,14 +1465,62 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             reveals_cameltoe = reveals_cameltoe or garment.get("reveals_cameltoe", False)
     if reveals_cameltoe:
         fragments.append(defaults["cameltoe_prompt"])
-    for key in ("pose", "action", "prop", "expression", "interior", "furniture", "mood", "photography_style"):
+
+    # Location and its physical surface are also persistent set identity.
+    for key in ("interior", "furniture", "mood", "photography_style"):
         item = scene.get(key)
         if item:
-            director_key = f"shot.{key}" if key in {"pose", "action", "expression", "furniture"} else f"scene.{key}"
-            if key == "editorial_role":
-                fragments.append(shot_prompt(key, item))
+            director_key = f"shot.{key}" if key == "furniture" else f"scene.{key}"
+            if key == "furniture":
+                base = custom.get(director_key) or item["prompt"]
+                modifier_parts = []
+                for kind in ("color", "texture"):
+                    modifier = scene.get(f"surface_{kind}")
+                    modifier_prompt = custom.get(f"shot.surface_{kind}") or (
+                        modifier.get("prompt", "") if modifier else ""
+                    )
+                    if modifier_prompt:
+                        modifier_parts.append(modifier_prompt)
+                target = item.get("surface_texture_target") or item.get(
+                    "surface_color_target", "surface"
+                )
+                fragments.append(
+                    f"{base}, {' '.join(modifier_parts)} {target}"
+                    if modifier_parts else base
+                )
             else:
                 fragments.append(custom.get(director_key) or item["prompt"])
+
+    # Everything below describes only this inference: explicit recipe, action,
+    # expression, editorial intent, and finally camera grammar.
+    stage_custom = custom.get("shot.stage")
+    if stage_custom:
+        fragments.append(stage_custom)
+    elif xxx_prompt:
+        fragments.append(xxx_prompt)
+    if scene.get("explicit_recipe"):
+        fragments.append(
+            custom.get("shot.explicit_recipe") or scene["explicit_recipe"]["prompt"]
+        )
+    if scene.get("intensity"):
+        fragments.append(
+            custom.get("shot.intensity") or f"{scene['intensity']} visual intensity"
+        )
+    if scene.get("garment_transition"):
+        fragments.append(
+            custom.get("shot.garment_transition")
+            or scene["garment_transition"]["prompt"]
+        )
+    for key in ("pose", "action", "prop", "expression"):
+        item = scene.get(key)
+        if item:
+            fragments.append(custom.get(f"shot.{key}") or item["prompt"])
+        elif key == "prop" and custom.get("shot.prop"):
+            fragments.append(custom["shot.prop"])
+    for key in ("editorial_role", "shot_size", "camera_angle", "framing", "focus_target"):
+        item = scene.get(key)
+        if item:
+            fragments.append(shot_prompt(key, item))
     fragments.extend(item["prompt"] for item in scene.get("dependencies", []))
     fragments.append(defaults.get("positive_suffix", ""))
     unique_fragments = []
@@ -1360,11 +1537,6 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
         negative = f"{negative}, {defaults['covered_chest_negative']}"
     if plateau_kind and defaults.get("xxx_negative_additions"):
         xxx_negative = defaults["xxx_negative_additions"]
-        if plateau_kind == "panties_aside":
-            xxx_negative = ", ".join(
-                term.strip() for term in xxx_negative.split(",")
-                if term.strip() not in {"clothes", "underwear"}
-            )
         negative = f"{negative}, {xxx_negative}"
     kind_negative = defaults.get("xxx_plateau_negative_additions", {}).get(
         plateau_kind, ""
@@ -1381,12 +1553,16 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             if slot in visible_slots
         )
     ids.extend(scene[key]["id"] for key in ("pose", "action", "expression", "interior", "furniture", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target"))
+    ids.extend(
+        scene[key]["id"] for key in ("surface_color", "surface_texture")
+        if scene.get(key)
+    )
     if scene.get("explicit_recipe"):
         ids.append(scene["explicit_recipe"]["id"])
     if scene.get("prop"):
         ids.append(scene["prop"]["id"])
     ids.extend(item["id"] for item in scene.get("dependencies", []))
-    return positive, negative, ids
+    return positive, negative, list(dict.fromkeys(ids))
 
 
 def prompt_lint(scene: dict[str, Any], positive: str) -> list[str]:
@@ -1397,8 +1573,8 @@ def prompt_lint(scene: dict[str, Any], positive: str) -> list[str]:
     if scene["stage"]["level"] == "covered" and any(term in folded for term in ("fully nude", "exposed genitals")):
         warnings.append("Covered stage contains exposed-content wording")
     coverage_anchors = {
-        "covered": "breasts and nipples fully covered by clothing",
-        "lingerie": "breasts and nipples covered by the bra",
+        "covered": "opaque upper-body clothing fully covering both breasts",
+        "lingerie": "opaque bra, lingerie top, or upper garment fully covering both breasts",
     }
     expected_anchor = coverage_anchors.get(scene["stage"]["level"])
     if expected_anchor and expected_anchor not in folded:
@@ -1984,10 +2160,6 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
         raise AppError("Inference seed strategy must be random, fixed, or sequence")
     if inference_strategy in {"fixed", "sequence"} and inference_seed is None:
         inference_seed = secrets.randbelow(2**63)
-    retry_count = _safe_int(
-        payload.get("retry_count", db["settings"].get("render_retry_count", 2)),
-        "Render retries", 0, 5,
-    )
     xxx_only = bool(payload.get("xxx_only", False))
     progression = db["settings"].get("photoshoot_progression", {})
     nsfw = _safe_percent(
@@ -2007,7 +2179,6 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
         prompt_seed=prompt_seed,
         inference_seed=inference_seed,
         inference_strategy=inference_strategy,
-        retry_count=retry_count,
         xxx_only=xxx_only,
         nsfw_percent=None if xxx_only or mode == "random" else nsfw,
         plateau_percent=None if xxx_only or mode == "random" else plateau,
@@ -2025,6 +2196,19 @@ def _outfit_summary(outfit: dict[str, Any]) -> list[str]:
         color = outfit.get("colors", {}).get(slot, {}).get("prompt")
         result.append(f"{color} {garment['prompt']}" if color else garment["prompt"])
     return result
+
+
+def _surface_summary(scene: dict[str, Any]) -> str:
+    custom = scene.get("custom_values", {})
+    parts = [custom.get("shot.furniture") or scene["furniture"]["prompt"]]
+    for kind in ("color", "texture"):
+        item = scene.get(f"surface_{kind}")
+        prompt = custom.get(f"shot.surface_{kind}") or (
+            item.get("prompt") if item else None
+        )
+        if prompt:
+            parts.append(prompt)
+    return " · ".join(parts)
 
 
 def serialize_shot(db: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
@@ -2048,7 +2232,7 @@ def serialize_shot(db: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
         "wardrobe": template.get("menu_label", template["id"]),
         "outfit": _outfit_summary(context["outfit"]),
         "location": context["interior"]["prompt"],
-        "surface": scene["furniture"]["prompt"],
+        "surface": _surface_summary(scene),
         "mood": context["mood"]["prompt"],
         "photography": context["photography_style"]["prompt"],
         "pose": {"id": scene["pose"]["id"], "prompt": scene["pose"]["prompt"]},
@@ -2162,6 +2346,63 @@ def director_option(item: dict[str, Any], current: str | None, defaults: set[str
         "current": item["id"] == current,
         "default": item["id"] in (defaults or set()),
     }
+
+
+def director_prop_options(db: dict[str, Any], shot: dict[str, Any]) -> list[dict[str, Any]]:
+    scene = shot["scene"]
+    stage = shot["stage"]
+    available = (
+        set(stage.get("body_visibility", []))
+        | set(stage.get("visible_slots", []))
+        | {stage["level"]}
+        | tags(scene["interior"])
+        | tags(scene["furniture"])
+        | tags(scene["action"])
+    )
+    required = set(scene["action"].get("requires_prop_tags", []))
+    return [
+        item for item in db["props"]
+        if not item.get("disabled", False)
+        and compatible_with_requirements(item, available)
+        and (not required or required.issubset(tags(item)))
+    ]
+
+
+def director_transition_options(scene: dict[str, Any]) -> list[dict[str, Any]]:
+    transition = scene.get("garment_transition")
+    if not transition:
+        return []
+    slots = transition.get("slots", [])
+    names = [
+        scene["outfit"]["garments"][slot]["prompt"]
+        for slot in slots if slot in scene["outfit"]["garments"]
+    ]
+    if not names:
+        return []
+    garments = " and ".join(names)
+    suffix = "_".join(slots)
+    return [
+        {
+            "id": f"transition_{suffix}",
+            "prompt": f"deliberately removing {garments}",
+            "menu_label": f"Removing {garments}",
+        },
+        {
+            "id": f"transition_in_motion_{suffix}",
+            "prompt": f"in the act of taking off {garments}",
+            "menu_label": f"Taking off {garments}",
+        },
+        {
+            "id": f"transition_half_removed_{suffix}",
+            "prompt": f"{garments} visibly halfway removed from her body",
+            "menu_label": f"Halfway removed: {garments}",
+        },
+        {
+            "id": f"transition_holding_removed_{suffix}",
+            "prompt": f"holding the removed {garments} in one hand",
+            "menu_label": f"Holding removed {garments}",
+        },
+    ]
 
 
 def director_required_overrides(
@@ -2349,6 +2590,19 @@ class WebState:
                 and set(item.get("requires_environment_tags", [])).issubset(tags(context["interior"]))
                 and not set(item.get("excludes_environment_tags", [])) & tags(context["interior"])
             ]
+            layer_compatible = []
+            for item in candidates:
+                candidate_garments = dict(context["outfit"]["garments"])
+                candidate_garments[slot] = item
+                try:
+                    validate_outfit_layers(
+                        db,
+                        {"template": template, "garments": candidate_garments},
+                    )
+                except AppError:
+                    continue
+                layer_compatible.append(item)
+            candidates = layer_compatible
             garment_options = [
                 director_option(item, garment["id"] if garment else None)
                 for item in candidates
@@ -2471,6 +2725,24 @@ class WebState:
                 "value": current_item["id"],
                 "options": [director_option(item, current_item["id"]) for item in compatible],
             })
+        furniture = shot["scene"]["furniture"]
+        for kind, label in (("color", "Surface color"), ("texture", "Surface texture")):
+            candidates = surface_modifier_candidates(db, furniture, kind)
+            if not candidates:
+                continue
+            key = f"surface_{kind}"
+            current_item = shot["scene"].get(key)
+            camera_fields.append({
+                "key": f"shot.{key}", "label": label, "scope": "shot",
+                "value": current_item["id"] if current_item else "",
+                "options": [{
+                    "id": "", "label": "None / original", "prompt": "",
+                    "current": current_item is None, "default": current_item is None,
+                }] + [
+                    director_option(item, current_item["id"] if current_item else None)
+                    for item in candidates
+                ],
+            })
         compatible_recipes = [
             item for item in db["explicit_recipes"]
             if not item.get("disabled", False)
@@ -2587,6 +2859,41 @@ class WebState:
                 "value": current_item["id"],
                 "options": [director_option(item, current_item["id"]) for item in compatible],
             })
+        current_prop = shot["scene"].get("prop")
+        prop_candidates = director_prop_options(db, shot)
+        prop_required = bool(
+            shot["scene"]["action"].get("requires_prop_tags", [])
+        )
+        direction_fields.append({
+            "key": "shot.prop", "label": "Prop", "scope": "shot",
+            "value": current_prop["id"] if current_prop else "",
+            "options": ([] if prop_required else [{
+                "id": "", "label": "None", "prompt": "",
+                "current": current_prop is None, "default": current_prop is None,
+            }]) + [
+                director_option(item, current_prop["id"] if current_prop else None)
+                for item in prop_candidates
+            ],
+        })
+        transition_candidates = director_transition_options(shot["scene"])
+        if transition_candidates:
+            current_transition = shot["scene"]["garment_transition"]
+            direction_fields.append({
+                "key": "shot.garment_transition",
+                "label": "Garment transition",
+                "scope": "shot",
+                "value": current_transition["id"] if current_transition.get("prompt") else "",
+                "options": [{
+                    "id": "", "label": "None / no removal action", "prompt": "",
+                    "current": False, "default": False,
+                }] + [
+                    director_option(
+                        item,
+                        current_transition["id"] if current_transition.get("prompt") else None,
+                    )
+                    for item in transition_candidates
+                ],
+            })
         direction_by_key = {field["key"]: field for field in direction_fields}
         direction_by_key["shot.stage"]["compatibility"] = {
             "poses": len(direction_by_key["shot.pose"]["options"]),
@@ -2677,6 +2984,33 @@ class WebState:
         if clear_custom and not field.startswith("shot."):
             context.setdefault("custom_values", {}).pop(field, None)
 
+        if value == "__director_random__" and "custom_value" not in payload:
+            director = self.director_payload(storyboard_id, number)
+            director_field = next(
+                (
+                    candidate
+                    for group in director["groups"]
+                    for candidate in group["fields"]
+                    if candidate["key"] == field
+                ),
+                None,
+            )
+            if director_field is None:
+                raise AppError("Unknown Director field")
+            candidates = [
+                option["id"] for option in director_field["options"]
+                if option.get("id")
+            ]
+            alternatives = [
+                candidate for candidate in candidates
+                if candidate != director_field.get("value")
+            ]
+            if alternatives:
+                candidates = alternatives
+            if not candidates:
+                raise AppError("This Director field has no randomizable values")
+            value = record["rng"].choice(candidates)
+
         if "custom_value" in payload:
             custom_value = payload.get("custom_value")
             if not isinstance(custom_value, str):
@@ -2696,8 +3030,10 @@ class WebState:
                 or field in {"scene.interior", "scene.furniture", "scene.mood", "scene.photography_style"}
                 or field in {
                     "shot.stage", "shot.pose", "shot.action", "shot.expression",
+                    "shot.prop",
                     "shot.furniture", "shot.editorial_role", "shot.shot_size",
                     "shot.camera_angle", "shot.framing", "shot.focus_target",
+                    "shot.surface_color", "shot.surface_texture",
                     "shot.explicit_recipe", "shot.intensity", "shot.garment_transition",
                 }
             )
@@ -2872,6 +3208,7 @@ class WebState:
                     outfit.setdefault(section, {})[slot] = modifier
             else:
                 raise AppError("Unknown wardrobe field")
+            validate_outfit_layers(db, outfit)
             record["composer"].validate_outfit_environment(outfit, context["interior"])
         elif field.startswith("scene."):
             key = field.split(".", 1)[1]
@@ -2917,6 +3254,64 @@ class WebState:
                 if clear_custom:
                     shot.setdefault("custom_values", {}).pop(field, None)
                 self._apply_director_customs(shot, shot["scene"], context)
+            elif key in {"surface_color", "surface_texture"}:
+                kind = key.removeprefix("surface_")
+                candidates = surface_modifier_candidates(
+                    db, shot["scene"]["furniture"], kind
+                )
+                selected = next(
+                    (item for item in candidates if item["id"] == value), None
+                ) if value else None
+                if value and selected is None:
+                    raise AppError(f"Surface {kind} is incompatible with this surface")
+                shot["scene"][key] = selected
+                if clear_custom:
+                    shot.setdefault("custom_values", {}).pop(field, None)
+                self._apply_director_customs(shot, shot["scene"], context)
+            elif key == "prop":
+                candidates = director_prop_options(db, shot)
+                selected = next(
+                    (item for item in candidates if item["id"] == value), None
+                ) if value else None
+                required = bool(
+                    shot["scene"]["action"].get("requires_prop_tags", [])
+                )
+                if value and selected is None:
+                    raise AppError("Prop is incompatible with this shot")
+                if not selected and required:
+                    raise AppError("This action requires a compatible prop")
+                shot["scene"]["prop"] = selected
+                shot["scene"]["dependencies"] = record["composer"].resolve_dependencies(
+                    shot["scene"]
+                )
+                if clear_custom:
+                    shot.setdefault("custom_values", {}).pop(field, None)
+                self._apply_director_customs(shot, shot["scene"], context)
+            elif key == "garment_transition":
+                options = director_transition_options(shot["scene"])
+                slots = list(
+                    shot["scene"].get("garment_transition", {}).get("slots", [])
+                )
+                selected = next(
+                    (item for item in options if item["id"] == value), None
+                ) if value else None
+                if value and selected is None:
+                    raise AppError("Garment transition is incompatible with this shot")
+                if selected:
+                    shot["scene"]["garment_transition"] = {
+                        "id": selected["id"],
+                        "prompt": selected["prompt"],
+                        "slots": slots,
+                    }
+                else:
+                    shot["scene"]["garment_transition"] = {
+                        "id": f"transition_none_{'_'.join(slots)}",
+                        "prompt": "",
+                        "slots": slots,
+                    }
+                if clear_custom:
+                    shot.setdefault("custom_values", {}).pop(field, None)
+                self._apply_director_customs(shot, shot["scene"], context)
             elif key in {
                 "pose", "action", "expression", "furniture", "editorial_role",
                 "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe",
@@ -2928,10 +3323,18 @@ class WebState:
                     for candidate in (
                         "pose", "action", "expression", "furniture", "editorial_role",
                         "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe",
+                        "surface_color", "surface_texture",
                     )
                     if candidate != key and shot["scene"].get(candidate)
                 }
+                preserved["prop"] = (
+                    shot["scene"]["prop"]["id"]
+                    if shot["scene"].get("prop") else ""
+                )
                 preserved[key] = value
+                previous_transition = copy.deepcopy(
+                    shot["scene"].get("garment_transition")
+                )
                 try:
                     scene = record["composer"].resolve_scene(
                         context, shot["stage"], preserved
@@ -2941,6 +3344,8 @@ class WebState:
                         context, shot["stage"], {key: value}
                     )
                 shot["scene"] = scene
+                if previous_transition:
+                    shot["scene"]["garment_transition"] = previous_transition
                 if clear_custom:
                     shot.setdefault("custom_values", {}).pop(field, None)
                 self._apply_director_customs(shot, shot["scene"], context)
@@ -3161,9 +3566,6 @@ class WebState:
             "total": len(shot_numbers),
             "shot_numbers": shot_numbers,
             "kind": "shot" if len(shot_numbers) == 1 else "storyboard",
-            "attempt": 0,
-            "retrying": False,
-            "last_error": None,
             "current_shot": None,
             "progress": 0,
             "elapsed_seconds": 0,
@@ -3433,37 +3835,11 @@ class WebState:
                         "total": len(selected_shots), "seed": shot["inference_seed"],
                         "positive": positive, "negative": negative,
                     })
-                prompt_id = None
-                paths = []
-                for attempt in range(record["args"].retry_count + 1):
-                    with self.lock:
-                        job["attempt"] = attempt + 1
-                        job["retrying"] = attempt > 0
-                    seed = shot["inference_seed"]
-                    if attempt and record["args"].inference_strategy != "fixed":
-                        material = f"{seed}:retry:{attempt}".encode()
-                        seed = int.from_bytes(hashlib.sha256(material).digest()[:8], "big") & (2**63 - 1)
-                    try:
-                        prompt_id, paths = generate_one(
-                            db, db_path, positive, negative, seed,
-                            record["args"].mode, shot["shot_index"], shot["photoshoot_index"],
-                            run_id, job["fast"], workflow, mapping,
-                        )
-                        with self.lock:
-                            job["last_error"] = None
-                            job["retrying"] = False
-                        break
-                    except Exception as exc:
-                        with self.lock:
-                            job["last_error"] = str(exc)
-                            job["logs"].append({
-                                "time": _iso_now(), "type": "retry" if attempt < record["args"].retry_count else "error",
-                                "message": str(exc), "shot": shot["number"],
-                                "position": completed_index, "total": len(selected_shots),
-                                "attempt": attempt + 1,
-                            })
-                        if attempt >= record["args"].retry_count:
-                            raise
+                prompt_id, paths = generate_one(
+                    db, db_path, positive, negative, shot["inference_seed"],
+                    record["args"].mode, shot["shot_index"], shot["photoshoot_index"],
+                    run_id, job["fast"], workflow, mapping,
+                )
                 elapsed = time.monotonic() - started
                 completed = completed_index
                 remaining = len(selected_shots) - completed

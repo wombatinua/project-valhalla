@@ -17,7 +17,7 @@ There is no terminal wizard and no `fzf` dependency. The terminal is used only f
 
 The Production Studio is designed around a review-before-render workflow:
 
-1. Configure the production mode, content direction, batch size, progression, prompt profile, retry policy, and seed strategy.
+1. Configure the production mode, content direction, batch size, progression, render mode, and seed strategy.
 2. Select **Resolve storyboard** to assemble every compatible shot without using the GPU.
 3. Review stage, pose, action, expression, set, and surface for every shot.
 4. Inspect positive and negative prompts or reroll individual compositions.
@@ -38,8 +38,8 @@ The UI includes:
 - automatic recovery of the active storyboard, settings, render progress, ETA, outputs, and polling after a browser reload;
 - editorially planned storyboard cards with camera grammar, roles, diversity scoring, one-shot reroll/render, prompt inspection, temporary Fast Preview, and compact JSON export/import tied to the exact semantic database version;
 - a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render style, stage, pose/action, surface, editorial role, shot size, angle, framing, focus, and explicit-recipe controls;
-- cancellable background render jobs with configurable technical retries and strategy-aware retry seeds;
-- a reload-safe Render Logger with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological retry/error/completion timeline, and safe history clearing that leaves outputs and the displayed preview intact;
+- cancellable background render jobs that fail clearly on the first generation error;
+- a reload-safe Render Logger with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves outputs and the displayed preview intact;
 - shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
 - a persistent output gallery with full-screen preview, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, previous/next navigation, swipe, downloads, individual deletion, and confirmed bulk deletion;
 - safe or forced workflow capture from the latest successful ComfyUI run.
@@ -165,13 +165,13 @@ Safe capture refuses to overwrite an existing `workflow.json`. Enable **Replace 
 
 ## Preview render
 
-Preview render patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. The Studio toggle selects this faster draft workflow for production renders. Individual **Preview** buttons in Studio and Director always use the preview workflow and require no toggle. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logger. Closing the draggable preview window discards its temporary image without adding anything to Outputs.
+Preview render patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. The synchronized Studio and Director split-buttons switch between **Preview storyboard** and **Render storyboard**, and their primary action runs the selected workflow. Individual **Preview** buttons always use the preview workflow. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logger. Closing the draggable preview window discards its temporary image without adding anything to Outputs.
 
 ## Database
 
-`database.json` contains 3,312 selectable production records covering adult-model traits, garments, modifiers, outfit templates, private locations, surfaces, poses, actions, expressions, moods, camera grammar, explicit recipes, and photography treatments. The expansion especially strengthens ordinary apartments and minimal sets, simple everyday clothes and footwear, and adult solo erotic/explicit direction while retaining all compatibility tags and stage rules.
+`database.json` contains more than 1,100 semantically distinct production records covering adult-model traits, garments, modifiers, outfit templates, private locations, surfaces, poses, actions, expressions, moods, camera grammar, explicit recipes, and photography treatments. Mechanical Studio/Editorial copies are prohibited: every selectable record must describe a distinct trait, garment construction, place, composition, or action. Combinatorial variety comes from composing real items with compatible colors, patterns, fabric textures, and surface finishes rather than duplicating records.
 
-Catalog wording is optimized for the captured Lumina2 workflow’s Qwen text encoder and remains broadly suitable for modern natural-language image conditioning: short concrete visual phrases, common garment/interior/anatomy/photography vocabulary, no internal taxonomy jargon, no duplicate prompt fragments, and no catalog fragment longer than 48 words. Database validation enforces these constraints. The compiler always preserves the complete deduplicated prompt; unusually long prompts produce a diagnostic warning instead of being modified.
+Catalog wording is optimized for the captured Lumina2 workflow’s Qwen text encoder and remains broadly suitable for modern natural-language image conditioning: short concrete visual phrases, common garment/interior/anatomy/photography vocabulary, no internal taxonomy jargon, no duplicate prompt fragments, and no catalog fragment longer than 48 words. Database validation enforces these constraints. Clothing supports compatible color, pattern, and fabric-texture composition; suitable beds, sofas, chairs, rugs, cushions, and other textile surfaces support independent color and texture finishes. The compiler always preserves the complete deduplicated prompt; unusually long prompts produce a diagnostic warning instead of being modified.
 
 The catalog follows the order in which a scene is assembled, so related material stays easy to find:
 

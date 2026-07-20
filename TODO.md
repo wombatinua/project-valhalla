@@ -30,7 +30,7 @@ This file tracks agreed future work. Unchecked items are not implemented.
 - [x] Provide a responsive production dashboard with totals, advanced settings, and a clear path to Director.
 - [x] Group high-level Web UI actions into clear production sections.
 - [x] Provide draggable, resizable, memory-only Fast Preview windows with responsive viewport limits and automatic cleanup on close.
-- [x] Provide a persistent Render Logger tab with live frame counts, elapsed/remaining time, seeds, formatted prompts, retries, errors, and generation events.
+- [x] Provide a persistent Render Logger tab with live frame counts, elapsed/remaining time, seeds, formatted prompts, errors, and generation events.
 - [x] Include Preview renders in Logger and keep the previous preview visible until its replacement finishes.
 - [x] Allow the visible preview to be rendered again directly from its popup header.
 - [x] Make preview refresh follow the currently open Director shot, spin only its glyph, and clear Logger history without deleting outputs or displayed preview data.
@@ -43,8 +43,8 @@ This file tracks agreed future work. Unchecked items are not implemented.
 - [x] Support `disabled: true` across selectable database records.
 - [x] Remove mirrors, sexual toys, and non-functional identity-consistency prompt procedures.
 - [x] Maintain README documentation alongside implementation.
-- [x] Expand the complete production catalog beyond 3,300 selectable records while preserving tags, dependencies, stage rules, pools, and Director performance.
-- [x] Triple interiors, surfaces, garments, footwear, poses, actions, camera grammar, expressions, treatments, and adult solo explicit recipes, with extra emphasis on ordinary apartments and simple sets.
+- [x] Maintain more than 1,100 semantically unique production records while preserving tags, dependencies, stage rules, pools, and Director performance.
+- [x] Remove mechanical Studio/Editorial copies and derive variety from distinct pieces plus compatible color, pattern, fabric-texture, and surface modifiers.
 - [x] Normalize catalog prompts for Lumina2/Qwen and general image-model conditioning, reject duplicate/internal/overlong fragments, and preserve the complete deduplicated prompt.
 
 ## P0 — Storyboard editorial planning
@@ -250,19 +250,15 @@ Ready when:
 - A complete series can be reviewed from one local HTML page.
 - Metadata is sufficient to reproduce a frame manually.
 
-## P2 — Retry policy and frame regeneration
+## P2 — Failure handling and frame regeneration
 
-- [x] Add configurable retry counts for HTTP, ComfyUI, and missing-output failures.
-- [x] Retry the same resolved prompt with a new inference seed when the selected strategy permits it.
-- [x] Never alter the storyboard during a technical retry.
+- [x] Fail the batch immediately and visibly when a frame cannot be generated.
 - [x] Add regeneration of one frame from printed metadata.
-- [x] Stop the batch after retries are exhausted.
 - [ ] Do not add an image-quality detector or external vision model in this phase.
 
 Ready when:
 
-- A transient failure does not discard the entire photoshoot.
-- Retry behavior is visible and explainable in console output.
+- A generation failure is visible and explainable in Logger.
 
 ## Recommended implementation order
 

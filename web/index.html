@@ -95,8 +95,6 @@
                   <label class="field seed-field"><span><strong>Storyboard seed <em>optional</em></strong><small>Controls subject, wardrobe, scene and direction.</small></span><div class="seed-input"><input type="number" name="prompt_seed" min="0" placeholder="Create one automatically"><button type="button" id="randomize-storyboard-seed" title="Generate a new storyboard seed" aria-label="Generate a new storyboard seed">↻</button></div></label>
                   <label class="field seed-field"><span><strong>Image variation seed <em>optional</em></strong><small>Controls rendered pixels without changing the direction.</small></span><div class="seed-input"><input type="number" name="inference_seed" min="0" placeholder="Create one automatically"><button type="button" id="randomize-variation-seed" title="Generate a new image variation seed" aria-label="Generate a new image variation seed">↻</button></div></label>
                   <label class="field"><span>Variation mode</span><select name="inference_strategy"><option value="sequence" selected>Unique and repeatable per shot</option><option value="fixed">Same variation for every shot</option><option value="random">Fresh random variation per shot</option></select></label>
-                  <label class="field"><span>Render retries</span><select name="retry_count"><option value="0">None</option><option value="1">1 retry</option><option value="2" selected>2 retries</option><option value="3">3 retries</option></select></label>
-                  <label class="switch-row"><span><strong>Preview render</strong><small>Faster draft workflow for production renders</small></span><input type="checkbox" name="fast"><i></i></label>
                 </div>
               </details>
 
@@ -114,7 +112,10 @@
                 <span class="seed-pill" id="seed-pill">Seed —</span>
                 <button class="button ghost" id="export-storyboard">↓ Export</button>
                 <button class="button warning" id="reroll-all">↻ Reroll all</button>
-                <button class="button render" id="generate-button" data-render-action>▶ Render storyboard</button>
+                <div class="render-choice" data-render-control>
+                  <button class="button render" id="generate-button" data-render-action>▶ Render storyboard</button>
+                  <label class="render-choice-menu" title="Choose storyboard render mode"><select data-render-mode aria-label="Storyboard render mode"><option value="preview">Preview storyboard</option><option value="production" selected>Render storyboard</option></select><span aria-hidden="true">⌄</span></label>
+                </div>
               </div>
             </div>
             <div class="storyboard-meta hidden" id="storyboard-meta"></div>
@@ -164,7 +165,10 @@
               </div>
               <div class="director-editor-tools">
                 <label class="director-search"><span>⌕</span><input id="director-search" type="search" placeholder="Find a setting or preset…"></label>
-                <button class="button render director-render" id="director-generate-button" data-render-action>▶ Render storyboard</button>
+                <div class="render-choice director-render" data-render-control>
+                  <button class="button render" id="director-generate-button" data-render-action>▶ Render storyboard</button>
+                  <label class="render-choice-menu" title="Choose storyboard render mode"><select data-render-mode aria-label="Storyboard render mode"><option value="preview">Preview storyboard</option><option value="production" selected>Render storyboard</option></select><span aria-hidden="true">⌄</span></label>
+                </div>
               </div>
             </header>
             <div class="director-summary" id="director-summary"></div>
@@ -185,7 +189,7 @@
           <div><p class="eyebrow">Production telemetry</p><h2>Render logger</h2></div>
           <div class="logger-header-actions"><span class="logger-status idle" id="logger-status">Idle</span><button class="button ghost danger" id="clear-logger">Clear logs</button></div>
         </header>
-        <div class="logger-empty panel" id="logger-empty"><div class="logger-empty-mark">≡</div><h3>No render activity yet</h3><p>Prompts, frame timing, progress, retries and errors will appear here.</p></div>
+        <div class="logger-empty panel" id="logger-empty"><div class="logger-empty-mark">≡</div><h3>No render activity yet</h3><p>Prompts, frame timing, progress and errors will appear here.</p></div>
         <div class="logger-workspace hidden" id="logger-workspace">
           <section class="logger-metrics panel">
             <div><span>Progress</span><strong id="logger-progress">0 / 0</strong><small id="logger-percent">0%</small></div>
@@ -243,9 +247,9 @@
         <button class="icon-button image-viewer-close" aria-label="Close image preview">×</button>
       </div>
     </div>
-    <div class="image-stage">
+    <div class="image-stage" aria-label="Image preview. Drag to pan when zoomed.">
       <button class="viewer-nav previous" id="image-previous" aria-label="Previous image">‹</button>
-      <img id="image-viewer-image" src="" alt="Maximized generated output">
+      <img id="image-viewer-image" src="" alt="Maximized generated output" draggable="false">
       <button class="viewer-nav next" id="image-next" aria-label="Next image">›</button>
     </div>
   </dialog>

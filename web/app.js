@@ -16,9 +16,14 @@ const state = {
   jobTimer: null,
   outputs: [],
   deletedOutputs: new Set(),
+  renderMode: sessionStorage.getItem('valhalla-render-mode') === 'preview'
+    ? 'preview'
+    : 'production',
   previewIndex: 0,
   previewZoom: Number(sessionStorage.getItem('valhalla-preview-zoom')) || 100,
   previewFit: sessionStorage.getItem('valhalla-preview-fit') === 'true',
+  previewPanX: 0,
+  previewPanY: 0,
   deleteResolver: null,
   promptShot: null,
   promptTab: 'positive',
@@ -144,10 +149,14 @@ function restoreConfig(config, job) {
   form.elements.prompt_seed.value = config.prompt_seed ?? '';
   form.elements.inference_seed.value = config.inference_seed ?? '';
   form.elements.inference_strategy.value = config.inference_strategy || 'sequence';
-  form.elements.retry_count.value = config.retry_count ?? 2;
   if (config.nsfw_percent != null) form.elements.nsfw_percent.value = config.nsfw_percent;
   if (config.plateau_percent != null) form.elements.plateau_percent.value = config.plateau_percent;
-  form.elements.fast.checked = Boolean(job.fast);
+  const previewMode = job && typeof job.fast === 'boolean'
+    ? job.fast
+    : Boolean(config.fast);
+  state.renderMode = previewMode ? 'preview' : 'production';
+  sessionStorage.setItem('valhalla-render-mode', state.renderMode);
+  syncRenderControls();
   syncForm();
 }
 
@@ -163,8 +172,7 @@ function configPayload() {
     prompt_seed: value('prompt_seed') === '' ? null : value('prompt_seed'),
     inference_seed: value('inference_seed') === '' ? null : value('inference_seed'),
     inference_strategy: value('inference_strategy'),
-    retry_count: Number(value('retry_count')),
-    fast: form.elements.fast.checked,
+    fast: state.renderMode === 'preview',
   };
 }
 
@@ -420,7 +428,7 @@ async function startGeneration() {
   try {
     state.job = await api('/api/jobs', {
       method: 'POST',
-      body: JSON.stringify({ storyboard_id: state.storyboard.id, fast: form.elements.fast.checked }),
+      body: JSON.stringify({ storyboard_id: state.storyboard.id, fast: state.renderMode === 'preview' }),
     });
     showJob();
     pollJob();
@@ -439,7 +447,7 @@ async function startShotRender(number, button) {
   setBusy(button, true, 'Queueing…');
   try {
     state.job = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/render`, {
-      method: 'POST', body: JSON.stringify({ fast: form.elements.fast.checked }),
+      method: 'POST', body: JSON.stringify({ fast: false }),
     });
     showJob();
     pollJob();
@@ -541,7 +549,7 @@ function showJob() {
     ? 'Cancelling… current image will finish'
     : (job.status === 'queued'
       ? 'Preparing workflow…'
-      : `${job.retrying ? `Retry ${job.attempt} · ` : ''}Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}`);
+      : `Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}`);
   $('#cancel-job').disabled = Boolean(job.cancel_requested);
   renderLogger();
 }
@@ -592,15 +600,31 @@ function isRenderActive() {
   return state.job && ['queued', 'running'].includes(state.job.status);
 }
 
+function setRenderMode(mode) {
+  state.renderMode = mode === 'preview' ? 'preview' : 'production';
+  sessionStorage.setItem('valhalla-render-mode', state.renderMode);
+  syncRenderControls();
+}
+
 function syncRenderControls() {
   const active = Boolean(isRenderActive());
+  const preview = state.renderMode === 'preview';
+  const idleLabel = preview ? '◉ Preview storyboard' : '▶ Render storyboard';
+  $$('[data-render-control]').forEach((control) => {
+    control.classList.toggle('preview', preview);
+  });
+  $$('[data-render-mode]').forEach((select) => {
+    select.value = state.renderMode;
+    select.disabled = active;
+  });
   $$('[data-render-action]').forEach((button) => {
-    if (!button.dataset.idleLabel) {
-      button.dataset.idleLabel = button.dataset.label || button.innerHTML;
-    }
     button.disabled = active;
-    button.innerHTML = active ? (state.job?.cancel_requested ? '◌ Cancelling…' : '◌ Rendering…') : button.dataset.idleLabel;
-    button.title = active ? 'A render job is already active' : 'Render the current storyboard';
+    button.textContent = active
+      ? (state.job?.cancel_requested ? '◌ Cancelling…' : '◌ Rendering…')
+      : idleLabel;
+    button.title = active
+      ? 'A render job is already active'
+      : `${idleLabel} using the ${preview ? 'faster draft' : 'full production'} workflow`;
   });
 }
 
@@ -753,7 +777,31 @@ function syncPreviewScaleControls() {
   $('#image-zoom-output').textContent = `${state.previewZoom}%`;
 }
 
-  state.previewZoom = Math.min(300, Math.max(25, Number(state.previewZoom) || 100));
+function previewPanBounds() {
+  const image = $('#image-viewer-image');
+  const stage = $('.image-stage');
+  return {
+    x: Math.max(0, (image.offsetWidth - stage.clientWidth) / 2),
+    y: Math.max(0, (image.offsetHeight - stage.clientHeight) / 2),
+  };
+}
+
+function applyPreviewPan() {
+  const bounds = previewPanBounds();
+  state.previewPanX = Math.max(-bounds.x, Math.min(bounds.x, state.previewPanX));
+  state.previewPanY = Math.max(-bounds.y, Math.min(bounds.y, state.previewPanY));
+  const image = $('#image-viewer-image');
+  image.style.transform = `translate(-50%, -50%) translate(${state.previewPanX}px, ${state.previewPanY}px)`;
+  $('.image-stage').classList.toggle('pannable', bounds.x > 0 || bounds.y > 0);
+}
+
+function resetPreviewPan() {
+  state.previewPanX = 0;
+  state.previewPanY = 0;
+  applyPreviewPan();
+}
+
+state.previewZoom = Math.min(300, Math.max(25, Number(state.previewZoom) || 100));
 function fitPreviewImage() {
   const image = $('#image-viewer-image');
   const stage = $('.image-stage');
@@ -765,6 +813,7 @@ function fitPreviewImage() {
     : state.previewZoom / 100;
   image.style.width = `${Math.round(image.naturalWidth * scale)}px`;
   image.style.height = `${Math.round(image.naturalHeight * scale)}px`;
+  applyPreviewPan();
 }
 
 function setPreviewZoom(value) {
@@ -787,6 +836,7 @@ function showPreview(index) {
   if (!state.outputs.length) return;
   state.previewIndex = (index + state.outputs.length) % state.outputs.length;
   const item = state.outputs[state.previewIndex];
+  resetPreviewPan();
   const image = $('#image-viewer-image');
   image.src = item.url;
   image.alt = `Maximized generated output from shot ${item.shot}`;
@@ -838,7 +888,12 @@ $('#image-viewer-delete').addEventListener('click', () => deleteOutput(state.pre
 $('#image-previous').addEventListener('click', () => movePreview(-1));
 $('#image-next').addEventListener('click', () => movePreview(1));
 $('.image-viewer-close').addEventListener('click', () => imageDialog.close());
+let suppressPreviewStageClick = false;
 $('.image-stage').addEventListener('click', (event) => {
+  if (suppressPreviewStageClick) {
+    suppressPreviewStageClick = false;
+    return;
+  }
   if (event.target.classList.contains('image-stage')) imageDialog.close();
 });
 imageDialog.addEventListener('keydown', (event) => {
@@ -850,14 +905,48 @@ imageDialog.addEventListener('keydown', (event) => {
   }
 });
 
-let previewPointerX = null;
-$('.image-stage').addEventListener('pointerdown', (event) => { previewPointerX = event.clientX; });
-$('.image-stage').addEventListener('pointerup', (event) => {
-  if (previewPointerX === null) return;
-  const distance = event.clientX - previewPointerX;
-  previewPointerX = null;
-  if (Math.abs(distance) > 55) movePreview(distance > 0 ? -1 : 1);
+let previewPointer = null;
+const imageStage = $('.image-stage');
+imageStage.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0 || event.target.closest('button')) return;
+  const bounds = previewPanBounds();
+  previewPointer = {
+    id: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    panX: state.previewPanX,
+    panY: state.previewPanY,
+    pannable: bounds.x > 0 || bounds.y > 0,
+    moved: false,
+  };
+  if (previewPointer.pannable) {
+    event.preventDefault();
+    imageStage.setPointerCapture(event.pointerId);
+    imageStage.classList.add('panning');
+  }
 });
+imageStage.addEventListener('pointermove', (event) => {
+  if (!previewPointer || previewPointer.id !== event.pointerId || !previewPointer.pannable) return;
+  const dx = event.clientX - previewPointer.x;
+  const dy = event.clientY - previewPointer.y;
+  previewPointer.moved ||= Math.abs(dx) > 3 || Math.abs(dy) > 3;
+  state.previewPanX = previewPointer.panX + dx;
+  state.previewPanY = previewPointer.panY + dy;
+  applyPreviewPan();
+});
+function finishPreviewPointer(event) {
+  if (!previewPointer || previewPointer.id !== event.pointerId) return;
+  const pointer = previewPointer;
+  previewPointer = null;
+  imageStage.classList.remove('panning');
+  suppressPreviewStageClick = event.type === 'pointerup' && pointer.pannable && pointer.moved;
+  if (!pointer.pannable) {
+    const distance = event.clientX - pointer.x;
+    if (Math.abs(distance) > 55) movePreview(distance > 0 ? -1 : 1);
+  }
+}
+imageStage.addEventListener('pointerup', finishPreviewPointer);
+imageStage.addEventListener('pointercancel', finishPreviewPointer);
 
 function directorShotButton(shot) {
   const active = shot.number === state.directorShot ? 'active' : '';
@@ -878,7 +967,7 @@ function directorField(field) {
     const suffix = option.default ? ' · Default' : '';
     const label = option.label ? `${option.label[0].toUpperCase()}${option.label.slice(1)}` : '';
     return `<option value="${escapeHtml(option.id)}" ${!field.custom && option.id === field.value ? 'selected' : ''} title="${escapeHtml(option.prompt)}">${escapeHtml(label + suffix)}</option>`;
-  }).join('');
+  }).join('') + '<option value="__director_random__">Random</option>';
   const fieldNote = field.key === 'shot.stage'
     ? `${field.compatibility?.poses ?? 0} poses · ${field.compatibility?.actions ?? 0} actions · ${field.compatibility?.expressions ?? 0} expressions`
     : (current?.default ? '<span class="default-mark">Database default</span>' : escapeHtml(current?.prompt || current?.label || ''));
@@ -1037,6 +1126,7 @@ async function applyDirectorChange(select) {
   const card = select.closest('.director-field');
   const activeField = directorFieldByKey(field);
   const previous = activeField?.custom ? '__director_custom__' : activeField?.value;
+  const randomChoice = select.value === '__director_random__';
   if (select.value === '__director_custom__') {
     openDirectorCustom(field);
     return;
@@ -1056,7 +1146,7 @@ async function applyDirectorChange(select) {
     state.storyboard = await api(`/api/storyboards/${state.storyboard.id}`);
     renderStoryboard();
     renderDirector();
-    toast('Direction applied', field.startsWith('shot.') ? 'This shot was updated.' : 'The complete set was updated.', 'success');
+    toast(randomChoice ? 'Random choice applied' : 'Direction applied', field.startsWith('shot.') ? 'This shot was updated.' : 'The complete set was updated.', 'success');
   } catch (error) {
     select.value = previous ?? '';
     card.classList.remove('changed');
@@ -1201,13 +1291,21 @@ form.addEventListener('input', syncForm);
 form.addEventListener('input', scheduleSeedResolve);
 $('#theme-button').addEventListener('click', cycleTheme);
 $('#refresh-status').addEventListener('click', () => refreshStatus(true));
-$('#reset-config').addEventListener('click', () => { form.reset(); syncForm(); toast('Setup reset', 'Default production settings restored.'); });
+$('#reset-config').addEventListener('click', () => {
+  form.reset();
+  setRenderMode('production');
+  syncForm();
+  toast('Setup reset', 'Default production settings restored.');
+});
 $('#randomize-storyboard-seed').addEventListener('click', () => randomizeSeedField('prompt_seed'));
 $('#randomize-variation-seed').addEventListener('click', () => randomizeSeedField('inference_seed'));
 $('#reroll-all').addEventListener('click', resolveStoryboard);
 $('#export-storyboard').addEventListener('click', exportStoryboard);
 $('#import-storyboard').addEventListener('click', () => $('#storyboard-file').click());
 $('#storyboard-file').addEventListener('change', importStoryboard);
+$$('[data-render-mode]').forEach((select) => select.addEventListener('change', (event) => {
+  setRenderMode(event.target.value);
+}));
 $$('[data-render-action]').forEach((button) => button.addEventListener('click', startGeneration));
 $('#director-open-studio').addEventListener('click', () => switchView('studio'));
 $('#director-search').addEventListener('input', (event) => filterDirector(event.target.value));
@@ -1374,6 +1472,7 @@ $('#clear-logger').addEventListener('click', async () => {
 
 applyTheme();
 syncForm();
+syncRenderControls();
 syncPreviewScaleControls();
 refreshStatus();
 restoreApplication();
