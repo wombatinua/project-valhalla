@@ -15,6 +15,7 @@ const state = {
   job: null,
   jobTimer: null,
   outputs: [],
+  deletedOutputs: new Set(),
   previewIndex: 0,
   previewZoom: Number(sessionStorage.getItem('valhalla-preview-zoom')) || 100,
   previewFit: sessionStorage.getItem('valhalla-preview-fit') === 'true',
@@ -143,7 +144,6 @@ function restoreConfig(config, job) {
   form.elements.prompt_seed.value = config.prompt_seed ?? '';
   form.elements.inference_seed.value = config.inference_seed ?? '';
   form.elements.inference_strategy.value = config.inference_strategy || 'sequence';
-  form.elements.prompt_profile.value = config.prompt_profile || 'balanced';
   form.elements.retry_count.value = config.retry_count ?? 2;
   if (config.nsfw_percent != null) form.elements.nsfw_percent.value = config.nsfw_percent;
   if (config.plateau_percent != null) form.elements.plateau_percent.value = config.plateau_percent;
@@ -163,7 +163,6 @@ function configPayload() {
     prompt_seed: value('prompt_seed') === '' ? null : value('prompt_seed'),
     inference_seed: value('inference_seed') === '' ? null : value('inference_seed'),
     inference_strategy: value('inference_strategy'),
-    prompt_profile: value('prompt_profile'),
     retry_count: Number(value('retry_count')),
     fast: form.elements.fast.checked,
   };
@@ -581,7 +580,11 @@ function finishJob() {
 
 function addOutputs(outputs) {
   const names = new Set(state.outputs.map((item) => item.name));
-  outputs.forEach((item) => { if (!names.has(item.name)) state.outputs.push(item); });
+  outputs.forEach((item) => {
+    if (!names.has(item.name) && !state.deletedOutputs.has(item.name)) {
+      state.outputs.push(item);
+    }
+  });
   renderOutputs();
 }
 
@@ -604,9 +607,13 @@ function syncRenderControls() {
 function syncDeleteControls() {
   const disabled = Boolean(isRenderActive());
   $('#delete-all-outputs').classList.toggle('hidden', state.outputs.length === 0);
-  $$('.output-delete, #delete-all-outputs, #image-viewer-delete').forEach((button) => {
-    button.disabled = disabled;
-    button.title = disabled ? 'Deletion is unavailable while rendering' : '';
+  $('#delete-all-outputs').disabled = disabled;
+  $('#delete-all-outputs').title = disabled
+    ? 'Bulk deletion is unavailable while rendering'
+    : '';
+  $$('.output-delete, #image-viewer-delete').forEach((button) => {
+    button.disabled = false;
+    button.title = 'Delete this completed image';
   });
 }
 
@@ -628,10 +635,6 @@ function resolveDeletion(value) {
 }
 
 async function deleteOutput(index) {
-  if (isRenderActive()) {
-    toast('Deletion unavailable', 'Wait for the active render job to finish or cancel it first.', 'error');
-    return;
-  }
   const item = state.outputs[index];
   if (!item) return;
   const confirmed = await confirmDeletion(
@@ -642,6 +645,7 @@ async function deleteOutput(index) {
   if (!confirmed) return;
   try {
     await api(`/api/outputs/${encodeURIComponent(item.name)}`, { method: 'DELETE' });
+    state.deletedOutputs.add(item.name);
     state.outputs = state.outputs.filter((output) => output.name !== item.name);
     renderOutputs();
     if (imageDialog.open) {

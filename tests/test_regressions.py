@@ -1,5 +1,7 @@
 import time
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import app
@@ -83,6 +85,73 @@ class DirectorRegressionTests(unittest.TestCase):
         ):
             self.assertIn(key, fields)
             self.assertTrue(fields[key]["options"])
+
+    def test_default_photoshoot_stays_in_casual_amateur_pools(self):
+        database, _ = app.load_database()
+        pools = database["settings"]["scene_defaults"]["pools"]
+        allowed = {
+            "interior": set(pools["interiors"]),
+            "furniture": set(pools["furniture"]),
+            "mood": set(pools["moods"]),
+            "photography_style": (
+                set(pools["photography_styles"])
+                | set(pools["explicit_photography_styles"])
+            ),
+        }
+        for seed in range(20):
+            state, storyboard_id = self.make_storyboard(count=12, prompt_seed=seed)
+            for shot in state.get_storyboard(storyboard_id)["shots"]:
+                scene = shot["scene"]
+                for field, ids in allowed.items():
+                    self.assertIn(scene[field]["id"], ids, (seed, field))
+                for field in (
+                    "pose", "action", "expression", "shot_size",
+                    "camera_angle", "framing", "focus_target",
+                ):
+                    self.assertFalse(
+                        scene[field]["id"].endswith(("_studio", "_editorial")),
+                        (seed, field, scene[field]["id"]),
+                    )
+                for garment in scene["outfit"]["garments"].values():
+                    self.assertFalse(
+                        garment["id"].endswith(("_studio", "_editorial"))
+                    )
+
+    def test_production_variants_remain_available_in_director(self):
+        state, storyboard_id = self.make_storyboard()
+        fields = director_fields(state.director_payload(storyboard_id, 1))
+        camera_ids = {item["id"] for item in fields["shot.camera_angle"]["options"]}
+        self.assertTrue(any(item.endswith("_studio") for item in camera_ids))
+        self.assertTrue(any(item.endswith("_editorial") for item in camera_ids))
+
+    def test_amateur_style_does_not_reduce_explicit_direction(self):
+        poses, actions, recipes, plateau_kinds = set(), set(), set(), set()
+        for seed in range(20):
+            state, storyboard_id = self.make_storyboard(
+                count=12, prompt_seed=seed, xxx_only=True
+            )
+            for shot in state.get_storyboard(storyboard_id)["shots"]:
+                scene = shot["scene"]
+                self.assertEqual(scene["stage"]["level"], "explicit")
+                self.assertIn("explicit_pose", app.tags(scene["pose"]))
+                self.assertIn("explicit_action", app.tags(scene["action"]))
+                poses.add(scene["pose"]["id"])
+                actions.add(scene["action"]["id"])
+                plateau_kinds.add(scene["stage"].get("plateau_kind"))
+                if scene.get("explicit_recipe"):
+                    recipes.add(scene["explicit_recipe"]["id"])
+                    self.assertFalse(
+                        scene["explicit_recipe"]["id"].endswith(
+                            ("_studio", "_editorial")
+                        )
+                    )
+        self.assertGreaterEqual(len(poses), 35)
+        self.assertGreaterEqual(len(actions), 30)
+        self.assertGreaterEqual(len(recipes), 8)
+        self.assertEqual(
+            plateau_kinds,
+            {"provocative_rear", "intimate_closeup", "panties_aside", "masturbation"},
+        )
 
     def test_sequence_seeds_are_stable_and_unique(self):
         first_state, first_id = self.make_storyboard(inference_strategy="sequence")
@@ -192,6 +261,48 @@ class DirectorRegressionTests(unittest.TestCase):
         self.assertIn("exported hair", shot["positive_prompt"])
         self.assertIn("exported pose", shot["positive_prompt"])
 
+    def test_photoshoot_stages_never_move_back_toward_more_clothing(self):
+        levels = {"covered": 0, "lingerie": 1, "topless": 2, "nude": 3, "explicit": 4}
+        for seed in range(40):
+            state, storyboard_id = self.make_storyboard(
+                count=12, prompt_seed=seed, xxx_only=bool(seed % 2)
+            )
+            shots = state.get_storyboard(storyboard_id)["shots"]
+            progression = [levels[shot["scene"]["stage"]["level"]] for shot in shots]
+            self.assertEqual(progression, sorted(progression), (seed, progression))
+
+    def test_compiler_preserves_stage_and_visible_garments(self):
+        anchors = {
+            "covered": "breasts and nipples fully covered by clothing",
+            "lingerie": "breasts and nipples covered by the bra",
+            "topless": "topless, bare breasts and visible nipples",
+            "nude": "fully nude body",
+            "explicit": "explicit adult nudity",
+        }
+        state, storyboard_id = self.make_storyboard(count=12, prompt_seed=8800)
+        record = state.get_storyboard(storyboard_id)
+        payload = state.storyboard_payload(record)
+        for shot, rendered in zip(record["shots"], payload["shots"]):
+            scene = shot["scene"]
+            positive = rendered["positive_prompt"].casefold()
+            self.assertIn(anchors[scene["stage"]["level"]], positive)
+            for slot in scene["stage"].get("visible_slots", []):
+                garment = scene["outfit"]["garments"].get(slot)
+                if garment:
+                    self.assertIn(garment["prompt"].casefold(), positive)
+
+    def test_legacy_prompt_profile_is_ignored_without_truncation(self):
+        state = app.WebState()
+        common = {
+            "mode": "photoshoot", "count": 4, "photoshoots": 1,
+            "prompt_seed": 31415, "inference_seed": 92653,
+        }
+        normal = state.create_storyboard(common)
+        legacy = state.create_storyboard({**common, "prompt_profile": "compact"})
+        normal_prompts = [shot["positive_prompt"] for shot in normal["shots"]]
+        legacy_prompts = [shot["positive_prompt"] for shot in legacy["shots"]]
+        self.assertEqual(normal_prompts, legacy_prompts)
+
 
 class PreviewRegressionTests(unittest.TestCase):
     def test_preview_lifecycle_keeps_image_in_memory(self):
@@ -232,6 +343,7 @@ class PreviewRegressionTests(unittest.TestCase):
         self.assertTrue(preview["positive"])
         self.assertTrue(preview["negative"])
         self.assertEqual(preview["seed"], board["shots"][0]["inference_seed"])
+
 
     def test_save_image_nodes_become_temporary_preview_nodes(self):
         class Response:
@@ -301,6 +413,45 @@ class PreviewRegressionTests(unittest.TestCase):
         self.assertEqual(
             state.preview_image(preview["id"]), (b"still-visible", "image/png")
         )
+
+
+class OutputDeletionRegressionTests(unittest.TestCase):
+    def test_completed_frame_can_be_deleted_while_batch_is_rendering(self):
+        state = app.WebState()
+        name = "run_photoshoot_001_shot_001_1_image_01.png"
+        state.jobs["job"] = {
+            "status": "running",
+            "_run_id": "run",
+            "outputs": [{"name": name, "url": f"/api/outputs/{name}"}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / name
+            target.write_bytes(b"complete image")
+            with (
+                patch.object(app, "WEB_STATE", state),
+                patch.object(app, "output_directory", return_value=Path(directory)),
+            ):
+                result = app.delete_output_image(name)
+        self.assertEqual(result["deleted"], name)
+        self.assertFalse(target.exists())
+        self.assertEqual(state.jobs["job"]["outputs"], [])
+
+    def test_frame_still_being_written_remains_protected(self):
+        state = app.WebState()
+        name = "run_photoshoot_001_shot_002_2_image_01.png"
+        state.jobs["job"] = {
+            "status": "running", "_run_id": "run", "outputs": []
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / name
+            target.write_bytes(b"partial image")
+            with (
+                patch.object(app, "WEB_STATE", state),
+                patch.object(app, "output_directory", return_value=Path(directory)),
+            ):
+                with self.assertRaisesRegex(app.AppError, "still being written"):
+                    app.delete_output_image(name)
+                self.assertTrue(target.exists())
 
 
 class RenderLifecycleRegressionTests(unittest.TestCase):

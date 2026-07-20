@@ -508,6 +508,15 @@ def tags(item: dict[str, Any]) -> set[str]:
     return set(item.get("tags", []))
 
 
+def base_catalog_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep production variants in Director, not in casual automatic direction."""
+    base = [
+        item for item in items
+        if not item["id"].endswith(("_studio", "_editorial"))
+    ]
+    return base or items
+
+
 def compatible_with_requirements(item: dict[str, Any], available_tags: set[str]) -> bool:
     required_any = set(item.get("requires_any_tags", []))
     return (
@@ -597,6 +606,7 @@ class Composer:
             if not item.get("disabled", False)
             and garment["id"] in item["allowed_garment_ids"]
         ]
+        candidates = base_catalog_items(candidates)
         return weighted_choice(self.rng, candidates) if candidates else None
 
     def choose_human(
@@ -630,6 +640,7 @@ class Composer:
                 if default_pools.get(category):
                     allowed_ids = set(default_pools[category])
                     candidates = [item for item in candidates if item["id"] in allowed_ids]
+                    candidates = base_catalog_items(candidates)
                 human[category] = self.rng.sample(candidates, k=min(count, len(candidates)))
                 for item in human[category]:
                     selected_tags |= tags(item)
@@ -642,6 +653,7 @@ class Composer:
             if category not in overrides and default_pools.get(category):
                 allowed_ids = set(default_pools[category])
                 candidates = [item for item in candidates if item["id"] in allowed_ids]
+                candidates = base_catalog_items(candidates)
             if category in overrides:
                 choice = overrides[category]
                 if choice not in candidates:
@@ -676,7 +688,9 @@ class Composer:
             required = bool(rule.get("required", False))
             if not required and self.rng.random() > float(rule.get("chance", 1)):
                 continue
-            candidates = list(self.db["garments"][rule["catalog"]])
+            candidates = base_catalog_items(
+                list(self.db["garments"][rule["catalog"]])
+            )
             required_tags = set(rule.get("required_tags", []))
             if required_tags:
                 candidates = [item for item in candidates if required_tags.issubset(tags(item))]
@@ -861,8 +875,17 @@ class Composer:
             if not item.get("disabled", False)
             and compatible_with_requirements(item, tags(fixed["interior"]))
         ]
+        scene_pools = self.db["settings"]["scene_defaults"].get("pools", {})
+        if not overrides.get("furniture") and scene_pools.get("furniture"):
+            default_furniture = set(scene_pools["furniture"])
+            furniture_candidates = [
+                item for item in furniture_candidates
+                if item["id"] in default_furniture
+            ]
         if overrides.get("furniture"):
             furniture_candidates = [item for item in furniture_candidates if item["id"] == overrides["furniture"]]
+        else:
+            furniture_candidates = base_catalog_items(furniture_candidates)
         furniture = choose("furniture", furniture_candidates)
         available_tags = set(stage.get("body_visibility", [])) | {stage["level"]}
         available_tags |= set(stage.get("visible_slots", []))
@@ -874,6 +897,8 @@ class Composer:
                 recipes = [item for item in recipes if item.get("plateau_kind") == stage["plateau_kind"]]
             if overrides.get("explicit_recipe"):
                 recipes = [item for item in recipes if item["id"] == overrides["explicit_recipe"]]
+            else:
+                recipes = base_catalog_items(recipes)
             if recipes:
                 recipe = choose("explicit_recipe", recipes)
                 available_tags |= tags(recipe)
@@ -904,6 +929,8 @@ class Composer:
             poses = [item for item in poses if required & tags(item)]
         if overrides.get("pose"):
             poses = [item for item in poses if item["id"] == overrides["pose"]]
+        else:
+            poses = base_catalog_items(poses)
         pose = choose("pose", poses)
         action_tags = available_tags | tags(pose)
         actions = [
@@ -931,6 +958,8 @@ class Composer:
             actions = [item for item in actions if required & tags(item)]
         if overrides.get("action"):
             actions = [item for item in actions if item["id"] == overrides["action"]]
+        else:
+            actions = base_catalog_items(actions)
         action = choose("action", actions)
         prop = None
         required_prop_tags = set(action.get("requires_prop_tags", []))
@@ -942,14 +971,41 @@ class Composer:
                 item for item in self.db["props"]
                 if compatible_with_requirements(item, available_tags | tags(action))
             ]
+            if stage["level"] != "explicit":
+                casual_props = [
+                    item for item in candidates
+                    if tags(item) & {"casual_prop", "home_prop"}
+                ]
+                candidates = casual_props or candidates
             if candidates:
                 prop = weighted_choice(self.rng, candidates)
-        expression_candidates = list(self.db["expressions"])
+        expression_candidates = base_catalog_items(list(self.db["expressions"]))
         required_expression_tags = set(action.get("requires_expression_tags", []))
         if required_expression_tags:
             expression_candidates = [
                 item for item in expression_candidates
                 if required_expression_tags.issubset(tags(item))
+            ]
+            if stage["level"] == "lingerie":
+                subtle = [
+                    item for item in expression_candidates
+                    if item["id"] == "expression_shy_sultry"
+                ]
+                expression_candidates = subtle or expression_candidates
+        elif stage["level"] in {"covered", "lingerie"}:
+            natural_expressions = {
+                "expression_confident", "expression_soft_smile",
+                "expression_dreamy", "expression_playful", "expression_serene",
+                "expression_shy_sultry",
+            }
+            expression_candidates = [
+                item for item in expression_candidates
+                if item["id"] in natural_expressions
+            ]
+        elif stage["level"] in {"topless", "nude"}:
+            expression_candidates = [
+                item for item in expression_candidates
+                if not tags(item) & {"pleasure_expression", "intense_pleasure_expression"}
             ]
         if overrides.get("expression"):
             expression_candidates = [
@@ -986,6 +1042,18 @@ class Composer:
             wanted = overrides.get(key) or recipe_refs.get(key)
             if wanted:
                 candidates = [item for item in candidates if item["id"] == wanted]
+            else:
+                candidates = base_catalog_items(candidates)
+                if key == "framing":
+                    casual_framings = {
+                        "framing_centered", "framing_tight_crop",
+                        "framing_environmental",
+                    }
+                    casual = [
+                        item for item in candidates
+                        if item["id"] in casual_framings
+                    ]
+                    candidates = casual or candidates
             camera[key] = choose(key, candidates)
             camera_tags |= tags(camera[key])
         intensity = overrides.get("intensity") or (recipe.get("intensity", "explicit") if recipe else {
@@ -1174,11 +1242,53 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     age_prompt = custom.get("human.age") or scene["human"]["age"]["prompt"]
     positive_prefix = defaults.get("positive_prefix", "").replace("{age}", age_prompt)
     fragments = [positive_prefix]
+    scene_pools = db["settings"]["scene_defaults"].get("pools", {})
+    casual_photo_ids = set(scene_pools.get("photography_styles", [])) | set(
+        scene_pools.get("explicit_photography_styles", [])
+    )
+    casual_role_prompts = {
+        "role_establishing": "casual opening snapshot showing the subject in her room",
+        "role_portrait": "relaxed personal portrait snapshot",
+        "role_development": "natural mid-sequence home snapshot",
+        "role_reveal": "candid reveal moment",
+        "role_nude_study": "relaxed natural nude snapshot",
+        "role_plateau": "close candid explicit home snapshot",
+        "role_peak": "intense closing snapshot",
+    }
+
+    def shot_prompt(key: str, item: dict[str, Any]) -> str:
+        override = custom.get(f"shot.{key}")
+        if override:
+            return override
+        if (
+            key == "editorial_role"
+            and scene.get("photography_style", {}).get("id") in casual_photo_ids
+        ):
+            return casual_role_prompts.get(item["id"], item["prompt"])
+        return item["prompt"]
+    # A stage label alone is UI metadata. These anchors state the visual contract
+    # explicitly in vocabulary image models reliably understand.
+    stage_anchors = {
+        "covered": (
+            "wearing the listed outfit, clothing continuity, breasts and nipples "
+            "fully covered by clothing"
+        ),
+        "lingerie": (
+            "wearing the listed lingerie, lingerie continuity, breasts and nipples "
+            "covered by the bra"
+        ),
+        "topless": "topless, bare breasts and visible nipples, lower garments retained",
+        "nude": "fully nude body, no clothing except the listed retained accessories",
+        "explicit": "explicit adult nudity, clothing state remains consistent",
+    }
+    stage_anchor = stage_anchors.get(stage.get("level"), "")
+    if stage_anchor:
+        fragments.append(stage_anchor)
     # Compiler v2 keeps the subject first, then establishes editorial intent and camera.
     for key in ("editorial_role", "shot_size", "camera_angle", "framing", "focus_target"):
         item = scene.get(key)
         if item:
-            fragments.append(custom.get(f"shot.{key}") or item["prompt"])
+            fragments.append(shot_prompt(key, item))
     stage_custom = custom.get("shot.stage")
     if stage_custom:
         fragments.append(stage_custom)
@@ -1221,7 +1331,8 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             if custom.get(f"outfit.textures.{slot}") or slot in outfit.get("textures", {}):
                 garment_parts.append(custom.get(f"outfit.textures.{slot}") or outfit["textures"][slot]["prompt"])
             garment_parts.append(custom.get(f"outfit.garments.{slot}") or garment["prompt"])
-            fragments.append(" ".join(garment_parts))
+            garment_fragment = " ".join(garment_parts)
+            fragments.append(garment_fragment)
             reveals_cameltoe = reveals_cameltoe or garment.get("reveals_cameltoe", False)
     if reveals_cameltoe:
         fragments.append(defaults["cameltoe_prompt"])
@@ -1229,7 +1340,10 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
         item = scene.get(key)
         if item:
             director_key = f"shot.{key}" if key in {"pose", "action", "expression", "furniture"} else f"scene.{key}"
-            fragments.append(custom.get(director_key) or item["prompt"])
+            if key == "editorial_role":
+                fragments.append(shot_prompt(key, item))
+            else:
+                fragments.append(custom.get(director_key) or item["prompt"])
     fragments.extend(item["prompt"] for item in scene.get("dependencies", []))
     fragments.append(defaults.get("positive_suffix", ""))
     unique_fragments = []
@@ -1240,17 +1354,6 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
         if clean and normalized not in seen_fragments:
             unique_fragments.append(clean)
             seen_fragments.add(normalized)
-    profile = scene.get("prompt_profile", db["settings"].get("prompt_profile", "balanced"))
-    budgets = db["settings"].get("prompt_token_budgets", {})
-    budget = int(budgets.get(profile, 230))
-    kept, words = [], 0
-    for position, fragment in enumerate(unique_fragments):
-        cost = max(1, round(len(fragment.split()) * 1.3))
-        mandatory = position < 14
-        if mandatory or words + cost <= budget:
-            kept.append(fragment)
-            words += cost
-    unique_fragments = kept
     positive = ", ".join(unique_fragments)
     negative = defaults.get("negative_prompt", "")
     if covered_chest and defaults.get("covered_chest_negative"):
@@ -1293,8 +1396,27 @@ def prompt_lint(scene: dict[str, Any], positive: str) -> list[str]:
         warnings.append("Subject identity is repeated")
     if scene["stage"]["level"] == "covered" and any(term in folded for term in ("fully nude", "exposed genitals")):
         warnings.append("Covered stage contains exposed-content wording")
+    coverage_anchors = {
+        "covered": "breasts and nipples fully covered by clothing",
+        "lingerie": "breasts and nipples covered by the bra",
+    }
+    expected_anchor = coverage_anchors.get(scene["stage"]["level"])
+    if expected_anchor and expected_anchor not in folded:
+        warnings.append("Clothing coverage contract is missing")
+    for slot in scene["stage"].get("visible_slots", []):
+        garment = scene["outfit"]["garments"].get(slot)
+        garment_prompt = scene.get("custom_values", {}).get(
+            f"outfit.garments.{slot}"
+        ) or (garment or {}).get("prompt", "")
+        if garment_prompt and garment_prompt.casefold() not in folded:
+            warnings.append(f"Visible garment is missing from prompt: {slot}")
     if scene.get("focus_target", {}).get("id") == "environment" and scene.get("shot_size", {}).get("id") in {"intimate_macro", "breast_closeup"}:
         warnings.append("Environmental focus conflicts with close-up framing")
+    word_count = len(positive.split())
+    if word_count > 500:
+        warnings.append(
+            f"Long prompt ({word_count} words); review it without automatic truncation"
+        )
     return warnings
 
 
@@ -1759,7 +1881,6 @@ def build_storyboard(
                 scene = composer.resolve_scene(
                     context, stage, {"editorial_role": role_id}
                 )
-            scene["prompt_profile"] = args.prompt_profile
             previous = storyboard[-1] if storyboard and storyboard[-1]["photoshoot_index"] == photoshoot_index else None
             previous_slots = set(previous["stage"].get("visible_slots", [])) if previous else set(stage.get("visible_slots", []))
             removed = previous_slots - set(stage.get("visible_slots", []))
@@ -1863,9 +1984,6 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
         raise AppError("Inference seed strategy must be random, fixed, or sequence")
     if inference_strategy in {"fixed", "sequence"} and inference_seed is None:
         inference_seed = secrets.randbelow(2**63)
-    prompt_profile = str(payload.get("prompt_profile", db["settings"].get("prompt_profile", "balanced")))
-    if prompt_profile not in {"compact", "balanced", "detailed"}:
-        raise AppError("Prompt profile must be compact, balanced, or detailed")
     retry_count = _safe_int(
         payload.get("retry_count", db["settings"].get("render_retry_count", 2)),
         "Render retries", 0, 5,
@@ -1889,7 +2007,6 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
         prompt_seed=prompt_seed,
         inference_seed=inference_seed,
         inference_strategy=inference_strategy,
-        prompt_profile=prompt_profile,
         retry_count=retry_count,
         xxx_only=xxx_only,
         nsfw_percent=None if xxx_only or mode == "random" else nsfw,
@@ -2823,7 +2940,6 @@ class WebState:
                     scene = record["composer"].resolve_scene(
                         context, shot["stage"], {key: value}
                     )
-                scene["prompt_profile"] = record["args"].prompt_profile
                 shot["scene"] = scene
                 if clear_custom:
                     shot.setdefault("custom_values", {}).pop(field, None)
@@ -3289,6 +3405,8 @@ class WebState:
             _, db_path = load_database()
             workflow, mapping = load_workflow_runtime(db, db_path, job["fast"])
             run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            with self.lock:
+                job["_run_id"] = run_id
             selected_shots = [record["shots"][number - 1] for number in job["shot_numbers"]]
             for completed_index, shot in enumerate(selected_shots, 1):
                 shot_started = time.monotonic()
@@ -3433,7 +3551,6 @@ def ensure_outputs_idle() -> None:
 
 
 def delete_output_image(name: str) -> dict[str, Any]:
-    ensure_outputs_idle()
     if not name or Path(name).name != name:
         raise AppError("Invalid output filename")
     target = output_directory() / name
@@ -3441,10 +3558,26 @@ def delete_output_image(name: str) -> dict[str, Any]:
         raise AppError("Only generated image files can be deleted")
     if not target.is_file():
         raise AppError("Output not found")
-    try:
-        target.unlink()
-    except OSError as exc:
-        raise AppError(f"Could not delete output: {exc}") from exc
+    with WEB_STATE.lock:
+        # A completed frame is safe to remove while the next frame renders. Guard
+        # only a file from the active run that has not yet been published as an
+        # output, because it may still be in the middle of being written.
+        for job in WEB_STATE.jobs.values():
+            if job["status"] not in {"queued", "running"}:
+                continue
+            run_id = job.get("_run_id")
+            published = {item["name"] for item in job.get("outputs", [])}
+            if run_id and name.startswith(f"{run_id}_") and name not in published:
+                raise AppError("This frame is still being written and cannot be deleted yet")
+        try:
+            target.unlink()
+        except OSError as exc:
+            raise AppError(f"Could not delete output: {exc}") from exc
+        # Prevent subsequent job polling from restoring a deleted card in the UI.
+        for job in WEB_STATE.jobs.values():
+            job["outputs"] = [
+                item for item in job.get("outputs", []) if item["name"] != name
+            ]
     return {"ok": True, "deleted": name}
 
 

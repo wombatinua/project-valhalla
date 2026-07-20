@@ -45,7 +45,7 @@ This file tracks agreed future work. Unchecked items are not implemented.
 - [x] Maintain README documentation alongside implementation.
 - [x] Expand the complete production catalog beyond 3,300 selectable records while preserving tags, dependencies, stage rules, pools, and Director performance.
 - [x] Triple interiors, surfaces, garments, footwear, poses, actions, camera grammar, expressions, treatments, and adult solo explicit recipes, with extra emphasis on ordinary apartments and simple sets.
-- [x] Normalize catalog prompts for Lumina2/Qwen and general image-model conditioning, reject duplicate/internal/overlong fragments, and enforce budgets for every compiler profile.
+- [x] Normalize catalog prompts for Lumina2/Qwen and general image-model conditioning, reject duplicate/internal/overlong fragments, and preserve the complete deduplicated prompt.
 
 ## P0 — Storyboard editorial planning
 
@@ -115,9 +115,9 @@ Ready when:
 
 - [ ] Order prompts by diffusion priority: solo/adult constraint → camera → pose/action → visible anatomy → human traits → visible garments → location → expression → lighting/quality.
 - [ ] Keep each human trait in one prompt block only.
-- [x] Add `compact`, `balanced`, and `detailed` prompt profiles.
-- [x] Give each profile an approximate token budget.
-- [x] Trim low-priority fragments without removing adult, pose, or action constraints.
+- [x] Remove misleading prompt profiles that differed only through destructive trimming.
+- [x] Remove unsafe approximate prompt budgeting; warn about unusually long prompts without truncating them.
+- [x] Preserve every selected fragment; report long prompts diagnostically without modifying them.
 - [ ] Make negative prompts stage-specific.
 - [ ] Remove irrelevant negatives from fashion stages.
 - [ ] Strengthen coverage and censorship negatives only for explicit stages.
@@ -133,7 +133,7 @@ Ready when:
 ## P1 — Visual trait prioritization
 
 - [ ] Keep the complete `model_signature` for reproducibility and console output.
-- [ ] Define a shorter visual-trait subset for prompt-budget decisions without claiming cross-frame identity control.
+- [ ] Define a concise visual-trait summary for diagnostics without dropping Director choices or claiming cross-frame identity control.
 - [ ] Prioritize face, hair, skin, and body traits that materially affect the rendered subject.
 - [ ] Select one or two distinctive beauty details when available.
 - [ ] Add more compatible beauty marks and facial accents.
@@ -271,7 +271,7 @@ Ready when:
 3. Shuffle bags and diversity scoring.
 4. Deterministic inference-seed sequence.
 5. Dynamic location surfaces.
-6. Prompt Compiler v2 and prompt budgets.
+6. Prompt Compiler v2 and non-destructive prompt diagnostics.
 7. Visual trait prioritization.
 8. Exact garment transitions.
 9. Plateau recipes and intensity scale.

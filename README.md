@@ -141,7 +141,7 @@ The UI calls the inference seed **Image variation seed** because it changes rend
 
 After a storyboard exists, changing the Storyboard seed automatically resolves a replacement after a short typing delay because it controls the direction. Changing the Image variation seed or its mode updates only frame seeds in place: scenes, prompts, manually selected directions, and custom Director values remain intact. Studio cards and Director are refreshed together.
 
-Prompt detail offers compact, balanced, and detailed compiler profiles. The compiler keeps the subject constraint first, promotes camera and direction, removes exact duplicate fragments, applies an approximate token budget, and reports prompt-lint warnings without silently changing Director choices.
+The prompt compiler keeps the subject constraint first, promotes camera and direction, removes exact duplicate fragments, and reports prompt-lint warnings without silently changing or truncating Director choices.
 
 The compact storyboard format stores catalog references by ID and includes a semantic SHA-256 fingerprint of the complete database. Import succeeds only against the matching database content; reordering JSON keys does not break compatibility, but changing catalog data does. Imported storyboards remain fully reviewable, rerollable, and renderable.
 
@@ -171,9 +171,7 @@ Preview render patches the captured graph to keep the base sampler and VAE outpu
 
 `database.json` contains 3,312 selectable production records covering adult-model traits, garments, modifiers, outfit templates, private locations, surfaces, poses, actions, expressions, moods, camera grammar, explicit recipes, and photography treatments. The expansion especially strengthens ordinary apartments and minimal sets, simple everyday clothes and footwear, and adult solo erotic/explicit direction while retaining all compatibility tags and stage rules.
 
-`tools/expand_database.py` is the idempotent catalog-expansion source. It adds the curated records, creates two weighted production variants for every selectable record, extends color/modifier/default-pool relationships, and preserves template stage uniqueness. It is safe to rerun and must always be followed by database validation and a resolver dry-run.
-
-Catalog wording is optimized for the captured Lumina2 workflow’s Qwen text encoder and remains broadly suitable for modern natural-language image conditioning: short concrete visual phrases, common garment/interior/anatomy/photography vocabulary, no internal taxonomy jargon, no duplicate prompt fragments, and no catalog fragment longer than 48 words. Database validation enforces these constraints. Compact, Balanced, and Detailed compiler profiles all apply their configured approximate token budgets; essential subject, camera, pose, action, and stage semantics are retained first.
+Catalog wording is optimized for the captured Lumina2 workflow’s Qwen text encoder and remains broadly suitable for modern natural-language image conditioning: short concrete visual phrases, common garment/interior/anatomy/photography vocabulary, no internal taxonomy jargon, no duplicate prompt fragments, and no catalog fragment longer than 48 words. Database validation enforces these constraints. The compiler always preserves the complete deduplicated prompt; unusually long prompts produce a diagnostic warning instead of being modified.
 
 The catalog follows the order in which a scene is assembled, so related material stays easy to find:
 
