@@ -4,7 +4,7 @@ This file tracks agreed future work. Unchecked items are not implemented.
 
 ## Project constraints
 
-- Keep one `app.py`, one manually editable `database.json`, one active local `workflow.json`, and one `launcher.sh`.
+- Keep one `app.py`, one manually editable `database.json`, one active local `workflow.json`, one `launcher.sh`, and static assets under `web/`.
 - Preserve compatibility with different checkpoint families through the captured workflow.
 - Do not add FaceID, IPAdapter, PuLID, reference-image, or architecture-specific identity pipelines.
 - Use adult women aged 21–22 only.
@@ -19,16 +19,16 @@ This file tracks agreed future work. Unchecked items are not implemented.
 - [x] Build a progressive stage sequence that does not move backward.
 - [x] Guarantee an explicit final plateau and support full-XXX mode from the first frame.
 - [x] Stop the batch when a scene cannot be resolved.
-- [x] Provide an interactive Director's Desk before any GPU job.
+- [x] Provide an interactive browser-based Director’s Desk before any GPU job.
 - [x] Support complete-storyboard reroll, single-shot reroll, stage selection, and compatible pose/action/expression selection.
 - [x] Provide Casting & Set Design for subject, wardrobe, interior, surface, mood, and photography style.
 - [x] Support constrained subject, wardrobe, interior, and surface remixing.
 - [x] Support all-groups, semantic-group, and exact-item choices across Director catalogs.
 - [x] Prevent manually edited stages from reversing photoshoot progression.
 - [x] Keep automatic operation available without storyboard review.
-- [x] Use `fzf` for fixed-choice screens with a numbered non-TTY fallback.
-- [x] Provide a compact editable launcher dashboard with totals, advanced settings, and a clear path to Director.
-- [x] Group high-level menu actions under non-action text headings.
+- [x] Provide accessible browser-native controls for every production choice.
+- [x] Provide a responsive production dashboard with totals, advanced settings, and a clear path to Director.
+- [x] Group high-level Web UI actions into clear production sections.
 - [x] Support `disabled: true` across selectable database records.
 - [x] Remove mirrors, sexual toys, and non-functional identity-consistency prompt procedures.
 - [x] Maintain README documentation alongside implementation.

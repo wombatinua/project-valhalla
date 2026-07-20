@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101216" media="(prefers-color-scheme: dark)">
+  <title>Project Valhalla</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Project Valhalla home">
+        <span class="brand-mark">V</span>
+        <span><strong>Valhalla</strong><small>Production Studio</small></span>
+      </a>
+
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <button class="nav-item active" data-view="studio"><span class="nav-icon">✦</span><span>Studio</span></button>
+        <button class="nav-item" data-view="outputs"><span class="nav-icon">▦</span><span>Outputs</span><span class="nav-count" id="output-count">0</span></button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+      <section class="system-card" aria-label="System status">
+        <div class="system-title"><span>System</span><button class="icon-button" id="refresh-status" title="Refresh status" aria-label="Refresh status">↻</button></div>
+        <div class="status-row"><span><i class="status-dot" id="comfy-dot"></i>ComfyUI</span><strong id="comfy-status">Checking</strong></div>
+        <div class="status-row"><span><i class="status-dot" id="workflow-dot"></i>Workflow</span><strong id="workflow-status">Checking</strong></div>
+        <div class="status-row"><span>Catalog</span><strong id="catalog-status">—</strong></div>
+      </section>
+      <div class="sidebar-footer"><span>Local workspace</span><span class="version">v2.0</span></div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Creative workspace</p>
+          <h1 id="view-title">Production Studio</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="button ghost" id="capture-button"><span>⌁</span> Capture workflow</button>
+          <button class="theme-button" id="theme-button" aria-label="Change color theme" title="Theme: system"><span id="theme-icon">◐</span></button>
+        </div>
+      </header>
+
+      <section class="view active" id="studio-view">
+        <div class="studio-grid">
+          <aside class="control-panel panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">New production</p><h2>Run setup</h2></div>
+              <button class="text-button" id="reset-config">Reset</button>
+            </div>
+
+            <form id="run-form">
+              <fieldset>
+                <legend>Mode</legend>
+                <div class="segmented" role="radiogroup" aria-label="Production mode">
+                  <label><input type="radio" name="mode" value="photoshoot" checked><span>Photoshoot</span></label>
+                  <label><input type="radio" name="mode" value="random"><span>Random</span></label>
+                </div>
+                <p class="field-help" id="mode-help">One consistent subject, wardrobe and set per photoshoot.</p>
+              </fieldset>
+
+              <fieldset>
+                <legend>Content direction</legend>
+                <div class="segmented" role="radiogroup" aria-label="Content direction">
+                  <label><input type="radio" name="content" value="progressive" checked><span>Progressive</span></label>
+                  <label><input type="radio" name="content" value="xxx"><span>Full XXX</span></label>
+                </div>
+              </fieldset>
+
+              <div class="field-grid two">
+                <label class="field" id="photoshoots-field"><span>Photoshoots</span><input type="number" name="photoshoots" min="1" max="50" value="1"></label>
+                <label class="field"><span>Shots per set</span><input type="number" name="count" min="1" max="200" value="12"></label>
+              </div>
+
+              <div class="range-section" id="progression-fields">
+                <div class="range-heading"><label for="nsfw-percent">NSFW ending</label><output id="nsfw-output">50%</output></div>
+                <input type="range" id="nsfw-percent" name="nsfw_percent" min="0" max="100" step="1" value="50">
+                <div class="range-heading"><label for="plateau-percent">Explicit plateau</label><output id="plateau-output">30%</output></div>
+                <input type="range" id="plateau-percent" name="plateau_percent" min="0" max="100" step="1" value="30">
+              </div>
+
+              <details class="advanced">
+                <summary><span>Advanced options</span><span class="chevron">⌄</span></summary>
+                <div class="advanced-content">
+                  <label class="field"><span>Prompt seed <em>optional</em></span><input type="number" name="prompt_seed" min="0" placeholder="Random"></label>
+                  <label class="field"><span>Inference seed <em>optional</em></span><input type="number" name="inference_seed" min="0" placeholder="Random per image"></label>
+                  <label class="switch-row"><span><strong>Fast test</strong><small>Bypass refinement stages</small></span><input type="checkbox" name="fast"><i></i></label>
+                </div>
+              </details>
+
+              <div class="batch-summary">
+                <span>Planned output</span><strong id="planned-total">12 images</strong>
+              </div>
+              <button class="button primary full" type="submit" id="resolve-button"><span>✦</span> Resolve storyboard</button>
+            </form>
+          </aside>
+
+          <section class="storyboard-panel panel">
+            <div class="storyboard-header">
+              <div><p class="eyebrow">Director’s desk</p><h2>Storyboard</h2></div>
+              <div class="storyboard-actions hidden" id="storyboard-actions">
+                <span class="seed-pill" id="seed-pill">Seed —</span>
+                <button class="button ghost" id="reroll-all">↻ Reroll all</button>
+                <button class="button primary" id="generate-button">Generate images</button>
+              </div>
+            </div>
+            <div class="storyboard-meta hidden" id="storyboard-meta"></div>
+            <div class="empty-state" id="empty-state">
+              <div class="empty-visual"><span></span><span></span><span></span></div>
+              <h3>Your production starts here</h3>
+              <p>Configure a run and resolve it to review every composition before the GPU starts.</p>
+            </div>
+            <div class="loading-state hidden" id="loading-state">
+              <div class="spinner"></div><h3>Directing your storyboard…</h3><p>Resolving compatible casting, styling, locations and poses.</p>
+            </div>
+            <div class="shot-grid hidden" id="shot-grid"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="outputs-view">
+        <div class="outputs-header"><div><p class="eyebrow">Generated assets</p><h2>Latest outputs</h2></div><div class="outputs-tools"><p id="outputs-summary">No generated images.</p><button class="button ghost danger hidden" id="delete-all-outputs">Delete all</button></div></div>
+        <div class="output-grid" id="output-grid"></div>
+        <div class="empty-state compact" id="outputs-empty"><div class="output-placeholder">▦</div><h3>No outputs yet</h3><p>Generated images will appear here as soon as each render completes.</p></div>
+      </section>
+    </main>
+  </div>
+
+  <section class="job-dock hidden" id="job-dock" aria-live="polite">
+    <div class="job-icon"><div class="spinner small"></div></div>
+    <div class="job-copy"><div><strong id="job-title">Rendering production</strong><span id="job-percent">0%</span></div><p id="job-detail">Preparing workflow…</p><div class="progress-track"><i id="job-progress"></i></div></div>
+    <button class="button ghost danger" id="cancel-job">Cancel</button>
+  </section>
+
+  <dialog id="image-dialog" class="image-viewer">
+    <div class="image-viewer-bar">
+      <div>
+        <strong id="image-viewer-title">Generated output</strong>
+        <span id="image-viewer-count">1 of 1</span>
+      </div>
+      <div class="viewer-scale-controls">
+        <label class="viewer-fit" for="image-fit">
+          <input id="image-fit" type="checkbox">
+          <span>Fit</span>
+        </label>
+        <label class="viewer-zoom" for="image-zoom">
+          <input id="image-zoom" type="range" min="25" max="300" step="5" value="100" aria-label="Image zoom">
+          <output id="image-zoom-output" for="image-zoom">100%</output>
+        </label>
+      </div>
+      <div class="image-viewer-actions">
+        <button class="button viewer-delete" id="image-viewer-delete">Delete</button>
+        <a class="button viewer-download" id="image-viewer-download" href="#" download>Download</a>
+        <button class="icon-button image-viewer-close" aria-label="Close image preview">×</button>
+      </div>
+    </div>
+    <div class="image-stage">
+      <button class="viewer-nav previous" id="image-previous" aria-label="Previous image">‹</button>
+      <img id="image-viewer-image" src="" alt="Maximized generated output">
+      <button class="viewer-nav next" id="image-next" aria-label="Next image">›</button>
+    </div>
+  </dialog>
+
+  <dialog id="prompt-dialog">
+    <div class="dialog-header"><div><p class="eyebrow" id="dialog-eyebrow">Shot</p><h2 id="dialog-title">Prompt inspector</h2></div><button class="icon-button dialog-close" aria-label="Close">×</button></div>
+    <div class="dialog-body">
+      <div class="prompt-tabs"><button class="active" data-prompt="positive">Positive</button><button data-prompt="negative">Negative</button><button data-prompt="ids">Selected IDs</button></div>
+      <pre id="prompt-content"></pre>
+    </div>
+    <div class="dialog-footer"><button class="button ghost" id="copy-prompt">Copy to clipboard</button><button class="button primary dialog-close">Done</button></div>
+  </dialog>
+
+  <dialog id="delete-dialog" class="small-dialog">
+    <div class="dialog-header"><div><p class="eyebrow">Permanent action</p><h2 id="delete-dialog-title">Delete image?</h2></div><button class="icon-button delete-dialog-cancel" aria-label="Cancel deletion">×</button></div>
+    <div class="dialog-body"><p id="delete-dialog-message">This file will be permanently removed from the output folder.</p></div>
+    <div class="dialog-footer"><button class="button ghost delete-dialog-cancel">Cancel</button><button class="button destructive" id="delete-dialog-confirm">Delete</button></div>
+  </dialog>
+
+  <dialog id="capture-dialog" class="small-dialog">
+    <div class="dialog-header"><div><p class="eyebrow">ComfyUI</p><h2>Capture workflow</h2></div><button class="icon-button capture-close" aria-label="Close">×</button></div>
+    <div class="dialog-body"><p>Capture the latest successful ComfyUI workflow and use it as the production template.</p><label class="switch-row"><span><strong>Replace existing workflow</strong><small>Overwrite workflow.json if it exists</small></span><input type="checkbox" id="capture-force"><i></i></label></div>
+    <div class="dialog-footer"><button class="button ghost capture-close">Cancel</button><button class="button primary" id="capture-confirm">Capture workflow</button></div>
+  </dialog>
+
+  <div class="toast-region" id="toast-region" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

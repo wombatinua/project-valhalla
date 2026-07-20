@@ -7,17 +7,13 @@ import argparse
 import copy
 import json
 import math
-import os
 import random
+import re
 import secrets
-import shutil
-import subprocess
 import sys
-import textwrap
 import time
 import uuid
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -1444,1950 +1440,593 @@ def build_storyboard(
     return storyboard
 
 
-def director_clear() -> None:
-    if sys.stdout.isatty():
-        print("\033[2J\033[H", end="")
+
+# ---------------------------------------------------------------------------
+# Web application
+# ---------------------------------------------------------------------------
+
+import mimetypes
+import threading
+import webbrowser
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
+from urllib.parse import unquote, urlparse
+
+WEB_ROOT = Path(__file__).resolve().with_name("web")
+MAX_STORYBOARDS = 20
+MAX_JOBS = 40
 
 
-def short_id(value: str, width: int) -> str:
-    prefixes = ("pose_", "action_", "expression_", "template_")
-    for prefix in prefixes:
-        if value.startswith(prefix):
-            value = value[len(prefix):]
-            break
-    return value if len(value) <= width else value[: width - 1] + "…"
+def _iso_now() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-def show_storyboard(storyboard: list[dict[str, Any]], title: str = "DIRECTOR'S DESK") -> None:
-    director_clear()
-    print(title)
-    print("═" * 104)
-    unique_contexts = {id(shot["context"]) for shot in storyboard}
-    random_contexts = len(unique_contexts) > len({shot["photoshoot_index"] for shot in storyboard})
-    if random_contexts:
-        print("RANDOM SET: every shot has an independently assembled model, wardrobe, and location.")
-        print("═" * 104)
-    seen_sets: set[int] = set()
-    for shot in storyboard:
-        if random_contexts:
-            break
-        photo = shot["photoshoot_index"]
-        if photo in seen_sets:
-            continue
-        seen_sets.add(photo)
-        context = shot["context"]
-        human = context["human"]
-        identity = ", ".join((
-            human["age"]["prompt"],
-            human["ethnic_appearance"]["prompt"],
-            human["hair_color"]["prompt"],
-            human["hair_style"]["prompt"],
-            human["body_frame"]["prompt"],
-        ))
-        print(
-            f"SET {photo + 1}: {identity}\n"
-            f"       wardrobe={wardrobe_category(context['outfit']['template'])}:"
-            f"{context['outfit']['template']['id']} | "
-            f"location={environment_category(context['interior'])}:"
-            f"{context['interior']['id']} | surface={context['furniture']['id']}"
-        )
-    print("═" * 104)
-    print(f"{'#':>3} {'Set':>3} {'Stage':<18} {'Pose':<23} {'Action':<24} {'Expression':<18}")
-    print("─" * 104)
-    for shot in storyboard:
-        scene = shot["scene"]
-        print(
-            f"{shot['number']:>3} {shot['photoshoot_index'] + 1:>3} "
-            f"{short_id(shot['stage']['id'], 18):<18} "
-            f"{short_id(scene['pose']['id'], 23):<23} "
-            f"{short_id(scene['action']['id'], 24):<24} "
-            f"{short_id(scene['expression']['id'], 18):<18}"
-        )
-    print("═" * 104)
-
-
-def director_input(prompt: str) -> str:
-    try:
-        return input(prompt).strip()
-    except EOFError as exc:
-        raise AppError("Interactive storyboard input ended before confirmation") from exc
-
-
-def choose_number(prompt: str, maximum: int, allow_zero: bool = True) -> int | None:
-    value = director_input(prompt)
-    if value == "" and allow_zero:
-        return 0
+def _safe_int(value: Any, name: str, minimum: int = 1, maximum: int = 500) -> int:
+    if isinstance(value, bool):
+        raise AppError(f"{name} must be a whole number")
     try:
         parsed = int(value)
-    except ValueError:
+    except (TypeError, ValueError) as exc:
+        raise AppError(f"{name} must be a whole number") from exc
+    if not minimum <= parsed <= maximum:
+        raise AppError(f"{name} must be between {minimum} and {maximum}")
+    return parsed
+
+
+def _optional_seed(value: Any, name: str, maximum: int) -> int | None:
+    if value in (None, ""):
         return None
-    if (allow_zero and parsed == 0) or 1 <= parsed <= maximum:
-        return parsed
-    return None
+    return _safe_int(value, name, 0, maximum)
 
 
-def fzf_binary() -> str | None:
-    configured_env = os.environ.get("FZF_BIN")
-    if configured_env and Path(configured_env).is_file():
-        return configured_env
-    configured = shutil.which("fzf")
-    if configured:
-        return configured
-    for path in (
-        "/home/linuxbrew/.linuxbrew/bin/fzf",
-        "/opt/homebrew/bin/fzf",
-        "/usr/local/bin/fzf",
-    ):
-        if Path(path).is_file():
-            return path
-    return None
-
-
-def director_uses_fzf() -> bool:
-    return bool(fzf_binary() and sys.stdin.isatty() and sys.stdout.isatty())
-
-
-def fzf_select(
-    prompt: str,
-    choices: list[tuple[str, Any]],
-    default: Any | None = None,
-    height: str = "72%",
-) -> Any | None:
-    executable = fzf_binary()
-    if not executable or not sys.stdin.isatty() or not sys.stdout.isatty():
-        return None
-    rows = []
-    for index, (label, value) in enumerate(choices, 1):
-        display = label.replace(chr(9), " ")
-        if value is FZF_GROUP:
-            display = f"\033[2m{display}\033[0m"
-        rows.append(f"{index}\t{display}")
-    while True:
-        try:
-            result = subprocess.run(
-                [
-                    executable,
-                    f"--height={height}",
-                    "--layout=reverse",
-                    "--border=rounded",
-                    "--info=inline",
-                    "--ansi",
-                    "--delimiter=\t",
-                    "--with-nth=2..",
-                    f"--prompt={prompt} › ",
-                    "--header=Type to search • Enter select • Esc go back",
-                ],
-                input="\n".join(rows) + "\n",
-                text=True,
-                stdout=subprocess.PIPE,
-                check=False,
-            )
-        except OSError:
-            return None
-        if result.returncode != 0 or not result.stdout.strip():
-            return default
-        try:
-            selected = int(result.stdout.split("\t", 1)[0])
-        except ValueError:
-            return default
-        value = choices[selected - 1][1]
-        if value is not FZF_GROUP:
-            return value
-
-
-FZF_GROUP = object()
-MENU_BACK = object()
-
-
-@dataclass(frozen=True)
-class MenuPool:
-    """A deferred, prompt-seed-controlled choice from a Director menu group."""
-
-    values: tuple[tuple[Any, float], ...]
-
-
-def menu_pool(values: Iterable[tuple[Any, float]]) -> MenuPool:
-    pool = tuple(values)
-    if not pool:
-        raise AppError("A Director menu group cannot be empty")
-    return MenuPool(pool)
-
-
-def resolve_menu_choice(value: Any, rng: random.Random) -> Any:
-    if not isinstance(value, MenuPool):
-        return value
-    values, weights = zip(*value.values)
-    if any(weight <= 0 for weight in weights):
-        raise AppError("Every selectable item weight must be greater than zero")
-    return rng.choices(values, weights=weights, k=1)[0]
-
-
-def fzf_group(title: str) -> tuple[str, Any]:
-    return (f"── {title.upper()} " + "─" * max(1, 28 - len(title)), FZF_GROUP)
-
-
-def director_menu_choice(
-    prompt: str,
-    choices: list[tuple[str, Any]],
-    default: str,
-) -> str:
-    if director_uses_fzf():
-        escape_value = next(
-            (value for _, value in choices if value == "0"), default
-        )
-        selected = fzf_select(
-            prompt,
-            choices,
-            escape_value,
-            height="42%",
-        )
-        return str(selected)
-    return director_input(f"\n{prompt} [{default}]: ") or default
-
-
-def director_stage_options(shot: dict[str, Any], xxx_only: bool) -> list[dict[str, Any]]:
-    template = shot["context"]["outfit"]["template"]
-    explicit = [xxx_only_stage(template, i, 3, "photoshoot", random.Random(0)) for i in range(3)]
-    if xxx_only:
-        return explicit
-    non_explicit = [
-        stage for stage in effective_photoshoot_stages(template) if stage["level"] != "explicit"
-    ]
-    return non_explicit + explicit
-
-
-def effective_progression(args: argparse.Namespace, db: dict[str, Any]) -> tuple[float, float]:
-    progression = db["settings"].get("photoshoot_progression", {})
-    nsfw = float(
-        progression.get("nsfw_final_percent", 50)
-        if args.nsfw_percent is None else args.nsfw_percent
-    )
-    plateau = float(
-        progression.get("explicit_plateau_percent", 30)
-        if args.plateau_percent is None else args.plateau_percent
-    )
-    return nsfw, plateau
-
-
-def replace_set_context(
-    args: argparse.Namespace,
-    db: dict[str, Any],
-    composer: Composer,
-    storyboard: list[dict[str, Any]],
-    indices: list[int],
-    context: dict[str, Any],
-    recalculate_stages: bool,
-) -> None:
-    nsfw, plateau = effective_progression(args, db)
-    replacements: list[tuple[int, dict[str, Any], dict[str, Any]]] = []
-    for index in indices:
-        shot = storyboard[index]
-        if recalculate_stages:
-            template = context["outfit"]["template"]
-            stage = (
-                xxx_only_stage(template, shot["shot_index"], args.count, args.mode, composer.rng)
-                if args.xxx_only
-                else stage_for_index(
-                    template, shot["shot_index"], args.count, args.mode,
-                    composer.rng, nsfw, plateau,
-                )
-            )
-        else:
-            stage = shot["stage"]
-        scene = composer.resolve_scene(context, stage)
-        replacements.append((index, stage, scene))
-    for index, stage, scene in replacements:
-        storyboard[index]["context"] = context
-        storyboard[index]["stage"] = stage
-        storyboard[index]["scene"] = scene
-
-
-def set_indices(storyboard: list[dict[str, Any]], index: int, mode: str) -> list[int]:
-    if mode == "random":
-        return [index]
-    photo = storyboard[index]["photoshoot_index"]
-    return [i for i, shot in enumerate(storyboard) if shot["photoshoot_index"] == photo]
-
-
-def human_section_label(human: dict[str, Any], parts: list[str]) -> str:
-    labels = {
-        "age": "Age", "ethnic_appearance": "Appearance", "skin_tone": "Skin",
-        "face_shape": "Face", "eye_shape": "Eyes", "eye_color": "Eye color",
-        "eyebrows": "Brows", "nose": "Nose", "lips": "Lips",
-        "cheekbones": "Cheekbones", "jawline": "Jaw", "facial_accents": "Details",
-        "hair_texture": "Texture", "hair_length": "Length", "hair_style": "Style",
-        "hair_color": "Color", "height": "Height", "body_frame": "Build",
-        "waist": "Waist", "hips": "Hips", "breast_size": "Breasts",
-        "breast_shape": "Shape", "areola_size": "Areola size",
-        "areola_color": "Areola color", "nipple_size": "Nipple size",
-        "nipple_shape": "Nipple shape", "pubic_hair": "Pubic hair",
-        "genital_appearance": "Genitals", "makeup": "Makeup", "manicure": "Manicure",
-    }
-    fragments = []
-    for part in parts:
-        value = human[part]
-        if isinstance(value, list):
-            prompt = ", ".join(item["prompt"] for item in value) or "none"
-        else:
-            prompt = value["prompt"]
-        fragments.append(f"{labels[part]}: {prompt}")
-    return "  ·  ".join(fragments)
-
-
-def human_cast_label(human: dict[str, Any]) -> str:
-    return human_section_label(human, [
-        "age", "ethnic_appearance", "skin_tone", "face_shape", "eye_color",
-        "hair_color", "hair_style", "body_frame",
-    ])
-
-
-HUMAN_FACE_PARTS = {
-    "face_shape", "eye_shape", "eye_color", "eyebrows", "nose", "lips",
-    "cheekbones", "jawline", "facial_accents",
-}
-HUMAN_HAIR_PARTS = {"hair_texture", "hair_length", "hair_style", "hair_color"}
-HUMAN_BODY_PARTS = {
-    "height", "body_frame", "waist", "hips", "breast_size", "breast_shape",
-    "areola_size", "areola_color", "nipple_size", "nipple_shape", "pubic_hair",
-    "genital_appearance",
-}
-HUMAN_STYLING_PARTS = {"makeup", "manicure"}
-
-HUMAN_SECTION_ORDER = {
-    "face": [
-        "face_shape", "eye_shape", "eye_color", "eyebrows", "nose", "lips",
-        "cheekbones", "jawline", "facial_accents",
-    ],
-    "hair": ["hair_texture", "hair_length", "hair_style", "hair_color"],
-    "body": [
-        "height", "body_frame", "waist", "hips", "breast_size", "breast_shape",
-        "areola_size", "areola_color", "nipple_size", "nipple_shape", "pubic_hair",
-        "genital_appearance",
-    ],
-    "styling": ["makeup", "manicure"],
-}
-
-
-def remixed_human(
-    composer: Composer,
-    current: dict[str, Any],
-    replace_parts: set[str] | None = None,
-    keep_parts: set[str] | None = None,
-) -> dict[str, Any]:
-    overrides = {}
-    if replace_parts is not None or (keep_parts and "ethnic_appearance" in keep_parts):
-        overrides["ethnic_appearance"] = current["ethnic_appearance"]
-    fresh = composer.choose_human(
-        overrides,
-        use_human_defaults=replace_parts is None,
-    )
-    if replace_parts is not None:
-        return {
-            key: fresh[key] if key in replace_parts else value
-            for key, value in current.items()
-        }
-    keep_parts = keep_parts or set()
-    return {
-        key: value if key in keep_parts else fresh[key]
-        for key, value in current.items()
-    }
-
-
-def choose_intimate_details(
-    composer: Composer, current: dict[str, Any]
-) -> dict[str, Any]:
-    working = current
-    while True:
-        mode = select_labeled(
-            "VULVA & PUBIC HAIR — choose what to change",
-            [
-                ("Choose pubic hair", "pubic_hair"),
-                ("Choose vulva", "genital_appearance"),
-            ],
-        )
-        if mode is None:
-            return working
-        if mode == "pubic_hair":
-            title = "INTIMATE DETAILS — choose pubic hair"
-        else:
-            title = "INTIMATE DETAILS — choose vulva appearance"
-        items = [
-            item
-            for item in composer.db["human_model_parts"][mode]
-            if not item.get("disabled", False)
-        ]
-        selected = select_labeled(
-            title,
-            any_catalog_choices(items, [
-                (item.get("menu_label", item["prompt"]), item)
-                for item in items
-            ]),
-        )
-        if selected is None:
-            continue
-        selected = resolve_menu_choice(selected, composer.rng)
-        updated = dict(working)
-        updated[mode] = selected
-        working = updated
-
-
-def _choose_subject_remix_once(
-    composer: Composer, current: dict[str, Any]
-) -> dict[str, Any] | None:
-    mode = select_labeled(
-        "SUBJECT — choose what to change",
-        [
-            fzf_group("Whole subject"),
-            ("Generate new subject", "all"),
-            ("Reroll same ethnicity", "ethnic"),
-            fzf_group("Identity & face"),
-            ("Choose ethnic appearance", "choose_ethnic"),
-            ("Choose age", "choose_age"),
-            ("Remix facial features", "face"),
-            fzf_group("Hair & beauty"),
-            ("Hair length", "choose_hair_length"),
-            ("Hair style", "choose_hair_style"),
-            ("Hair texture", "choose_hair_texture"),
-            ("Hair color", "choose_hair_color"),
-            ("Choose makeup", "choose_makeup"),
-            ("Choose manicure", "choose_manicure"),
-            ("Remix hair", "hair"),
-            ("Remix styling", "styling"),
-            fzf_group("Body"),
-            ("Choose body type", "choose_body_type"),
-            ("Choose breast size", "choose_breast_size"),
-            ("Intimate details", "intimate_details"),
-            ("Remix body anatomy", "body"),
-        ],
-    )
-    if mode is None:
-        return None
-    if mode == "intimate_details":
-        return choose_intimate_details(composer, current)
-    if mode == "choose_age":
-        age_options = [
-            item for item in composer.db["human_model_parts"]["age"]
-            if not item.get("disabled", False)
-        ]
-        selected_age = select_labeled(
-            "CASTING CALL — choose age",
-            any_catalog_choices(age_options, [(item["prompt"], item) for item in age_options]),
-        )
-        if selected_age is None:
-            return current
-        updated = dict(current)
-        updated["age"] = resolve_menu_choice(selected_age, composer.rng)
-        return updated
-    if mode in {"choose_breast_size", "choose_body_type"}:
-        if mode == "choose_breast_size":
-            category = "breast_size"
-            title = "CASTING CALL — choose breast size"
-            choices = [
-                ("Tiny", "breasts_very_small"),
-                ("Small", "breasts_small"),
-                ("Medium", "breasts_medium"),
-                ("Large", "breasts_large"),
-            ]
-        else:
-            category = "body_frame"
-            title = "CASTING CALL — choose body type"
-            choices = [
-                ("Thin", "body_slender"),
-                ("Normal", "body_average"),
-                ("Petite", "body_petite"),
-                ("Athletic", "body_athletic"),
-                ("Fit", "body_fitness"),
-                ("Curvy", "body_curvy"),
-                ("Hourglass", "body_hourglass"),
-                ("Soft", "body_soft"),
-                ("Voluptuous", "body_voluptuous"),
-                ("Plus-size curvy", "body_plus_curvy"),
-            ]
-        items = {
-            item["id"]: item
-            for item in composer.db["human_model_parts"][category]
-            if not item.get("disabled", False)
-        }
-        selected = select_labeled(
-            title,
-            any_catalog_choices(list(items.values()), [
-                (label, items[item_id])
-                for label, item_id in choices if item_id in items
-            ]),
-        )
-        if selected is None:
-            return current
-        updated = dict(current)
-        updated[category] = resolve_menu_choice(selected, composer.rng)
-        return updated
-    if mode in {"choose_hair_length", "choose_hair_style", "choose_hair_texture"}:
-        category = {
-            "choose_hair_length": "hair_length",
-            "choose_hair_style": "hair_style",
-            "choose_hair_texture": "hair_texture",
-        }[mode]
-        available_tags: set[str] = set()
-        for key, value in current.items():
-            if key in {category, "hair_style"}:
-                continue
-            if isinstance(value, list):
-                for item in value:
-                    available_tags |= tags(item)
-            else:
-                available_tags |= tags(value)
-        items = [
-            item for item in composer.db["human_model_parts"][category]
-            if not item.get("disabled", False)
-            and compatible_with_requirements(item, available_tags)
-        ]
-        if category == "hair_length":
-            choices: list[tuple[str, Any]] = [
-                ("All groups", menu_pool((item, float(item.get("weight", 1))) for item in items))
-            ]
-            for group, tag in (("Short", "short_hair"), ("Medium", "medium_hair"), ("Long", "long_hair")):
-                grouped = [item for item in items if tag in tags(item)]
-                if grouped:
-                    choices.append(fzf_group(group))
-                    choices.append((
-                        f"Any {group}",
-                        menu_pool((item, float(item.get("weight", 1))) for item in grouped),
-                    ))
-                    choices.extend((compact_item_label(item, ("hair_length_",)), item) for item in grouped)
-        elif category == "hair_style":
-            choices = [
-                ("All groups", menu_pool((item, float(item.get("weight", 1))) for item in items))
-            ]
-            assigned_styles: set[str] = set()
-            for group, tag in (("Short", "short_hairstyle"), ("Medium", "medium_hairstyle"), ("Long", "long_hairstyle")):
-                grouped = [
-                    item for item in items
-                    if item["id"] not in assigned_styles and tag in tags(item)
-                ]
-                if grouped:
-                    choices.append(fzf_group(group))
-                    choices.append((
-                        f"Any {group}",
-                        menu_pool((item, float(item.get("weight", 1))) for item in grouped),
-                    ))
-                    choices.extend((compact_item_label(item, ("hair_style_",)), item) for item in grouped)
-                    assigned_styles.update(item["id"] for item in grouped)
-        else:
-            choices = any_catalog_choices(
-                items,
-                [(compact_item_label(item, ("hair_texture_",)), item) for item in items],
-            )
-        selected = select_labeled(f"CASTING — {category.replace('_', ' ')}", choices)
-        if selected is None:
-            return current
-        selected = resolve_menu_choice(selected, composer.rng)
-        updated = dict(current)
-        updated[category] = selected
-        if category != "hair_style":
-            style_tags = set()
-            for key, value in updated.items():
-                if key == "hair_style":
-                    continue
-                if isinstance(value, list):
-                    for item in value:
-                        style_tags |= tags(item)
-                else:
-                    style_tags |= tags(value)
-            current_style = updated["hair_style"]
-            if not compatible_with_requirements(current_style, style_tags):
-                styles = [
-                    item for item in composer.db["human_model_parts"]["hair_style"]
-                    if not item.get("disabled", False)
-                    and compatible_with_requirements(item, style_tags)
-                ]
-                updated["hair_style"] = weighted_choice(composer.rng, styles)
-        return updated
-    if mode in {"choose_hair_color", "choose_makeup", "choose_manicure"}:
-        category = {
-            "choose_hair_color": "hair_color",
-            "choose_makeup": "makeup",
-            "choose_manicure": "manicure",
-        }[mode]
-        available_tags: set[str] = set()
-        for key, value in current.items():
-            if key == category:
-                continue
-            if isinstance(value, list):
-                for item in value:
-                    available_tags |= tags(item)
-            else:
-                available_tags |= tags(value)
-        options = [
-            item for item in composer.db["human_model_parts"][category]
-            if not item.get("disabled", False)
-            and compatible_with_requirements(item, available_tags)
-        ]
-        if category == "hair_color":
-            labels = [
-                ("All groups", menu_pool((item, float(item.get("weight", 1))) for item in options))
-            ]
-            for group, predicate in (
-                ("Natural", lambda item: "natural_hair_color" in tags(item)),
-                ("Fashion", lambda item: "natural_hair_color" not in tags(item)),
-            ):
-                grouped = [item for item in options if predicate(item)]
-                if not grouped:
-                    continue
-                labels.append(fzf_group(group))
-                labels.append((
-                    f"Any {group}",
-                    menu_pool((item, float(item.get("weight", 1))) for item in grouped),
-                ))
-                labels.extend(
-                    (compact_item_label(item, ("hair_",)), item) for item in grouped
-                )
-            title = "CASTING CALL — choose hair color"
-        elif category == "manicure":
-            exact_labels = [
-                (
-                    "No manicure" if item["id"] == "manicure_none"
-                    else item["id"].removeprefix("manicure_").replace("_", " ").title(),
-                    item,
-                )
-                for item in options
-            ]
-            labels = any_catalog_choices(options, exact_labels)
-            title = "CASTING CALL — choose manicure"
-        else:
-            exact_labels = [
-                (
-                    "No makeup" if item["id"] == "makeup_no_makeup"
-                    else item["id"].removeprefix("makeup_").replace("_", " ").title(),
-                    item,
-                )
-                for item in options
-            ]
-            labels = any_catalog_choices(options, exact_labels)
-            title = "CASTING CALL — choose makeup"
-        selected = select_labeled(title, labels)
-        if selected is None:
-            return current
-        selected = resolve_menu_choice(selected, composer.rng)
-        updated = dict(current)
-        updated[category] = selected
-        return updated
-    selected_ethnic = None
-    if mode == "choose_ethnic":
-        ethnic_options = [
-            item for item in composer.db["human_model_parts"]["ethnic_appearance"]
-            if not item.get("disabled", False)
-        ]
-        selected_ethnic = select_labeled(
-            "CASTING CALL — choose ethnic appearance",
-            any_catalog_choices(ethnic_options, [
-                (item["id"].removeprefix("appearance_").replace("_", " ").title(), item)
-                for item in ethnic_options
-            ]),
-        )
-        if selected_ethnic is None:
-            return current
-        selected_ethnic = resolve_menu_choice(selected_ethnic, composer.rng)
-    candidates: list[dict[str, Any]] = []
-    for _ in range(8):
-        if mode == "all":
-            candidate = composer.choose_human(use_default_ethnicity=False)
-        elif mode == "ethnic":
-            candidate = remixed_human(composer, current, keep_parts={"ethnic_appearance"})
-        elif mode == "choose_ethnic":
-            candidate = composer.choose_human({"ethnic_appearance": selected_ethnic})
-        else:
-            groups = {
-                "face": HUMAN_FACE_PARTS,
-                "hair": HUMAN_HAIR_PARTS,
-                "body": HUMAN_BODY_PARTS,
-                "styling": HUMAN_STYLING_PARTS,
-            }
-            candidate = remixed_human(composer, current, replace_parts=groups[mode])
-            if mode == "body":
-                compatible_colors = [
-                    item for item in composer.db["human_model_parts"]["areola_color"]
-                    if not item.get("disabled", False)
-                    and compatible_with_requirements(item, tags(current["skin_tone"]))
-                ]
-                candidate["areola_color"] = weighted_choice(composer.rng, compatible_colors)
-        candidates.append(candidate)
-    if mode in HUMAN_SECTION_ORDER:
-        title = f"CASTING CALL — choose {mode}"
-        label_parts = HUMAN_SECTION_ORDER[mode]
-    else:
-        title = "CASTING CALL — choose subject"
-        label_parts = [
-            "age", "ethnic_appearance", "skin_tone", "face_shape", "eye_color",
-            "hair_color", "hair_style", "body_frame",
-        ]
-    selected = select_labeled(
-        title,
-        [(human_section_label(candidate, label_parts), candidate) for candidate in candidates],
-    )
-    return selected if selected is not None else current
-
-
-def choose_subject_remix(
-    composer: Composer, current: dict[str, Any]
-) -> dict[str, Any] | None:
-    original = current
-    working = current
-    while True:
-        updated = _choose_subject_remix_once(composer, working)
-        if updated is None:
-            return working if working is not original else None
-        working = updated
-
-
-def outfit_label(outfit: dict[str, Any], limit: int = 4) -> str:
-    garments = []
-    for slot, item in outfit["garments"].items():
-        parts = [outfit["colors"][slot]["prompt"]]
-        if slot in outfit.get("patterns", {}):
-            parts.append(outfit["patterns"][slot]["prompt"])
-        if slot in outfit.get("textures", {}):
-            parts.append(outfit["textures"][slot]["prompt"])
-        parts.append(item["prompt"])
-        garments.append(" ".join(parts))
-    visible = garments[:limit]
-    if len(garments) > limit:
-        visible.append(f"+{len(garments) - limit} more")
-    return "  ·  ".join(visible)
-
-
-def template_label(template: dict[str, Any]) -> str:
-    return template["id"].removeprefix("template_").replace("_", " ").title()
-
-
-def compact_item_label(
-    item: dict[str, Any], prefixes: tuple[str, ...] = (), maximum_words: int = 3
-) -> str:
-    label = item.get("menu_label")
-    if not label:
-        raw = item["id"]
-        for prefix in prefixes:
-            raw = raw.removeprefix(prefix)
-        label = raw.replace("_", " ").title()
-    words = str(label).split()
-    return " ".join(words[:maximum_words])
-
-
-def any_catalog_choices(
-    items: list[dict[str, Any]], labels: Iterable[tuple[str, dict[str, Any]]]
-) -> list[tuple[str, Any]]:
-    """Offer a seed-controlled unrestricted value followed by exact values."""
-    return [
-        (
-            "Any value",
-            menu_pool((item, float(item.get("weight", 1))) for item in items),
-        ),
-        *labels,
-    ]
-
-
-def grouped_catalog_choices(
-    items: list[dict[str, Any]],
-    prefixes: tuple[str, ...],
-    group_order: tuple[str, ...],
-) -> list[tuple[str, Any]]:
-    choices: list[tuple[str, Any]] = [
-        (
-            "All groups",
-            menu_pool((item, float(item.get("weight", 1))) for item in items),
-        )
-    ]
-    groups = {str(item.get("menu_group", "Other")) for item in items}
-    ordered = [group for group in group_order if group in groups]
-    ordered.extend(sorted(groups - set(ordered)))
-    for group in ordered:
-        group_items = [
-            item for item in items if item.get("menu_group", "Other") == group
-        ]
-        choices.append(fzf_group(group))
-        choices.append((
-            f"Any {group}",
-            menu_pool((item, float(item.get("weight", 1))) for item in group_items),
-        ))
-        choices.extend(
-            (compact_item_label(item, prefixes), item)
-            for item in group_items
-        )
-    return choices
-
-
-def wardrobe_category(template: dict[str, Any]) -> str:
-    return str(template["wardrobe_category"])
-
-
-def grouped_template_choices(templates: list[dict[str, Any]]) -> list[tuple[str, Any]]:
-    choices: list[tuple[str, Any]] = [
-        (
-            "All groups",
-            menu_pool((item, float(item.get("weight", 1))) for item in templates),
-        )
-    ]
-    for category in ("normal", "glamour"):
-        items = [item for item in templates if wardrobe_category(item) == category]
-        if items:
-            choices.append(fzf_group(category))
-            choices.append((
-                f"Any {category.title()}",
-                menu_pool((item, float(item.get("weight", 1))) for item in items),
-            ))
-            choices.extend((template_label(item), item) for item in items)
-    return choices
-
-
-def choose_wardrobe_remix(
-    db: dict[str, Any],
-    composer: Composer,
-    current: dict[str, Any],
-    interior: dict[str, Any],
-) -> dict[str, Any] | None:
-    templates = [
-        template for template in db["outfit_templates"]
-        if not template.get("disabled", False)
-    ]
-    template = select_labeled(
-        "WARDROBE — choose scope or outfit",
-        [("Same template", current["template"])] + grouped_template_choices(templates),
-    )
-    if template is None:
-        return None
-    template = resolve_menu_choice(template, composer.rng)
-    candidates = [composer.choose_outfit(template, interior) for _ in range(8)]
-    return select_labeled(
-        f"WARDROBE DEPARTMENT — choose {template_label(template)} variation",
-        [(outfit_label(outfit), outfit) for outfit in candidates],
-    )
-
-
-def location_family(interior: dict[str, Any]) -> set[str]:
-    generic = {"indoor", "private", "luxury", "cozy", "intimate"}
-    return tags(interior) - generic
-
-
-def environment_category(interior: dict[str, Any]) -> str:
-    return "luxury" if "luxury" in tags(interior) else "normal"
-
-
-def grouped_location_choices(
-    candidates: list[tuple[str, tuple[dict[str, Any], dict[str, Any]]]],
-) -> list[tuple[str, Any]]:
-    grouped: list[tuple[str, Any]] = [
-        (
-            "All groups",
-            menu_pool(
-                (value, float(value[0].get("weight", 1)))
-                for _, value in candidates
-            ),
-        )
-    ]
-    for category in ("normal", "luxury"):
-        category_items = [
-            candidate for candidate in candidates
-            if environment_category(candidate[1][0]) == category
-        ]
-        if category_items:
-            grouped.append(fzf_group(category))
-            grouped.append((
-                f"Any {category.title()}",
-                menu_pool(
-                    (value, float(value[0].get("weight", 1)))
-                    for _, value in category_items
-                ),
-            ))
-            grouped.extend(category_items)
-    return grouped
-
-
-def outfit_environment_compatible(
-    composer: Composer,
-    outfit: dict[str, Any],
-    interior: dict[str, Any],
-) -> bool:
+def _safe_percent(value: Any, name: str) -> float:
     try:
-        composer.validate_outfit_environment(outfit, interior)
-        return True
-    except AppError:
-        return False
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise AppError(f"{name} must be a number") from exc
+    if not 0 <= parsed <= 100:
+        raise AppError(f"{name} must be between 0 and 100")
+    return parsed
 
 
-def resolved_location_candidates(
-    db: dict[str, Any], composer: Composer, interiors: list[dict[str, Any]]
-) -> list[tuple[str, tuple[dict[str, Any], dict[str, Any]]]]:
+def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNamespace:
+    mode = payload.get("mode", "photoshoot")
+    if mode not in {"photoshoot", "random"}:
+        raise AppError("mode must be photoshoot or random")
+    count = _safe_int(payload.get("count", 12), "Images", 1, 200)
+    photoshoots = _safe_int(payload.get("photoshoots", 1), "Photoshoots", 1, 50)
+    if mode == "random":
+        photoshoots = 1
+    prompt_seed = _optional_seed(payload.get("prompt_seed"), "Prompt seed", 2**63 - 1)
+    inference_seed = _optional_seed(payload.get("inference_seed"), "Inference seed", 2**64 - 1)
+    xxx_only = bool(payload.get("xxx_only", False))
+    progression = db["settings"].get("photoshoot_progression", {})
+    nsfw = _safe_percent(
+        payload.get("nsfw_percent", progression.get("nsfw_final_percent", 50)),
+        "NSFW ending",
+    )
+    plateau = _safe_percent(
+        payload.get("plateau_percent", progression.get("explicit_plateau_percent", 30)),
+        "Explicit plateau",
+    )
+    if plateau > nsfw:
+        raise AppError("The explicit plateau percentage cannot exceed the NSFW ending")
+    return SimpleNamespace(
+        mode=mode,
+        count=count,
+        photoshoots=photoshoots,
+        prompt_seed=prompt_seed,
+        inference_seed=inference_seed,
+        xxx_only=xxx_only,
+        nsfw_percent=None if xxx_only or mode == "random" else nsfw,
+        plateau_percent=None if xxx_only or mode == "random" else plateau,
+        fast=bool(payload.get("fast", False)),
+    )
+
+
+def _args_dict(args: SimpleNamespace) -> dict[str, Any]:
+    return {key: value for key, value in vars(args).items() if key != "review_storyboard"}
+
+
+def _outfit_summary(outfit: dict[str, Any]) -> list[str]:
     result = []
-    for interior in interiors:
-        surfaces = [
-            item for item in db["furniture"]
-            if not item.get("disabled", False)
-            and compatible_with_requirements(item, tags(interior))
-        ]
-        if surfaces:
-            surface = weighted_choice(composer.rng, surfaces)
-            result.append((f"{interior['prompt']} — {surface['prompt']}", (interior, surface)))
+    for slot, garment in outfit["garments"].items():
+        color = outfit.get("colors", {}).get(slot, {}).get("prompt")
+        result.append(f"{color} {garment['prompt']}" if color else garment["prompt"])
     return result
 
 
-def choose_location_remix(
-    db: dict[str, Any],
-    composer: Composer,
-    current: dict[str, Any],
-    outfit: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any]] | None:
-    interiors = [item for item in db["interiors"] if not item.get("disabled", False)]
-    interiors = [
-        interior for interior in interiors
-        if outfit_environment_compatible(composer, outfit, interior)
-    ]
-    candidates = resolved_location_candidates(db, composer, interiors)
-    selected = select_labeled(
-        "LOCATION — choose scope or room",
-        grouped_location_choices(candidates),
-    )
-    if selected is None:
-        return None
-    return resolve_menu_choice(selected, composer.rng)
-
-
-def choose_surface_remix(
-    db: dict[str, Any], composer: Composer, current_interior: dict[str, Any]
-) -> dict[str, Any] | None:
-    surface_types = {
-        "bed", "sofa", "chair", "bathtub", "floor", "wall", "windowsill",
-        "table", "shower", "bench", "stool",
+def serialize_shot(db: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
+    scene = shot["scene"]
+    context = shot["context"]
+    positive, negative, selected_ids = compile_scene(db, scene)
+    template = context["outfit"]["template"]
+    return {
+        "number": shot["number"],
+        "photoshoot_index": shot["photoshoot_index"],
+        "shot_index": shot["shot_index"],
+        "stage": {
+            "id": shot["stage"]["id"],
+            "level": shot["stage"]["level"],
+            "plateau_kind": shot["stage"].get("plateau_kind"),
+        },
+        "inference_seed": shot["inference_seed"],
+        "subject": model_signature(context["human"]),
+        "wardrobe": template.get("menu_label", template["id"]),
+        "outfit": _outfit_summary(context["outfit"]),
+        "location": context["interior"]["prompt"],
+        "surface": context["furniture"]["prompt"],
+        "mood": context["mood"]["prompt"],
+        "photography": context["photography_style"]["prompt"],
+        "pose": {"id": scene["pose"]["id"], "prompt": scene["pose"]["prompt"]},
+        "action": {"id": scene["action"]["id"], "prompt": scene["action"]["prompt"]},
+        "expression": {"id": scene["expression"]["id"], "prompt": scene["expression"]["prompt"]},
+        "positive_prompt": positive,
+        "negative_prompt": negative,
+        "selected_ids": selected_ids,
     }
-    candidates = [
-        item for item in db["furniture"]
-        if not item.get("disabled", False)
-        and compatible_with_requirements(item, tags(current_interior))
-    ]
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for item in candidates:
-        group = next((kind for kind in sorted(surface_types) if kind in tags(item)), "other")
-        groups.setdefault(group, []).append(item)
-    choices: list[tuple[str, Any]] = [
-        (
-            "All groups",
-            menu_pool((item, float(item.get("weight", 1))) for item in candidates),
-        )
-    ]
-    for group, items in sorted(groups.items()):
-        choices.append(fzf_group(group))
-        choices.append((
-            f"Any {group.title()}",
-            menu_pool((item, float(item.get("weight", 1))) for item in items),
-        ))
-        choices.extend((compact_item_label(item, ("surface_", "furniture_")), item) for item in items)
-    selected = select_labeled("SURFACE — choose scope or item", choices)
-    if selected is None:
-        return None
-    return resolve_menu_choice(selected, composer.rng)
 
 
-def select_labeled(
-    prompt: str,
-    choices: list[tuple[str, Any]],
-    preamble: str | None = None,
-) -> Any | None:
-    menu_choices = list(choices)
-    if not any(value is MENU_BACK for _, value in menu_choices):
-        menu_choices.append(("Back", MENU_BACK))
-    if director_uses_fzf():
-        director_clear()
-        if preamble:
-            print(preamble + "\n")
-        selected = fzf_select(prompt, menu_choices)
-        return None if selected is MENU_BACK else selected
-    director_clear()
-    if preamble:
-        print(preamble + "\n")
-    print(prompt + "\n")
-    selectable = []
-    for label, value in menu_choices:
-        if value is FZF_GROUP:
-            title = label.removeprefix("── ").split(" ─", 1)[0]
-            print(f"\n{title}")
-            continue
-        selectable.append((label, value))
-        print(f"{len(selectable):>2}) {label}")
-    selected = choose_number("\nChoose: ", len(selectable), allow_zero=False)
-    if not selected:
-        return None
-    value = selectable[selected - 1][1]
-    return None if value is MENU_BACK else value
+class WebState:
+    def __init__(self) -> None:
+        self.lock = threading.RLock()
+        self.storyboards: dict[str, dict[str, Any]] = {}
+        self.jobs: dict[str, dict[str, Any]] = {}
 
+    def trim(self, mapping: dict[str, Any], maximum: int) -> None:
+        while len(mapping) > maximum:
+            mapping.pop(next(iter(mapping)))
 
-def direct_set(
-    args: argparse.Namespace,
-    db: dict[str, Any],
-    composer: Composer,
-    storyboard: list[dict[str, Any]],
-    index: int,
-) -> None:
-    indices = set_indices(storyboard, index, args.mode)
-    while True:
-        shot = storyboard[index]
-        context = shot["context"]
-        show_storyboard([storyboard[i] for i in indices], f"CASTING & SET DESIGN — SET {shot['photoshoot_index'] + 1}")
-        if not director_uses_fzf():
-            print("1) Edit subject")
-            print("2) Edit wardrobe")
-            print("3) Edit location")
-            print("4) Edit surface")
-            print("5) Edit mood")
-            print("6) Edit camera")
-            print("7) Reroll SET")
-            print("0) Back")
-        choice = director_menu_choice(
-            "Set designer's choice",
-            [
-                fzf_group("Casting"),
-                ("Edit subject", "1"),
-                fzf_group("Styling"),
-                ("Edit wardrobe", "2"),
-                ("Edit mood", "5"),
-                ("Edit camera", "6"),
-                fzf_group("Location"),
-                ("Edit location", "3"),
-                ("Edit surface", "4"),
-                fzf_group("Complete SET"),
-                ("Reroll SET", "7"),
-                ("Back", "0"),
-            ],
-            "0",
-        )
-        if choice == "0":
-            return
-        new_context = dict(context)
-        recalculate_stages = False
-        if choice == "1":
-            human = choose_subject_remix(composer, context["human"])
-            if human is None:
-                continue
-            new_context["human"] = human
-        elif choice == "2":
-            outfit = choose_wardrobe_remix(
-                db, composer, context["outfit"], context["interior"]
-            )
-            if outfit is None:
-                continue
-            new_context["outfit"] = outfit
-            recalculate_stages = True
-        elif choice == "3":
-            selected = choose_location_remix(
-                db, composer, context["interior"], context["outfit"]
-            )
-            if selected is None:
-                continue
-            new_context["interior"], new_context["furniture"] = selected
-        elif choice == "4":
-            surface = choose_surface_remix(db, composer, context["interior"])
-            if surface is None:
-                continue
-            new_context["furniture"] = surface
-        elif choice == "5":
-            moods = [item for item in db["moods"] if not item.get("disabled", False)]
-            mood = select_labeled(
-                "MOOD",
-                grouped_catalog_choices(moods, ("mood_",), ("Everyday", "Romantic", "Editorial")),
-            )
-            if mood is None:
-                continue
-            new_context["mood"] = resolve_menu_choice(mood, composer.rng)
-        elif choice == "6":
-            styles = [
-                item for item in db["photography_styles"]
-                if not item.get("disabled", False)
-            ]
-            style = select_labeled(
-                "CAMERA STYLE",
-                grouped_catalog_choices(
-                    styles, ("photo_",), ("Amateur", "Studio", "Editorial", "Explicit")
-                ),
-            )
-            if style is None:
-                continue
-            new_context["photography_style"] = resolve_menu_choice(style, composer.rng)
-        elif choice == "7":
-            new_context = composer.fixed_context()
-            recalculate_stages = True
-        else:
-            continue
-        try:
-            replace_set_context(
-                args, db, composer, storyboard, indices, new_context, recalculate_stages
-            )
-        except AppError as exc:
-            director_input(f"Could not apply this direction: {exc}\nPress Enter...")
+    def create_storyboard(self, payload: dict[str, Any]) -> dict[str, Any]:
+        db, _ = load_database()
+        args = parse_run_config(payload, db)
+        prompt_seed = args.prompt_seed if args.prompt_seed is not None else secrets.randbits(63)
+        args.prompt_seed = prompt_seed
+        rng = random.Random(prompt_seed)
+        composer = Composer(db, rng)
+        progression = db["settings"].get("photoshoot_progression", {})
+        nsfw = float(progression.get("nsfw_final_percent", 50) if args.nsfw_percent is None else args.nsfw_percent)
+        plateau = float(progression.get("explicit_plateau_percent", 30) if args.plateau_percent is None else args.plateau_percent)
+        shots = build_storyboard(args, db, composer, rng, nsfw, plateau)
+        storyboard_id = uuid.uuid4().hex
+        record = {
+            "id": storyboard_id,
+            "created_at": _iso_now(),
+            "db": db,
+            "args": args,
+            "composer": composer,
+            "rng": rng,
+            "shots": shots,
+        }
+        with self.lock:
+            self.storyboards[storyboard_id] = record
+            self.trim(self.storyboards, MAX_STORYBOARDS)
+        return self.storyboard_payload(record)
 
+    def storyboard_payload(self, record: dict[str, Any]) -> dict[str, Any]:
+        args = record["args"]
+        return {
+            "id": record["id"],
+            "created_at": record["created_at"],
+            "config": _args_dict(args),
+            "total": len(record["shots"]),
+            "shots": [serialize_shot(record["db"], shot) for shot in record["shots"]],
+        }
 
-def stage_change_preserves_progression(
-    storyboard: list[dict[str, Any]], index: int, stage: dict[str, Any], mode: str
-) -> bool:
-    if mode != "photoshoot":
-        return True
-    ranks = {"covered": 0, "lingerie": 1, "topless": 2, "nude": 3, "explicit": 4}
-    photo = storyboard[index]["photoshoot_index"]
-    previous = next(
-        (storyboard[i] for i in range(index - 1, -1, -1)
-         if storyboard[i]["photoshoot_index"] == photo), None
-    )
-    following = next(
-        (storyboard[i] for i in range(index + 1, len(storyboard))
-         if storyboard[i]["photoshoot_index"] == photo), None
-    )
-    rank = ranks[stage["level"]]
-    return (
-        (previous is None or ranks[previous["stage"]["level"]] <= rank)
-        and (following is None or rank <= ranks[following["stage"]["level"]])
-    )
+    def get_storyboard(self, storyboard_id: str) -> dict[str, Any]:
+        with self.lock:
+            record = self.storyboards.get(storyboard_id)
+        if record is None:
+            raise AppError("Storyboard not found or expired")
+        return record
 
-
-def choose_compatible_override(
-    db: dict[str, Any], composer: Composer, shot: dict[str, Any], key: str
-) -> dict[str, Any] | None:
-    section = {"pose": "poses", "action": "actions"}[key]
-    candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    for item in db[section]:
-        if item.get("disabled", False):
-            continue
-        try:
-            scene = composer.resolve_scene(
-                shot["context"], shot["stage"], {key: item["id"]}
-            )
-        except AppError:
-            continue
-        candidates.append((item, scene))
-    grouped: list[tuple[str, Any]] = [
-        (
-            "All groups",
-            menu_pool((scene, float(item.get("weight", 1))) for item, scene in candidates),
-        )
-    ]
-    if key == "pose":
-        group_specs = (
-            ("Everyday", lambda item: not tags(item) & {"erotic_pose", "explicit_pose", "nude_pose", "topless_pose"}),
-            ("Erotic", lambda item: "explicit_pose" not in tags(item) and bool(tags(item) & {"erotic_pose", "nude_pose", "topless_pose"})),
-            ("Explicit", lambda item: "explicit_pose" in tags(item)),
-        )
-    else:
-        group_specs = (
-            ("Everyday", lambda item: not tags(item) & {"undressing_action", "erotic_action", "sensual_action", "explicit_action", "explicit"}),
-            ("Undressing", lambda item: "undressing_action" in tags(item)),
-            ("Erotic", lambda item: "undressing_action" not in tags(item) and "explicit_action" not in tags(item) and "explicit" not in tags(item)),
-            ("Explicit", lambda item: bool(tags(item) & {"explicit_action", "explicit"})),
-        )
-    assigned: set[str] = set()
-    for group, predicate in group_specs:
-        items = [(item, scene) for item, scene in candidates if item["id"] not in assigned and predicate(item)]
-        if items:
-            grouped.append(fzf_group(group))
-            grouped.append((
-                f"Any {group}",
-                menu_pool((scene, float(item.get("weight", 1))) for item, scene in items),
-            ))
-            grouped.extend(
-                (compact_item_label(item, ("pose_", "action_")), scene)
-                for item, scene in items
-            )
-            assigned.update(item["id"] for item, _ in items)
-    selected = select_labeled(
-        f"Compatible {key}s for shot {shot['number']}",
-        grouped,
-    )
-    if selected is None:
-        return None
-    return resolve_menu_choice(selected, composer.rng)
-
-
-def choose_expression(
-    db: dict[str, Any], composer: Composer, shot: dict[str, Any]
-) -> dict[str, Any] | None:
-    candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    for item in db["expressions"]:
-        if item.get("disabled", False):
-            continue
-        scene = dict(shot["scene"])
-        scene["expression"] = item
-        try:
-            composer.validate_scene_rules(scene)
-        except AppError:
-            continue
-        candidates.append((item, scene))
-    grouped: list[tuple[str, Any]] = [
-        (
-            "All groups",
-            menu_pool((scene, float(item.get("weight", 1))) for item, scene in candidates),
-        )
-    ]
-    assigned_expressions: set[str] = set()
-    for group, tag in (
-        ("Natural", None),
-        ("Intense", "intense_pleasure_expression"),
-        ("Aroused", "aroused_expression"),
-        ("Sensual", "pleasure_expression"),
-    ):
-        items = [
-            (item, scene) for item, scene in candidates
-            if item["id"] not in assigned_expressions
-            and (not tags(item) if tag is None else tag in tags(item))
-        ]
-        if items:
-            grouped.append(fzf_group(group))
-            grouped.append((
-                f"Any {group}",
-                menu_pool((scene, float(item.get("weight", 1))) for item, scene in items),
-            ))
-            grouped.extend(
-                (compact_item_label(item, ("expression_",)), scene)
-                for item, scene in items
-            )
-            assigned_expressions.update(item["id"] for item, _ in items)
-    selected = select_labeled(
-        f"Compatible expressions for shot {shot['number']}",
-        grouped,
-    )
-    if selected is None:
-        return None
-    return resolve_menu_choice(selected, composer.rng)
-
-
-def direct_one_shot(
-    args: argparse.Namespace,
-    db: dict[str, Any],
-    composer: Composer,
-    storyboard: list[dict[str, Any]],
-    index: int,
-) -> None:
-    shot = storyboard[index]
-    while True:
-        show_storyboard([shot], f"DIRECT SHOT {shot['number']}")
-        if not director_uses_fzf():
-            print("1) Stage / XXX")
-            print("2) Pose")
-            print("3) Action")
-            print("4) Expression")
-            print("5) Reroll shot")
-            print("6) View prompt")
-            print("0) Back")
-        choice = director_menu_choice(
-            "Director's choice",
-            [
-                fzf_group("Composition"),
-                ("Stage / XXX", "1"),
-                ("Pose", "2"),
-                ("Action", "3"),
-                ("Expression", "4"),
-                ("Reroll shot", "5"),
-                fzf_group("Review & navigation"),
-                ("View prompt", "6"),
-                ("Back", "0"),
-            ],
-            "0",
-        )
-        if choice == "0":
-            return
-        if choice == "1":
-            options = director_stage_options(shot, args.xxx_only)
-            stage_choices: list[tuple[str, Any]] = []
-            for level in ("covered", "lingerie", "topless", "nude", "explicit"):
-                stages = [stage for stage in options if stage["level"] == level]
-                if stages:
-                    stage_choices.append(fzf_group(level))
-                    stage_choices.extend(
-                        (compact_item_label(stage, maximum_words=3), stage)
-                        for stage in stages
-                    )
-            stage = select_labeled(
-                f"Stage for shot {shot['number']}",
-                stage_choices,
-            )
-            if stage:
-                if not stage_change_preserves_progression(storyboard, index, stage, args.mode):
-                    director_input("That would reverse the photoshoot progression. Press Enter...")
-                    continue
-                shot["stage"] = stage
-                shot["scene"] = composer.resolve_scene(shot["context"], stage)
-        elif choice in {"2", "3"}:
-            scene = choose_compatible_override(
-                db, composer, shot, "pose" if choice == "2" else "action"
-            )
-            if scene:
-                shot["scene"] = scene
-        elif choice == "4":
-            scene = choose_expression(db, composer, shot)
-            if scene:
-                shot["scene"] = scene
-        elif choice == "5":
-            shot["scene"] = composer.resolve_scene(shot["context"], shot["stage"])
-            if args.inference_seed is None:
+    def reroll_shot(self, storyboard_id: str, number: int) -> dict[str, Any]:
+        record = self.get_storyboard(storyboard_id)
+        shots = record["shots"]
+        if not 1 <= number <= len(shots):
+            raise AppError("Shot number is out of range")
+        with self.lock:
+            shot = shots[number - 1]
+            shot["scene"] = record["composer"].resolve_scene(shot["context"], shot["stage"])
+            if record["args"].inference_seed is None:
                 shot["inference_seed"] = secrets.randbelow(2**63)
-        elif choice == "6":
-            positive, negative, _ = compile_scene(db, shot["scene"])
-            director_clear()
-            print(f"POSITIVE\n{positive}\n\nNEGATIVE\n{negative}\n")
-            director_input("Press Enter to return...")
+            return serialize_shot(record["db"], shot)
 
+    def create_job(self, storyboard_id: str, fast: bool) -> dict[str, Any]:
+        record = self.get_storyboard(storyboard_id)
+        job_id = uuid.uuid4().hex
+        job = {
+            "id": job_id,
+            "storyboard_id": storyboard_id,
+            "status": "queued",
+            "fast": bool(fast),
+            "created_at": _iso_now(),
+            "started_at": None,
+            "finished_at": None,
+            "completed": 0,
+            "total": len(record["shots"]),
+            "current_shot": None,
+            "progress": 0,
+            "elapsed_seconds": 0,
+            "eta_seconds": None,
+            "outputs": [],
+            "error": None,
+            "cancel_requested": False,
+        }
+        with self.lock:
+            self.jobs[job_id] = job
+            self.trim(self.jobs, MAX_JOBS)
+        threading.Thread(target=self._run_job, args=(job_id,), daemon=True).start()
+        return self.job_payload(job)
 
-def review_storyboard(
-    args: argparse.Namespace,
-    db: dict[str, Any],
-    composer: Composer,
-    storyboard: list[dict[str, Any]],
-    render: bool | None,
-) -> str:
-    while True:
-        show_storyboard(storyboard)
-        if render is None:
-            run_choices = [("Generate", "1"), ("Print prompts", "2")]
-            reroll_code, design_code, reroll_shot_code = "3", "4", "5"
-            direct_code, inspect_code = "6", "7"
-        else:
-            run_choices = [(("Generate" if render else "Print prompts"), "1")]
-            reroll_code, design_code, reroll_shot_code = "2", "3", "4"
-            direct_code, inspect_code = "5", "6"
-        if not director_uses_fzf():
-            for label, code in run_choices:
-                print(f"{code}) {label}")
-            print(f"{reroll_code}) Reroll storyboard")
-            print(f"{design_code}) Design SET")
-            print(f"{reroll_shot_code}) Reroll shot")
-            print(f"{direct_code}) Direct shot")
-            print(f"{inspect_code}) Inspect prompt")
-            print("0) Cancel")
-        choice = director_menu_choice(
-            "Director's choice",
-            [
-                fzf_group("Run"),
-                *run_choices,
-                ("Reroll storyboard", reroll_code),
-                fzf_group("Direct"),
-                ("Design SET", design_code),
-                ("Reroll shot", reroll_shot_code),
-                ("Direct shot", direct_code),
-                ("Inspect prompt", inspect_code),
-                fzf_group("Exit"),
-                ("Cancel", "0"),
-            ],
-            "1",
+    def job_payload(self, job: dict[str, Any]) -> dict[str, Any]:
+        return {key: value for key, value in job.items() if key != "cancel_requested"}
+
+    def get_job(self, job_id: str) -> dict[str, Any]:
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                raise AppError("Render job not found or expired")
+            return self.job_payload(job)
+
+    def jobs_payload(self) -> dict[str, Any]:
+        with self.lock:
+            jobs = [self.job_payload(job) for job in self.jobs.values()]
+        active = next(
+            (job for job in reversed(jobs) if job["status"] in {"queued", "running"}),
+            None,
         )
-        if choice == "1":
-            return "generate" if render is None or render else "dry-run"
-        if render is None and choice == "2":
-            return "dry-run"
-        if choice == reroll_code:
-            return "reroll"
-        if choice == "0":
-            return "cancel"
-        if choice in {design_code, reroll_shot_code, direct_code, inspect_code}:
-            if choice == design_code and args.mode == "photoshoot":
-                set_representatives = []
-                seen_sets: set[int] = set()
-                for offset, shot in enumerate(storyboard):
-                    photo = shot["photoshoot_index"]
-                    if photo not in seen_sets:
-                        seen_sets.add(photo)
-                        set_representatives.append((offset, shot))
-                selection_choices = [
-                    (
-                        f"SET {shot['photoshoot_index'] + 1} · "
-                        f"{human_cast_label(shot['context']['human'])} · "
-                        f"{shot['context']['outfit']['template']['id']} · "
-                        f"{shot['context']['interior']['id']}",
-                        offset,
-                    )
-                    for offset, shot in set_representatives
-                ]
-                noun = "Choose a SET for casting and design"
-            else:
-                selection_choices = [
-                    (
-                        f"Shot {shot['number']} · SET {shot['photoshoot_index'] + 1} · "
-                        f"{shot['stage']['id']} · {shot['scene']['pose']['id']}",
-                        offset,
-                    )
-                    for offset, shot in enumerate(storyboard)
-                ]
-                noun = "Choose an independent shot as its SET" if choice == design_code else "Choose a shot"
-            index = select_labeled(
-                noun,
-                selection_choices,
-            )
-            if index is None:
-                continue
-            number = index + 1
-            if choice == design_code:
-                direct_set(args, db, composer, storyboard, index)
-            elif choice == reroll_shot_code:
-                shot = storyboard[index]
-                shot["scene"] = composer.resolve_scene(shot["context"], shot["stage"])
-                if args.inference_seed is None:
-                    shot["inference_seed"] = secrets.randbelow(2**63)
-            elif choice == direct_code:
-                direct_one_shot(args, db, composer, storyboard, index)
-            else:
-                shot = storyboard[index]
+        return {
+            "active_job": active,
+            "jobs": list(reversed(jobs)),
+        }
+
+    def cancel_job(self, job_id: str) -> dict[str, Any]:
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                raise AppError("Render job not found or expired")
+            if job["status"] in {"queued", "running"}:
+                job["cancel_requested"] = True
+            return self.job_payload(job)
+
+    def _run_job(self, job_id: str) -> None:
+        with self.lock:
+            job = self.jobs[job_id]
+            job["status"] = "running"
+            job["started_at"] = _iso_now()
+        started = time.monotonic()
+        try:
+            record = self.get_storyboard(job["storyboard_id"])
+            db = record["db"]
+            _, db_path = load_database()
+            workflow, mapping = load_workflow_runtime(db, db_path, job["fast"])
+            run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            for shot in record["shots"]:
+                with self.lock:
+                    if job["cancel_requested"]:
+                        job["status"] = "cancelled"
+                        break
+                    job["current_shot"] = shot["number"]
                 positive, negative, _ = compile_scene(db, shot["scene"])
-                director_clear()
-                print(f"SHOT {number}\n\nPOSITIVE\n{positive}\n\nNEGATIVE\n{negative}\n")
-                director_input("Press Enter to return...")
+                prompt_id, paths = generate_one(
+                    db, db_path, positive, negative, shot["inference_seed"],
+                    record["args"].mode, shot["shot_index"], shot["photoshoot_index"],
+                    run_id, job["fast"], workflow, mapping,
+                )
+                elapsed = time.monotonic() - started
+                completed = shot["number"]
+                remaining = len(record["shots"]) - completed
+                with self.lock:
+                    job["completed"] = completed
+                    job["progress"] = round(completed * 100 / len(record["shots"]), 1)
+                    job["elapsed_seconds"] = round(elapsed, 1)
+                    job["eta_seconds"] = round(elapsed / completed * remaining, 1) if remaining else 0
+                    for path in paths:
+                        job["outputs"].append({
+                            "name": path.name,
+                            "url": f"/api/outputs/{path.name}",
+                            "prompt_id": prompt_id,
+                            "shot": shot["number"],
+                        })
+            with self.lock:
+                if job["status"] == "running":
+                    job["status"] = "completed"
+        except Exception as exc:
+            with self.lock:
+                job["status"] = "failed"
+                job["error"] = str(exc)
+        finally:
+            with self.lock:
+                job["elapsed_seconds"] = round(time.monotonic() - started, 1)
+                job["finished_at"] = _iso_now()
+                job["current_shot"] = None
 
 
-def report_width() -> int:
-    return max(72, min(shutil.get_terminal_size((100, 24)).columns, 120))
+WEB_STATE = WebState()
 
 
-def report_heading(title: str, heavy: bool = False) -> None:
-    width = report_width()
-    fill = "═" if heavy else "─"
-    label = f" {title} "
-    remaining = max(0, width - len(label))
-    left = remaining // 2
-    print(f"{fill * left}{label}{fill * (remaining - left)}")
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 
 
-def report_field(label: str, value: Any) -> None:
-    prefix = f"{label:<16} "
-    lines = textwrap.wrap(
-        str(value),
-        width=max(20, report_width() - len(prefix)),
-        break_long_words=False,
-        break_on_hyphens=False,
-    ) or [""]
-    print(prefix + lines[0])
-    for line in lines[1:]:
-        print(" " * len(prefix) + line)
-
-
-def report_prompt(title: str, prompt: str) -> None:
-    print(f"\n{title}")
-    print("─" * min(len(title), report_width()))
-    for line in textwrap.wrap(
-        prompt,
-        width=report_width(),
-        initial_indent="  ",
-        subsequent_indent="  ",
-        break_long_words=False,
-        break_on_hyphens=False,
-    ) or ["  —"]:
-        print(line)
-
-
-def format_duration(seconds: float) -> str:
-    if seconds < 60:
-        return f"{seconds:.1f} s"
-    minutes, remainder = divmod(seconds, 60)
-    if minutes < 60:
-        return f"{int(minutes)} min {remainder:.1f} s"
-    hours, minutes = divmod(int(minutes), 60)
-    return f"{hours} h {minutes} min {remainder:.1f} s"
-
-
-def run_batch(args: argparse.Namespace, render: bool | None) -> None:
+def output_directory() -> Path:
     db, db_path = load_database()
-    prompt_seed = args.prompt_seed if args.prompt_seed is not None else secrets.randbits(63)
-    rng = random.Random(prompt_seed)
-    composer = Composer(db, rng)
-    progression = db["settings"].get("photoshoot_progression", {})
-    nsfw_percent = float(
-        progression.get("nsfw_final_percent", 50)
-        if args.nsfw_percent is None else args.nsfw_percent
-    )
-    plateau_percent = float(
-        progression.get("explicit_plateau_percent", 30)
-        if args.plateau_percent is None else args.plateau_percent
-    )
-    if args.mode == "random" and (args.nsfw_percent is not None or args.plateau_percent is not None):
-        raise AppError("--nsfw-percent and --plateau-percent are only valid with --mode photoshoot")
-    if args.xxx_only and (args.nsfw_percent is not None or args.plateau_percent is not None):
-        raise AppError("--xxx-only cannot be combined with --nsfw-percent or --plateau-percent")
-    if args.mode == "random" and args.photoshoots != 1:
-        raise AppError("--photoshoots is only valid with --mode photoshoot")
-    if plateau_percent > nsfw_percent:
-        raise AppError("The explicit plateau percentage cannot exceed the NSFW final percentage")
-
-    photoshoot_count = args.photoshoots if args.mode == "photoshoot" else 1
-    storyboard = build_storyboard(args, db, composer, rng, nsfw_percent, plateau_percent)
-    if args.review_storyboard:
-        choose_output = render is None
-        while True:
-            decision = review_storyboard(args, db, composer, storyboard, render)
-            if decision in {"generate", "dry-run"}:
-                render = decision == "generate"
-                if choose_output and render:
-                    quality = select_labeled(
-                        "QUALITY", [("Production", False), ("Fast test", True)]
-                    )
-                    if quality is None:
-                        render = None
-                        continue
-                    args.fast = quality
-                elif not render:
-                    args.fast = False
-                break
-            if decision == "cancel":
-                print("Cancelled by director.")
-                return
-            storyboard = build_storyboard(args, db, composer, rng, nsfw_percent, plateau_percent)
-
-    if render is None:
-        raise AppError("Output action was not selected")
-
-    workflow_template: dict[str, Any] | None = None
-    workflow_mapping: dict[str, Any] | None = None
-    if render:
-        workflow_template, workflow_mapping = load_workflow_runtime(
-            db, db_path, args.fast
-        )
-
-    director_clear() if args.review_storyboard else None
-    report_heading("VALHALLA RUN", heavy=True)
-    report_field("Action", "Generate images" if render else "Print prompts")
-    report_field("Mode", args.mode.title())
-    report_field("Content", "Full XXX" if args.xxx_only else "Progressive")
-    report_field("Photoshoots", photoshoot_count)
-    report_field("Images", len(storyboard))
-    report_field("Prompt seed", prompt_seed)
-    report_field("Inference seed", args.inference_seed if args.inference_seed is not None else "Random per image")
-    if render:
-        report_field("Render profile", "Fast test" if args.fast else "Production")
-    if args.mode == "photoshoot" and not args.xxx_only:
-        report_field("NSFW ending", f"{nsfw_percent:g}%")
-        report_field("XXX plateau", f"{plateau_percent:g}%")
-
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    batch_started = time.monotonic()
-    announced_photoshoot = -1
-    for shot in storyboard:
-        photo = shot["photoshoot_index"]
-        scene = shot["scene"]
-        if args.mode == "photoshoot" and photo != announced_photoshoot:
-            context = shot["context"]
-            print()
-            report_heading(f"SET {photo + 1} OF {photoshoot_count}", heavy=True)
-            report_field("Subject", model_signature(context["human"]).replace("+", " + "))
-            report_field("Wardrobe", template_label(context["outfit"]["template"]))
-            report_field("Outfit", outfit_label(context["outfit"], limit=6))
-            report_field("Location", context["interior"]["prompt"])
-            report_field("Surface", context["furniture"]["prompt"])
-            report_field("Mood", context["mood"]["prompt"])
-            report_field("Camera", context["photography_style"]["prompt"])
-            announced_photoshoot = photo
-        positive, negative, selected_ids = compile_scene(db, scene)
-        print()
-        shot_title = (
-            f"PHOTOSHOOT {photo + 1}/{photoshoot_count} · "
-            f"IMAGE {shot['shot_index'] + 1}/{args.count} · "
-            f"BATCH {shot['number']}/{len(storyboard)} · "
-            f"{shot['stage']['level'].upper()}"
-        )
-        report_heading(shot_title)
-        report_field("Photoshoot", f"{photo + 1}/{photoshoot_count}")
-        report_field("Image", f"{shot['shot_index'] + 1}/{args.count}")
-        report_field("Batch progress", f"{shot['number']}/{len(storyboard)}")
-        if args.mode == "random":
-            report_field("Subject", model_signature(scene["human"]).replace("+", " + "))
-            report_field("Wardrobe", template_label(scene["outfit"]["template"]))
-            report_field("Location", scene["interior"]["prompt"])
-        report_field("Stage", shot["stage"]["id"])
-        report_field("Inference seed", shot["inference_seed"])
-        report_field("Pose", scene["pose"]["prompt"])
-        report_field("Action", scene["action"]["prompt"])
-        report_field("Expression", scene["expression"]["prompt"])
-        report_field("Selected IDs", ", ".join(selected_ids))
-        report_prompt("POSITIVE PROMPT", positive)
-        report_prompt("NEGATIVE PROMPT", negative)
-        if render:
-            assert workflow_template is not None and workflow_mapping is not None
-            generation_started = time.monotonic()
-            prompt_id, paths = generate_one(
-                db, db_path, positive, negative, shot["inference_seed"], args.mode,
-                shot["shot_index"], photo, run_id, args.fast,
-                workflow_template, workflow_mapping,
-            )
-            generation_seconds = time.monotonic() - generation_started
-            completed_images = shot["number"]
-            remaining_images = len(storyboard) - completed_images
-            batch_elapsed = time.monotonic() - batch_started
-            average_seconds = batch_elapsed / completed_images
-            remaining_seconds = average_seconds * remaining_images
-            estimated_finish = datetime.now() + timedelta(seconds=remaining_seconds)
-            print()
-            report_heading("RENDER RESULT")
-            report_field("Prompt ID", prompt_id)
-            report_field("Generation time", format_duration(generation_seconds))
-            report_field("Job elapsed", format_duration(batch_elapsed))
-            report_field("Average / image", format_duration(average_seconds))
-            report_field("Images remaining", remaining_images)
-            report_field("Time remaining", format_duration(remaining_seconds))
-            report_field(
-                "Estimated finish",
-                estimated_finish.strftime("%Y-%m-%d %H:%M:%S"),
-            )
-            for path in paths:
-                report_field("File", path.name)
-                report_field("Saved to", path.parent)
-    print()
-    report_heading("RUN COMPLETE", heavy=True)
+    return resolve_path(db_path.parent, db["settings"]["output_dir"])
 
 
-def positive_int(value: str) -> int:
-    parsed = int(value)
-    if parsed < 1:
-        raise argparse.ArgumentTypeError("must be at least 1")
-    return parsed
+def output_payload(path: Path) -> dict[str, Any]:
+    match = re.search(r"_shot_(\d+)_", path.name)
+    return {
+        "name": path.name,
+        "url": f"/api/outputs/{path.name}",
+        "shot": int(match.group(1)) if match else None,
+        "size": path.stat().st_size,
+        "modified_at": datetime.fromtimestamp(path.stat().st_mtime).astimezone().isoformat(timespec="seconds"),
+    }
 
 
-def inference_seed_value(value: str) -> int:
-    parsed = int(value)
-    if not 0 <= parsed < 2**64:
-        raise argparse.ArgumentTypeError("must be between 0 and 18446744073709551615")
-    return parsed
+def list_output_images() -> list[dict[str, Any]]:
+    directory = output_directory()
+    if not directory.is_dir():
+        return []
+    paths = [
+        path for path in directory.iterdir()
+        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+    ]
+    paths.sort(key=lambda path: (path.stat().st_mtime, path.name))
+    return [output_payload(path) for path in paths]
 
 
-def percent_value(value: str) -> float:
-    parsed = float(value)
-    if not 0 <= parsed <= 100:
-        raise argparse.ArgumentTypeError("must be between 0 and 100")
-    return parsed
+def ensure_outputs_idle() -> None:
+    with WEB_STATE.lock:
+        active = any(job["status"] in {"queued", "running"} for job in WEB_STATE.jobs.values())
+    if active:
+        raise AppError("Outputs cannot be deleted while a render job is active")
 
 
-@dataclass
-class WizardState:
-    mode: str = "photoshoot"
-    count: int = 10
-    photoshoots: int = 1
-    prompt_seed: int | None = None
-    inference_seed: int | None = None
-    xxx_only: bool = False
-    review_storyboard: bool = True
-    nsfw_percent: float | None = None
-    plateau_percent: float | None = None
-
-
-def wizard_input(prompt: str) -> str:
+def delete_output_image(name: str) -> dict[str, Any]:
+    ensure_outputs_idle()
+    if not name or Path(name).name != name:
+        raise AppError("Invalid output filename")
+    target = output_directory() / name
+    if target.suffix.lower() not in IMAGE_SUFFIXES:
+        raise AppError("Only generated image files can be deleted")
+    if not target.is_file():
+        raise AppError("Output not found")
     try:
-        return input(prompt).strip()
-    except EOFError as exc:
-        raise AppError("Interactive input closed") from exc
+        target.unlink()
+    except OSError as exc:
+        raise AppError(f"Could not delete output: {exc}") from exc
+    return {"ok": True, "deleted": name}
 
 
-def wizard_integer(prompt: str, current: int, minimum: int = 1) -> int:
-    while True:
-        raw = wizard_input(f"{prompt} [{current}]: ")
-        if not raw:
-            return current
+def delete_all_output_images() -> dict[str, Any]:
+    ensure_outputs_idle()
+    directory = output_directory()
+    if not directory.is_dir():
+        return {"ok": True, "deleted": 0, "names": []}
+    targets = [
+        path for path in directory.iterdir()
+        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+    ]
+    deleted: list[str] = []
+    for target in targets:
         try:
-            value = int(raw)
-        except ValueError:
-            value = minimum - 1
-        if value >= minimum:
-            return value
-        print(f"Enter a whole number of at least {minimum}.")
+            target.unlink()
+            deleted.append(target.name)
+        except OSError as exc:
+            raise AppError(
+                f"Deleted {len(deleted)} images, then could not delete {target.name}: {exc}"
+            ) from exc
+    return {"ok": True, "deleted": len(deleted), "names": deleted}
 
 
-def wizard_optional_integer(
-    prompt: str, current: int | None, maximum: int | None = None
-) -> int | None:
-    shown = "Random" if current is None else str(current)
-    while True:
-        raw = wizard_input(f"{prompt} [{shown}; blank keeps]: ")
-        if not raw:
-            return current
-        if raw.lower() in {"r", "random", "none"}:
-            return None
+def application_status(check_comfy: bool = True) -> dict[str, Any]:
+    db, db_path = load_database()
+    settings = db["settings"]
+    workflow_path = resolve_path(db_path.parent, settings["workflow_file"])
+    output_path = resolve_path(db_path.parent, settings["output_dir"])
+    selectable = sum(1 for item in iter_content_items(db) if not item.get("disabled", False))
+    comfy = {"url": settings["comfy_url"], "online": False, "message": "Not checked"}
+    if check_comfy:
         try:
-            value = int(raw)
-        except ValueError:
-            print("Enter a whole number or 'random'.")
-            continue
-        if maximum is not None and not 0 <= value <= maximum:
-            print(f"Enter a value from 0 through {maximum}.")
-            continue
+            session, url, _ = comfy_session(db)
+            response = session.get(f"{url}/system_stats", timeout=2)
+            response.raise_for_status()
+            comfy.update(online=True, message="Connected")
+        except Exception as exc:
+            comfy["message"] = str(exc)
+    progression = settings.get("photoshoot_progression", {})
+    return {
+        "app": "Project Valhalla",
+        "version": "2.0-web",
+        "comfy": comfy,
+        "workflow": {"ready": workflow_path.is_file(), "name": workflow_path.name},
+        "output": {"path": str(output_path), "exists": output_path.is_dir()},
+        "catalog_records": selectable,
+        "defaults": {
+            "nsfw_percent": progression.get("nsfw_final_percent", 50),
+            "plateau_percent": progression.get("explicit_plateau_percent", 30),
+        },
+    }
+
+
+class ValhallaHandler(BaseHTTPRequestHandler):
+    server_version = "Valhalla/2.0"
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        print(f"[{self.log_date_time_string()}] {fmt % args}")
+
+    def send_json(self, payload: Any, status: int = HTTPStatus.OK) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def read_json(self) -> dict[str, Any]:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            raise AppError("Invalid Content-Length") from exc
+        if length > 1_000_000:
+            raise AppError("Request body is too large")
+        try:
+            value = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError as exc:
+            raise AppError("Request body must be valid JSON") from exc
+        if not isinstance(value, dict):
+            raise AppError("Request body must be a JSON object")
         return value
 
-
-def wizard_percent(prompt: str, current: float) -> float:
-    while True:
-        raw = wizard_input(f"{prompt} [{current:g}]: ")
-        if not raw:
-            return current
+    def do_GET(self) -> None:
         try:
-            return percent_value(raw)
-        except (ValueError, argparse.ArgumentTypeError):
-            print("Enter a number from 0 through 100.")
-
-
-def wizard_summary(state: WizardState, db: dict[str, Any]) -> str:
-    progression = db["settings"].get("photoshoot_progression", {})
-    nsfw = state.nsfw_percent
-    if nsfw is None:
-        nsfw = float(progression.get("nsfw_final_percent", 50))
-    plateau = state.plateau_percent
-    if plateau is None:
-        plateau = float(progression.get("explicit_plateau_percent", 30))
-    batch = (
-        f"{state.photoshoots} × {state.count} = {state.photoshoots * state.count}"
-        if state.mode == "photoshoot" else str(state.count)
-    )
-    rows = [
-        f"Mode            {state.mode.title()}",
-        f"Content         {'Full XXX' if state.xxx_only else 'Progressive'}",
-        f"Batch           {batch} images",
-        f"Director        {'Interactive' if state.review_storyboard else 'Automatic'}",
-    ]
-    rows.extend([
-        f"Prompt seed     {state.prompt_seed if state.prompt_seed is not None else 'Random'}",
-        f"Inference seed  {state.inference_seed if state.inference_seed is not None else 'Random per image'}",
-    ])
-    if state.mode == "photoshoot" and not state.xxx_only:
-        total = state.photoshoots * state.count
-        rows.extend([
-            f"NSFW ending     {nsfw:g}% (~{math.ceil(total * nsfw / 100)})",
-            f"XXX plateau     {plateau:g}% (~{math.ceil(total * plateau / 100)})",
-        ])
-    return "\n".join(rows)
-
-
-def wizard_advanced(state: WizardState, db: dict[str, Any]) -> None:
-    progression = db["settings"].get("photoshoot_progression", {})
-    while True:
-        choices: list[tuple[str, Any]] = [
-            fzf_group("Randomness"),
-            (f"Prompt · {state.prompt_seed if state.prompt_seed is not None else 'Random'}", "prompt"),
-            (f"Inference · {state.inference_seed if state.inference_seed is not None else 'Random'}", "inference"),
-        ]
-        if state.mode == "photoshoot" and not state.xxx_only:
-            nsfw = state.nsfw_percent
-            if nsfw is None:
-                nsfw = float(progression.get("nsfw_final_percent", 50))
-            plateau = state.plateau_percent
-            if plateau is None:
-                plateau = float(progression.get("explicit_plateau_percent", 30))
-            choices.extend([
-                fzf_group("Progression"),
-                (f"NSFW · {nsfw:g}%", "nsfw"),
-                (f"Plateau · {plateau:g}%", "plateau"),
-            ])
-        selected = select_labeled("ADVANCED", choices)
-        if selected is None:
-            return
-        if selected == "prompt":
-            state.prompt_seed = wizard_optional_integer("Prompt seed", state.prompt_seed)
-        elif selected == "inference":
-            state.inference_seed = wizard_optional_integer(
-                "Inference seed", state.inference_seed, 2**64 - 1
-            )
-        elif selected in {"nsfw", "plateau"}:
-            default_nsfw = float(progression.get("nsfw_final_percent", 50))
-            default_plateau = float(progression.get("explicit_plateau_percent", 30))
-            if selected == "nsfw":
-                state.nsfw_percent = wizard_percent(
-                    "NSFW ending", state.nsfw_percent if state.nsfw_percent is not None else default_nsfw
-                )
+            path = urlparse(self.path).path
+            if path == "/api/status":
+                self.send_json(application_status())
+            elif path.startswith("/api/storyboards/"):
+                storyboard_id = path.split("/")[3]
+                self.send_json(WEB_STATE.storyboard_payload(WEB_STATE.get_storyboard(storyboard_id)))
+            elif path == "/api/jobs":
+                self.send_json(WEB_STATE.jobs_payload())
+            elif path.startswith("/api/jobs/"):
+                self.send_json(WEB_STATE.get_job(path.split("/")[3]))
+            elif path == "/api/outputs":
+                self.send_json({"outputs": list_output_images()})
+            elif path.startswith("/api/outputs/"):
+                self.serve_output(unquote(path.removeprefix("/api/outputs/")))
+            elif path.startswith("/api"):
+                self.send_json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
             else:
-                state.plateau_percent = wizard_percent(
-                    "XXX plateau", state.plateau_percent if state.plateau_percent is not None else default_plateau
+                self.serve_static(path)
+        except AppError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        except BrokenPipeError:
+            pass
+        except Exception as exc:
+            self.send_json({"error": f"Internal server error: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def do_POST(self) -> None:
+        try:
+            path = urlparse(self.path).path
+            if path == "/api/storyboards":
+                self.send_json(WEB_STATE.create_storyboard(self.read_json()), HTTPStatus.CREATED)
+            elif path.endswith("/reroll") and path.startswith("/api/storyboards/"):
+                parts = path.split("/")
+                self.send_json(WEB_STATE.reroll_shot(parts[3], _safe_int(parts[5], "Shot", 1, 10000)))
+            elif path == "/api/jobs":
+                payload = self.read_json()
+                self.send_json(
+                    WEB_STATE.create_job(str(payload.get("storyboard_id", "")), bool(payload.get("fast", False))),
+                    HTTPStatus.ACCEPTED,
                 )
+            elif path.endswith("/cancel") and path.startswith("/api/jobs/"):
+                self.send_json(WEB_STATE.cancel_job(path.split("/")[3]))
+            elif path == "/api/workflow/capture":
+                payload = self.read_json()
+                db, db_path = load_database()
+                capture(db, db_path, bool(payload.get("force", False)))
+                self.send_json({"ok": True, "message": "Workflow captured successfully"})
+            else:
+                self.send_json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
+        except AppError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        except Exception as exc:
+            self.send_json({"error": f"Internal server error: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def do_DELETE(self) -> None:
+        try:
+            path = urlparse(self.path).path
+            if path == "/api/outputs":
+                self.send_json(delete_all_output_images())
+            elif path.startswith("/api/outputs/"):
+                name = unquote(path.removeprefix("/api/outputs/"))
+                self.send_json(delete_output_image(name))
+            else:
+                self.send_json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
+        except AppError as exc:
+            self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        except Exception as exc:
+            self.send_json({"error": f"Internal server error: {exc}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
-def wizard_namespace(
-    state: WizardState, action: str = "dry-run", fast: bool = False
-) -> argparse.Namespace:
-    return argparse.Namespace(
-        command=action,
-        mode=state.mode,
-        count=state.count,
-        photoshoots=state.photoshoots if state.mode == "photoshoot" else 1,
-        prompt_seed=state.prompt_seed,
-        inference_seed=state.inference_seed,
-        fast=fast if action == "generate" else False,
-        xxx_only=state.xxx_only,
-        review_storyboard=state.review_storyboard,
-        nsfw_percent=state.nsfw_percent if state.mode == "photoshoot" and not state.xxx_only else None,
-        plateau_percent=state.plateau_percent if state.mode == "photoshoot" and not state.xxx_only else None,
-    )
-
-
-def wizard_configure(state: WizardState, db: dict[str, Any]) -> bool:
-    while True:
-        mode = state.mode.title()
-        content = "Full XXX" if state.xxx_only else "Progressive"
-        batch = f"{state.photoshoots} × {state.count}" if state.mode == "photoshoot" else f"{state.count} images"
-        director = "Interactive" if state.review_storyboard else "Automatic"
-        choices: list[tuple[str, Any]] = [
-            fzf_group("Run"),
-            (("Open Director" if state.review_storyboard else "Start run"), "start"),
-            fzf_group("Setup"),
-            (f"Mode · {mode}", "mode"),
-            (f"Content · {content}", "content"),
-            (f"Batch · {batch}", "batch"),
-            (f"Director · {director}", "director"),
-        ]
-        choices.extend([fzf_group("Options"), ("Advanced", "advanced"), ("Reset", "reset")])
-        selected = select_labeled(
-            "CONFIGURE", choices, preamble=wizard_summary(state, db)
-        )
-        if selected is None:
-            return False
-        if selected == "start":
-            progression = db["settings"].get("photoshoot_progression", {})
-            nsfw = state.nsfw_percent if state.nsfw_percent is not None else float(progression.get("nsfw_final_percent", 50))
-            plateau = state.plateau_percent if state.plateau_percent is not None else float(progression.get("explicit_plateau_percent", 30))
-            if plateau > nsfw:
-                director_input("XXX plateau exceeds NSFW ending. Press Enter...")
-                continue
-            if state.review_storyboard:
-                run_batch(wizard_namespace(state), render=None)
-                return True
-            action = select_labeled(
-                "OUTPUT", [("Generate", "generate"), ("Dry run", "dry-run")]
-            )
-            if action is None:
-                continue
-            fast = False
-            if action == "generate":
-                quality = select_labeled(
-                    "QUALITY", [("Production", False), ("Fast test", True)]
-                )
-                if quality is None:
-                    continue
-                fast = quality
-            confirmed = select_labeled(
-                "CONFIRM", [("Start run", True), ("Cancel", MENU_BACK)],
-                preamble=(
-                    wizard_summary(state, db)
-                    + f"\nOutput          {'Generate' if action == 'generate' else 'Dry run'}"
-                    + (f"\nQuality         {'Fast test' if fast else 'Production'}" if action == "generate" else "")
-                ),
-            )
-            if confirmed:
-                run_batch(
-                    wizard_namespace(state, action=action, fast=fast),
-                    render=action == "generate",
-                )
-                return True
-        elif selected == "mode":
-            value = select_labeled("MODE", [("Photoshoot", "photoshoot"), ("Random", "random")])
-            if value:
-                state.mode = value
-        elif selected == "content":
-            value = select_labeled("CONTENT", [("Progressive", False), ("Full XXX", True)])
-            if value is not None:
-                state.xxx_only = value
-        elif selected == "batch":
-            director_clear()
-            if state.mode == "photoshoot":
-                state.photoshoots = wizard_integer("Photoshoots", state.photoshoots)
-            state.count = wizard_integer("Images", state.count)
-        elif selected == "director":
-            value = select_labeled("DIRECTOR", [("Automatic", False), ("Interactive", True)])
-            if value is not None:
-                state.review_storyboard = value
-        elif selected == "advanced":
-            wizard_advanced(state, db)
-        elif selected == "reset":
-            state.__dict__.update(WizardState().__dict__)
-
-
-def run_wizard(parser: argparse.ArgumentParser) -> None:
-    db, db_path = load_database()
-    state = WizardState()
-    while True:
-        selected = select_labeled(
-            "MAIN MENU",
-            [
-                fzf_group("Create"),
-                ("New run", "run"),
-                fzf_group("Tools"),
-                ("Capture workflow", "capture"),
-                ("Help", "help"),
-                fzf_group("Exit"),
-                ("Exit", MENU_BACK),
-            ],
-            preamble=(
-                f"ComfyUI  {db['settings']['comfy_url']}\n"
-                f"Workflow {db['settings']['workflow_file']}\n"
-                f"Output   {db['settings']['output_dir']}"
-            ),
-        )
-        if selected is None:
+    def serve_static(self, path: str) -> None:
+        relative = "index.html" if path in {"", "/"} else unquote(path.lstrip("/"))
+        target = (WEB_ROOT / relative).resolve()
+        if WEB_ROOT.resolve() not in target.parents and target != WEB_ROOT.resolve():
+            self.send_error(HTTPStatus.FORBIDDEN)
             return
-        if selected == "run":
-            if wizard_configure(state, db):
-                return
-        elif selected == "capture":
-            capture_mode = select_labeled(
-                "CAPTURE", [("Capture safe", False), ("Replace workflow", True)]
-            )
-            if capture_mode is not None:
-                capture(db, db_path, capture_mode)
-                return
-        elif selected == "help":
-            director_clear()
-            parser.print_help()
-            director_input("\nPress Enter...")
+        if not target.is_file():
+            target = WEB_ROOT / "index.html"
+        body = target.read_bytes()
+        content_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type + ("; charset=utf-8" if content_type.startswith("text/") else ""))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def serve_output(self, name: str) -> None:
+        if Path(name).suffix.lower() not in IMAGE_SUFFIXES:
+            raise AppError("Only generated image files can be viewed")
+        if not name or Path(name).name != name:
+            raise AppError("Invalid output filename")
+        db, db_path = load_database()
+        target = resolve_path(db_path.parent, db["settings"]["output_dir"]) / name
+        if not target.is_file():
+            self.send_json({"error": "Output not found"}, HTTPStatus.NOT_FOUND)
+            return
+        body = target.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "private, max-age=3600")
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def serve(host: str, port: int, open_browser: bool) -> None:
+    if not WEB_ROOT.joinpath("index.html").is_file():
+        raise AppError(f"Web UI assets not found: {WEB_ROOT}")
+    server = ThreadingHTTPServer((host, port), ValhallaHandler)
+    browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    url = f"http://{browser_host}:{server.server_port}/"
+    print(f"Project Valhalla Web UI: {url}")
+    if open_browser:
+        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopping Project Valhalla…")
+    finally:
+        server.server_close()
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Rule-based prompt composer for ComfyUI")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("wizard", help="Open the interactive FZF launcher")
-    capture_parser = subparsers.add_parser("capture", help="Capture the latest successful ComfyUI workflow")
-    capture_parser.add_argument("--force", action="store_true", help="Replace an existing workflow.json")
-    for name, help_text in (("dry-run", "Resolve and print prompts without rendering"), ("generate", "Resolve prompts and render them")):
-        command = subparsers.add_parser(name, help=help_text)
-        command.add_argument("--mode", choices=("photoshoot", "random"), required=True)
-        command.add_argument("--count", type=positive_int, required=True, help="Images per photoshoot (or total random images)")
-        command.add_argument("--photoshoots", type=positive_int, default=1, help="Number of distinct photoshoots (photoshoot mode only)")
-        command.add_argument("--prompt-seed", type=int)
-        command.add_argument("--inference-seed", type=inference_seed_value)
-        command.add_argument(
-            "--fast",
-            action="store_true",
-            help="Render only the base sampler and VAE output, bypassing LoRA and pruning refiners/detailers",
-        )
-        command.add_argument(
-            "--xxx-only",
-            action="store_true",
-            help="Make every image immediately explicit XXX (works with photoshoot and random modes)",
-        )
-        command.add_argument(
-            "--review-storyboard",
-            action="store_true",
-            help="Open the interactive Director's Desk before printing or generating the batch",
-        )
-        command.add_argument(
-            "--nsfw-percent",
-            type=percent_value,
-            help="Override settings.photoshoot_progression.nsfw_final_percent (photoshoot only)",
-        )
-        command.add_argument(
-            "--plateau-percent",
-            type=percent_value,
-            help="Override settings.photoshoot_progression.explicit_plateau_percent (photoshoot only)",
-        )
+    parser = argparse.ArgumentParser(description="Project Valhalla local Web UI server")
+    parser.add_argument("--host", default="127.0.0.1", help="HTTP bind address")
+    parser.add_argument("--port", type=int, default=8765, help="HTTP port")
+    parser.add_argument("--no-browser", action="store_true", help="Do not open the browser automatically")
     return parser
 
 
 def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
+    args = build_parser().parse_args()
     try:
-        if args.command == "wizard":
-            run_wizard(parser)
-        elif args.command == "capture":
-            db, db_path = load_database()
-            capture(db, db_path, args.force)
-        else:
-            run_batch(args, render=args.command == "generate")
+        serve(args.host, args.port, not args.no_browser)
         return 0
     except AppError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    except KeyboardInterrupt:
-        print("error: interrupted", file=sys.stderr)
-        return 130
+    except OSError as exc:
+        print(f"error: could not start web server: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
