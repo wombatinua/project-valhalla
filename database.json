@@ -168,24 +168,8 @@
         "luxury"
       ],
       "pools": {
-        "interiors": [
-          "interior_small_apartment_bedroom",
-          "interior_ordinary_apartment_bedroom",
-          "interior_rental_bedroom",
-          "interior_compact_studio_apartment",
-          "interior_small_apartment_living_room",
-          "interior_ordinary_living_room"
-        ],
-        "furniture": [
-          "furniture_simple_double_bed",
-          "furniture_unmade_home_bed",
-          "furniture_compact_fabric_sofa",
-          "furniture_worn_home_sofa",
-          "furniture_simple_wooden_chair",
-          "furniture_thin_apartment_rug",
-          "furniture_narrow_windowsill",
-          "furniture_wall"
-        ],
+        "interiors": [],
+        "furniture": [],
         "moods": [
           "mood_everyday_relaxed",
           "mood_ordinary_afternoon",

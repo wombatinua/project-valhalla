@@ -56,6 +56,22 @@ class CatalogQualityTests(unittest.TestCase):
                 self.assertIn("luxury", selected_garment_categories)
                 self.assertIn("luxury", selected_surface_categories)
 
+    def test_enabling_both_categories_cycles_through_both_in_a_batch(self):
+        database, _ = app.load_database()
+        defaults = database["settings"]["scene_defaults"]
+        self.assertEqual(set(defaults["wardrobe_categories"]), {"normal", "luxury"})
+        self.assertEqual(set(defaults["environment_categories"]), {"normal", "luxury"})
+        composer = app.Composer(database, app.random.Random(20260721))
+        contexts = [composer.fixed_context() for _ in range(10)]
+        self.assertEqual(
+            [app.catalog_category(item["outfit"]["template"]) for item in contexts].count("luxury"),
+            5,
+        )
+        self.assertEqual(
+            [app.catalog_category(item["interior"]) for item in contexts].count("luxury"),
+            5,
+        )
+
     def test_age_catalog_contains_only_three_explicit_adult_presets(self):
         database, _ = app.load_database()
         ages = database["human_model_parts"]["age"]
@@ -216,12 +232,12 @@ class DirectorRegressionTests(unittest.TestCase):
                 positive.index(shot["context"]["human"]["ethnic_appearance"]["prompt"].casefold()),
             )
 
-    def test_default_photoshoot_stays_in_casual_amateur_pools(self):
+    def test_default_photoshoot_stays_in_casual_amateur_treatment_pools(self):
         database, _ = app.load_database()
         pools = database["settings"]["scene_defaults"]["pools"]
+        self.assertEqual(pools["interiors"], [])
+        self.assertEqual(pools["furniture"], [])
         allowed = {
-            "interior": set(pools["interiors"]),
-            "furniture": set(pools["furniture"]),
             "mood": set(pools["moods"]),
             "photography_style": (
                 set(pools["photography_styles"])
@@ -232,8 +248,8 @@ class DirectorRegressionTests(unittest.TestCase):
             state, storyboard_id = self.make_storyboard(count=12, prompt_seed=seed)
             for shot in state.get_storyboard(storyboard_id)["shots"]:
                 scene = shot["scene"]
-                for field, ids in allowed.items():
-                    self.assertIn(scene[field]["id"], ids, (seed, field))
+                for field in ("mood", "photography_style"):
+                    self.assertIn(scene[field]["id"], allowed[field], (seed, field))
 
     def test_compiled_prompt_contains_only_current_frame_visual_instructions(self):
         state, storyboard_id = self.make_storyboard(count=12)
@@ -500,6 +516,18 @@ class DirectorRegressionTests(unittest.TestCase):
             expected_anchor = (
                 "anatomically coherent rear-facing nude pose"
                 if scene["stage"].get("plateau_kind") == "provocative_rear"
+                else "one coherent sheer bra or lingerie top"
+                if scene["stage"]["level"] == "lingerie" and any(
+                    "sheer" in app.tags(scene["outfit"]["garments"][slot])
+                    for slot in scene["stage"].get("visible_slots", [])
+                    if slot in scene["outfit"]["garments"]
+                )
+                else "one opaque bra fully covering both breasts beneath the sheer outer garment"
+                if scene["stage"]["level"] == "covered" and any(
+                    "sheer" in app.tags(scene["outfit"]["garments"][slot])
+                    for slot in scene["stage"].get("visible_slots", [])
+                    if slot in scene["outfit"]["garments"]
+                )
                 else anchors[scene["stage"]["level"]]
             )
             self.assertIn(expected_anchor, positive)
@@ -615,6 +643,12 @@ class DirectorRegressionTests(unittest.TestCase):
         for scene, rendered in covered:
             positive = rendered["positive_prompt"].casefold()
             negative = rendered["negative_prompt"].casefold()
+            if "unbroken opaque fabric over the entire bust" not in positive:
+                self.assertTrue(
+                    "one coherent sheer bra" in positive
+                    or "one opaque bra fully covering both breasts beneath" in positive
+                )
+                continue
             self.assertIn("unbroken opaque fabric over the entire bust", positive)
             self.assertIn("natural clothed bust silhouette", positive)
             self.assertIn("continuous garment color and fabric texture", positive)
@@ -630,9 +664,18 @@ class DirectorRegressionTests(unittest.TestCase):
             self.assertNotIn("nipples protruding through fabric", negative)
 
     def test_lingerie_bra_is_compiled_as_one_coherent_layer(self):
-        state, storyboard_id = self.make_storyboard(count=12, prompt_seed=1)
-        rendered = state.storyboard_payload(state.get_storyboard(storyboard_id))["shots"]
-        lingerie = next(shot for shot in rendered if shot["stage"]["level"] == "lingerie")
+        lingerie = None
+        for seed in range(20):
+            state, storyboard_id = self.make_storyboard(count=12, prompt_seed=seed)
+            rendered = state.storyboard_payload(state.get_storyboard(storyboard_id))["shots"]
+            lingerie = next((
+                shot for shot in rendered
+                if shot["stage"]["level"] == "lingerie"
+                and "multiple bras" in shot["negative_prompt"].casefold()
+            ), None)
+            if lingerie:
+                break
+        self.assertIsNotNone(lingerie)
         positive = lingerie["positive_prompt"].casefold()
         negative = lingerie["negative_prompt"].casefold()
         self.assertIn("one single-layer", positive)

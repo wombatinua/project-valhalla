@@ -770,6 +770,16 @@ class Composer:
             for item in iter_content_items(db)
             if not item.get("disabled", False)
         }
+        self._category_bags: dict[str, list[str]] = {}
+
+    def choose_catalog_category(self, key: str, allowed: set[str]) -> str:
+        """Cycle every enabled tier before repeating, with seeded random order."""
+        bag = self._category_bags.get(key, [])
+        if not bag or not set(bag).issubset(allowed):
+            bag = sorted(allowed)
+            self.rng.shuffle(bag)
+            self._category_bags[key] = bag
+        return bag.pop()
 
     def choose_garment_modifier(
         self, section: str, garment: dict[str, Any], chance: float
@@ -873,14 +883,17 @@ class Composer:
             selected_tags |= tags(choice)
         return human
 
-    def choose_template(self) -> dict[str, Any]:
+    def choose_template(self, selected_category: str | None = None) -> dict[str, Any]:
         allowed = set(
             self.db["settings"]["scene_defaults"]["wardrobe_categories"]
+        )
+        selected_category = selected_category or self.choose_catalog_category(
+            "wardrobe", allowed
         )
         candidates = [
             template for template in self.db["outfit_templates"]
             if not template.get("disabled", False)
-            and template["catalog_category"] in allowed
+            and template["catalog_category"] == selected_category
         ]
         return weighted_choice(self.rng, candidates)
 
@@ -915,7 +928,7 @@ class Composer:
                     item for item in candidates
                     if set(item.get("mix_tags", item.get("tags", []))) & group_tags[match_group]
                 ]
-            if set(self.db["settings"]["scene_defaults"]["wardrobe_categories"]) == {"luxury"}:
+            if catalog_category(template) == "luxury":
                 candidates = prefer_catalog_category(candidates, "luxury")
             choice = weighted_choice(self.rng, candidates)
             selected[slot] = choice
@@ -1049,16 +1062,25 @@ class Composer:
     def fixed_context(self) -> dict[str, Any]:
         attempts = int(self.db["settings"].get("max_scene_attempts", 100))
         last_error = "no compatible fixed context"
+        allowed_wardrobes = set(
+            self.db["settings"]["scene_defaults"]["wardrobe_categories"]
+        )
+        selected_wardrobe_category = self.choose_catalog_category(
+            "wardrobe", allowed_wardrobes
+        )
+        allowed_environments = set(
+            self.db["settings"]["scene_defaults"]["environment_categories"]
+        )
+        selected_environment_category = self.choose_catalog_category(
+            "environment", allowed_environments
+        )
         for _ in range(attempts):
             try:
-                template = self.choose_template()
-                allowed_environments = set(
-                    self.db["settings"]["scene_defaults"]["environment_categories"]
-                )
+                template = self.choose_template(selected_wardrobe_category)
                 interiors = [
                     interior for interior in self.db["interiors"]
                     if not interior.get("disabled", False)
-                    and catalog_category(interior) in allowed_environments
+                    and catalog_category(interior) == selected_environment_category
                 ]
                 scene_pools = self.db["settings"]["scene_defaults"].get("pools", {})
                 if scene_pools.get("interiors"):
@@ -1069,8 +1091,7 @@ class Composer:
                     if compatible_with_requirements(item, tags(interior))
                     and category_allows(interior, item)
                 ]
-                strict_luxury_environment = allowed_environments == {"luxury"}
-                if strict_luxury_environment:
+                if selected_environment_category == "luxury":
                     furniture_candidates = prefer_catalog_category(
                         furniture_candidates, "luxury"
                     )
@@ -1123,10 +1144,8 @@ class Composer:
             and category_allows(fixed["interior"], item)
         ]
         scene_pools = self.db["settings"]["scene_defaults"].get("pools", {})
-        strict_luxury_environment = set(
-            self.db["settings"]["scene_defaults"]["environment_categories"]
-        ) == {"luxury"}
-        if not overrides.get("furniture") and strict_luxury_environment:
+        luxury_environment = catalog_category(fixed["interior"]) == "luxury"
+        if not overrides.get("furniture") and luxury_environment:
             furniture_candidates = prefer_catalog_category(
                 furniture_candidates, "luxury"
             )
