@@ -675,7 +675,7 @@ HUMAN_SELECTION_ORDER = (
     "age", "ethnic_appearance", "skin_tone", "face_shape", "eye_shape",
     "eye_color", "eyebrows", "nose", "lips", "cheekbones", "jawline",
     "hair_texture", "hair_length", "hair_style", "hair_color", "height",
-    "body_frame", "waist", "hips", "breast_size", "breast_shape",
+    "body_frame", "body_state", "waist", "hips", "breast_size", "breast_shape",
     "areola_size", "areola_color", "nipple_size", "nipple_shape",
     "pubic_hair", "genital_appearance", "facial_accents", "makeup",
     "manicure",
@@ -1338,9 +1338,14 @@ def human_fragments(
     covered_chest: bool,
     custom: dict[str, str],
 ) -> list[str]:
+    pregnant = (
+        human.get("body_state", {}).get("id") == "body_state_pregnant"
+        or "pregnan" in custom.get("human.body_state", "").casefold()
+    )
     fragments = [
         custom.get(f"human.{key}") or human[key].get("prompt", "")
         for key in ALWAYS_HUMAN_PARTS
+        if not (pregnant and key == "waist")
     ]
     facial_custom = custom.get("human.facial_accents")
     if facial_custom:
@@ -1397,6 +1402,14 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     age_prompt = custom.get("human.age") or scene["human"]["age"]["prompt"]
     positive_prefix = defaults.get("positive_prefix", "").replace("{age}", age_prompt)
     fragments = [positive_prefix]
+    body_state_prompt = (
+        custom.get("human.body_state")
+        or scene["human"].get("body_state", {}).get("prompt", "")
+    )
+    if body_state_prompt:
+        # Structural body modifiers need attention before stage, styling and
+        # fine identity details. The neutral default deliberately emits nothing.
+        fragments.append(body_state_prompt)
     scene_pools = db["settings"]["scene_defaults"].get("pools", {})
     casual_photo_ids = set(scene_pools.get("photography_styles", [])) | set(
         scene_pools.get("explicit_photography_styles", [])
@@ -1612,7 +1625,7 @@ def model_description(
     custom = custom or {}
     keys = (
         "age", "ethnic_appearance", "skin_tone", "hair_length", "hair_style",
-        "hair_color", "height", "body_frame", "breast_size",
+        "hair_color", "height", "body_frame", "body_state", "breast_size",
     )
     parts = [custom.get(f"human.{key}") or human[key]["prompt"] for key in keys]
     summarized = {f"human.{key}" for key in keys}
@@ -2293,7 +2306,7 @@ DIRECTOR_HUMAN_GROUPS = (
     ("Identity", ("age", "ethnic_appearance", "skin_tone")),
     ("Face", ("face_shape", "eye_shape", "eye_color", "eyebrows", "nose", "lips", "cheekbones", "jawline", "facial_accents")),
     ("Hair", ("hair_texture", "hair_length", "hair_style", "hair_color")),
-    ("Body", ("height", "body_frame", "waist", "hips", "breast_size", "breast_shape", "areola_size", "areola_color", "nipple_size", "nipple_shape", "pubic_hair", "genital_appearance")),
+    ("Body", ("height", "body_frame", "body_state", "waist", "hips", "breast_size", "breast_shape", "areola_size", "areola_color", "nipple_size", "nipple_shape", "pubic_hair", "genital_appearance")),
     ("Styling", ("makeup", "manicure")),
 )
 
@@ -2303,7 +2316,7 @@ DIRECTOR_LABELS = {
     "eyebrows": "Eyebrows", "nose": "Nose", "lips": "Lips", "cheekbones": "Cheekbones",
     "jawline": "Jawline", "facial_accents": "Facial detail", "hair_texture": "Hair texture",
     "hair_length": "Hair length", "hair_style": "Hair style", "hair_color": "Hair color",
-    "height": "Height", "body_frame": "Body type", "waist": "Waist", "hips": "Hips",
+    "height": "Height", "body_frame": "Body type", "body_state": "Body modifier", "waist": "Waist", "hips": "Hips",
     "breast_size": "Breast size", "breast_shape": "Breast shape",
     "areola_size": "Areola size", "areola_color": "Areola color",
     "nipple_size": "Nipple size", "nipple_shape": "Nipple shape",

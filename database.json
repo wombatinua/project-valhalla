@@ -109,6 +109,9 @@
           "body_petite",
           "body_lithe"
         ],
+        "body_state": [
+          "body_state_none"
+        ],
         "waist": [
           "waist_tiny",
           "waist_slender"
@@ -1539,6 +1542,18 @@
       {
         "id": "body_lithe",
         "prompt": "lithe dancer-like feminine figure"
+      }
+    ],
+    "body_state": [
+      {
+        "id": "body_state_none",
+        "prompt": "",
+        "menu_label": "No modifier"
+      },
+      {
+        "id": "body_state_pregnant",
+        "prompt": "(visibly pregnant:1.3), prominent naturally rounded pregnant belly",
+        "menu_label": "Pregnant"
       }
     ],
     "waist": [

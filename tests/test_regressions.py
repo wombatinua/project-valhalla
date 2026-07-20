@@ -132,6 +132,50 @@ class DirectorRegressionTests(unittest.TestCase):
             self.assertIn(key, fields)
             self.assertTrue(fields[key]["options"])
 
+    def test_pregnancy_is_a_persistent_body_modifier_without_waist_conflict(self):
+        state, storyboard_id = self.make_storyboard()
+        fields = director_fields(state.director_payload(storyboard_id, 1))
+        modifier = fields["human.body_state"]
+        self.assertEqual(modifier["label"], "Body modifier")
+        self.assertEqual(
+            {option["label"] for option in modifier["options"]},
+            {"No modifier", "Pregnant"},
+        )
+
+        state.update_director(
+            storyboard_id,
+            {
+                "shot": 1,
+                "field": "human.body_state",
+                "value": "body_state_pregnant",
+            },
+        )
+        record = state.get_storyboard(storyboard_id)
+        rendered = state.storyboard_payload(record)["shots"]
+        for shot, payload in zip(record["shots"], rendered):
+            self.assertEqual(
+                shot["context"]["human"]["body_state"]["id"],
+                "body_state_pregnant",
+            )
+            self.assertIn("pregnant", payload["positive_prompt"].casefold())
+            self.assertNotIn(
+                shot["context"]["human"]["waist"]["prompt"],
+                payload["positive_prompt"],
+            )
+            positive = payload["positive_prompt"].casefold()
+            stage_marker = {
+                "covered": "opaque upper-body clothing",
+                "lingerie": "opaque bra",
+                "topless": "topless",
+                "nude": "fully nude body",
+                "explicit": "explicit adult pose",
+            }[shot["stage"]["level"]]
+            self.assertLess(positive.index("pregnant"), positive.index(stage_marker))
+            self.assertLess(
+                positive.index("pregnant"),
+                positive.index(shot["context"]["human"]["ethnic_appearance"]["prompt"].casefold()),
+            )
+
     def test_default_photoshoot_stays_in_casual_amateur_pools(self):
         database, _ = app.load_database()
         pools = database["settings"]["scene_defaults"]["pools"]
