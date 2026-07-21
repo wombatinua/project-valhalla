@@ -557,6 +557,41 @@ class DirectorRegressionTests(unittest.TestCase):
         self.assertNotIn("retrying", job)
         self.assertNotIn("last_error", job)
 
+    def test_render_jobs_queue_in_fifo_order_and_snapshot_the_storyboard(self):
+        state, storyboard_id = self.make_storyboard()
+        original_prompt = state.get_storyboard(storyboard_id)["shots"][0]["scene"]["pose"]["prompt"]
+        with patch.object(app.threading, "Thread") as thread:
+            first = state.create_job(storyboard_id, False)
+            second = state.create_job(storyboard_id, True, [1])
+        self.assertEqual(first["queue_position"], 1)
+        self.assertEqual(second["queue_position"], 2)
+        self.assertEqual(thread.call_count, 1)
+        state.get_storyboard(storyboard_id)["shots"][0]["scene"]["pose"]["prompt"] = "changed later"
+        self.assertEqual(state.jobs[first["id"]]["_shots"][0]["scene"]["pose"]["prompt"], original_prompt)
+
+        order = []
+        def complete(job_id):
+            order.append(job_id)
+            state.jobs[job_id]["status"] = "completed"
+
+        state._job_worker_running = True
+        with patch.object(state, "_run_job", side_effect=complete):
+            state._run_job_queue()
+        self.assertEqual(order, [first["id"], second["id"]])
+        self.assertFalse(state._job_worker_running)
+
+    def test_queued_job_can_be_cancelled_before_it_starts(self):
+        state, storyboard_id = self.make_storyboard()
+        with patch.object(app.threading, "Thread"):
+            first = state.create_job(storyboard_id, False)
+            second = state.create_job(storyboard_id, False)
+        cancelled = state.cancel_job(second["id"])
+        self.assertEqual(cancelled["status"], "cancelled")
+        self.assertEqual(cancelled["logs"][-1]["message"], "Queued render cancelled")
+        session = state.jobs_payload()
+        self.assertEqual(session["active_job"]["id"], first["id"])
+        self.assertEqual([job["id"] for job in session["queued_jobs"]], [first["id"]])
+
     def test_new_variation_changes_only_the_shot_inference_seed(self):
         state, storyboard_id = self.make_storyboard()
         before = state.storyboard_payload(state.get_storyboard(storyboard_id))["shots"][1]
@@ -1344,6 +1379,25 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_active_render_accepts_additional_fifo_jobs(self):
+        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("button.textContent = idleLabel", js)
+        self.assertIn("alreadyActive ? 'Added to render queue'", js)
+        self.assertIn("queuedJob.queue_position", js)
+        self.assertIn("session.active_job.id !== job.id", js)
+
+    def test_logger_timeline_can_inspect_historical_shot_prompts(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn('id="logger-shot-label"', html)
+        self.assertIn("function inspectedJobPrompt(job)", js)
+        self.assertIn('data-log-index="${logIndex}"', js)
+        self.assertIn("function inspectLoggerEvent(element)", js)
+        self.assertIn("displayedLoggerPrompt()", js)
+        self.assertIn(".logger-event.inspectable.selected", css)
+
     def test_gallery_benchmark_is_read_only_and_reports_bounded_dom_size(self):
         js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("state.galleryBenchmark = Boolean(result.benchmark)", js)
@@ -1427,7 +1481,9 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("kind: 'random'", js)
         self.assertIn("kind: 'legacy'", js)
         self.assertIn("group.displayNumber = ++randomNumber", js)
+        self.assertIn("group.displayNumber = ++photoshootNumber", js)
         self.assertIn("`Random ${group.displayNumber}`", js)
+        self.assertIn("`Photoshoot ${group.displayNumber}`", js)
         self.assertIn("'Render run'", js)
         self.assertIn("sessionStorage.getItem('valhalla-gallery-view') === 'flat' ? 'flat' : 'photoshoots'", js)
         self.assertIn("function formatOutputRun(run)", js)

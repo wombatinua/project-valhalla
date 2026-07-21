@@ -2972,6 +2972,7 @@ class WebState:
         self.storyboards: dict[str, dict[str, Any]] = {}
         self.jobs: dict[str, dict[str, Any]] = {}
         self.previews: dict[str, dict[str, Any]] = {}
+        self._job_worker_running = False
 
     def trim(self, mapping: dict[str, Any], maximum: int) -> None:
         while len(mapping) > maximum:
@@ -4149,6 +4150,9 @@ class WebState:
         shot_numbers = shot_numbers or [shot["number"] for shot in record["shots"]]
         if not shot_numbers or any(number < 1 or number > len(record["shots"]) for number in shot_numbers):
             raise AppError("Render selection contains an invalid shot")
+        selected_shots = copy.deepcopy([
+            record["shots"][number - 1] for number in shot_numbers
+        ])
         job_id = uuid.uuid4().hex
         job = {
             "id": job_id,
@@ -4174,16 +4178,34 @@ class WebState:
             }],
             "error": None,
             "cancel_requested": False,
+            "_db": record["db"],
+            "_mode": record["args"].mode,
+            "_shots": selected_shots,
         }
+        start_worker = False
         with self.lock:
-            if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
-                raise AppError("Another render job is already active")
             if any(preview["status"] in {"queued", "running"} for preview in self.previews.values()):
                 raise AppError("Wait for the active shot preview to finish")
+            while len(self.jobs) >= MAX_JOBS:
+                removable = next((
+                    job_id for job_id, item in self.jobs.items()
+                    if item["status"] not in {"queued", "running"}
+                ), None)
+                if removable is None:
+                    raise AppError(f"Render queue is full ({MAX_JOBS} jobs)")
+                self.jobs.pop(removable)
             self.jobs[job_id] = job
-            self.trim(self.jobs, MAX_JOBS)
-        threading.Thread(target=self._run_job, args=(job_id,), daemon=True).start()
-        return self.job_payload(job)
+            if not self._job_worker_running:
+                self._job_worker_running = True
+                start_worker = True
+            payload = self.job_payload(job)
+            payload["queue_position"] = sum(
+                1 for item in self.jobs.values()
+                if item["status"] == "queued"
+            )
+        if start_worker:
+            threading.Thread(target=self._run_job_queue, daemon=True).start()
+        return payload
 
     def create_preview(
         self, storyboard_id: str, number: int, fast: bool
@@ -4326,7 +4348,19 @@ class WebState:
             job = self.jobs.get(job_id)
             if job is None:
                 raise AppError("Render job not found or expired")
-            return self.job_payload(job)
+            payload = self.job_payload(job)
+            pipeline = [
+                item for item in self.jobs.values()
+                if item["status"] in {"queued", "running"}
+            ]
+            position = next(
+                (index for index, item in enumerate(pipeline) if item["id"] == job_id),
+                None,
+            )
+            payload["queued_after"] = (
+                max(0, len(pipeline) - position - 1) if position is not None else 0
+            )
+            return payload
 
     def jobs_payload(self) -> dict[str, Any]:
         with self.lock:
@@ -4339,13 +4373,20 @@ class WebState:
                 self.preview_payload(visible_previews[-1])
                 if visible_previews else None
             )
-        active = next(
-            (job for job in reversed(jobs) if job["status"] in {"queued", "running"}),
-            None,
-        )
+        active = next((job for job in jobs if job["status"] == "running"), None)
+        if active is None:
+            active = next((job for job in jobs if job["status"] == "queued"), None)
+        queued = [job for job in jobs if job["status"] == "queued"]
+        for position, job in enumerate(queued, 1):
+            job["queue_position"] = position
+            if active and active["id"] == job["id"]:
+                active = job
+        if active:
+            active["queued_after"] = len(queued) - (1 if active["status"] == "queued" else 0)
         return {
             "active_job": active,
             "jobs": list(reversed(jobs)),
+            "queued_jobs": queued,
             "latest_preview": latest_preview,
         }
 
@@ -4376,7 +4417,16 @@ class WebState:
             job = self.jobs.get(job_id)
             if job is None:
                 raise AppError("Render job not found or expired")
-            if job["status"] in {"queued", "running"}:
+            if job["status"] == "queued":
+                job["status"] = "cancelled"
+                job["cancel_requested"] = True
+                job["finished_at"] = _iso_now()
+                job["logs"].append({
+                    "time": _iso_now(), "type": "cancelled",
+                    "message": "Queued render cancelled", "shot": None,
+                    "position": 0, "total": job["total"],
+                })
+            elif job["status"] == "running":
                 if not job["cancel_requested"]:
                     job["cancel_requested"] = True
                     job["logs"].append({
@@ -4386,9 +4436,24 @@ class WebState:
                     })
             return self.job_payload(job)
 
+    def _run_job_queue(self) -> None:
+        while True:
+            with self.lock:
+                next_job = next(
+                    (job for job in self.jobs.values() if job["status"] == "queued"),
+                    None,
+                )
+                if next_job is None:
+                    self._job_worker_running = False
+                    return
+                job_id = next_job["id"]
+            self._run_job(job_id)
+
     def _run_job(self, job_id: str) -> None:
         with self.lock:
             job = self.jobs[job_id]
+            if job["status"] != "queued":
+                return
             job["status"] = "running"
             job["started_at"] = _iso_now()
             job["_started_monotonic"] = time.monotonic()
@@ -4398,14 +4463,13 @@ class WebState:
             })
         started = time.monotonic()
         try:
-            record = self.get_storyboard(job["storyboard_id"])
-            db = record["db"]
+            db = job["_db"]
             _, db_path = load_database()
             workflow, mapping = load_workflow_runtime(db, db_path, job["fast"])
             run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             with self.lock:
                 job["_run_id"] = run_id
-            selected_shots = [record["shots"][number - 1] for number in job["shot_numbers"]]
+            selected_shots = job["_shots"]
             for completed_index, shot in enumerate(selected_shots, 1):
                 shot_started = time.monotonic()
                 with self.lock:
@@ -4433,7 +4497,7 @@ class WebState:
                     })
                 prompt_id, paths = generate_one(
                     db, db_path, positive, negative, shot["inference_seed"],
-                    record["args"].mode, shot["shot_index"], shot["photoshoot_index"],
+                    job["_mode"], shot["shot_index"], shot["photoshoot_index"],
                     run_id, job["fast"], workflow, mapping,
                 )
                 elapsed = time.monotonic() - started

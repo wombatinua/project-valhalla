@@ -40,7 +40,7 @@ The UI includes:
 - automatic recovery of the active storyboard, settings, render progress, ETA, outputs, and polling after a browser reload;
 - editorially planned storyboard cards with camera grammar, roles, diversity scoring, one-shot reroll/render, prompt inspection, temporary Fast Preview, and compact JSON export/import tied to the exact semantic database version;
 - a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render style, stage, pose/action, surface, editorial role, shot size, angle, framing, focus, and explicit-recipe controls;
-- cancellable background render jobs that fail clearly on the first generation error;
+- cancellable FIFO background render jobs that accept additional work while rendering and fail each job clearly on its first generation error;
 - a reload-safe Render Logger with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves outputs and the displayed preview intact;
 - shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
 - a persistent, virtualized output gallery with bounded DOM size, a browser-fullscreen lightbox, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
@@ -111,7 +111,7 @@ The Web UI is served from `/`. All application endpoints are under `/api`.
 | `POST` | `/api/storyboards/{id}/director` | Apply one validated SET- or shot-level direction |
 | `POST` | `/api/storyboards/import` | Validate and restore a complete exported storyboard |
 | `POST` | `/api/storyboards/{id}/shots/{number}/reroll` | Resolve a new compatible composition for one shot |
-| `POST` | `/api/jobs` | Start a background render job for a storyboard |
+| `POST` | `/api/jobs` | Append a storyboard render job to the production queue |
 | `GET` | `/api/jobs` | Discover the active render job and recover browser state after reload |
 | `GET` | `/api/jobs/{id}` | Read render progress, ETA, errors, and outputs |
 | `POST` | `/api/jobs/{id}/cancel` | Request cancellation between images |
@@ -188,6 +188,8 @@ Safe capture refuses to overwrite an existing `workflow.json`. Enable **Replace 
 ## Preview render
 
 Preview render patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. The synchronized Studio and Director split-buttons switch between **Preview storyboard** and **Render storyboard**, and their primary action runs the selected workflow. Individual **Preview** buttons always use the preview workflow. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logger. Closing the draggable preview window discards its temporary image without adding anything to Outputs.
+
+While production is active, using **Preview storyboard** or **Render storyboard** again appends another immutable storyboard snapshot to the FIFO render queue. The current image is never interrupted, queued jobs start automatically in submission order, and cancelling the active job advances to the next queued job after the current image finishes.
 
 ## Database
 

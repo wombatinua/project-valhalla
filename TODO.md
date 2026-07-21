@@ -29,6 +29,7 @@ Unchecked items are planned work, not claims about missing historical features.
 - [x] Display the base Image Variation seed in active configuration and each effective frame seed in Studio, Director, and Logger.
 - [x] Resolve one default storyboard when no recoverable storyboard exists.
 - [x] Provide cancellable production jobs, memory-only Fast Preview, reload-safe Logger state, ETA, prompts, seeds, and generation events.
+- [x] Queue additional production jobs during an active render and execute them in deterministic FIFO order.
 - [x] Support one-shot render/regeneration from Studio and Director.
 - [x] Provide compact database-bound storyboard export and import.
 - [x] Remove Studio generation-count maximums while retaining positive-integer validation.

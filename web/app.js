@@ -14,6 +14,7 @@ const state = {
   previewJobTimer: null,
   job: null,
   jobTimer: null,
+  loggerInspection: null,
   outputs: [],
   galleryBenchmark: false,
   galleryView: sessionStorage.getItem('valhalla-gallery-view') === 'flat' ? 'flat' : 'photoshoots',
@@ -108,8 +109,10 @@ function photoshootGroups() {
     groups.get(key).items.push({ item, outputIndex });
   });
   const ordered = [...groups.values()].sort((a, b) => a.firstIndex - b.firstIndex);
+  let photoshootNumber = 0;
   let randomNumber = 0;
   ordered.forEach((group) => {
+    if (group.identity?.kind === 'photoshoot') group.displayNumber = ++photoshootNumber;
     if (group.identity?.kind === 'random') group.displayNumber = ++randomNumber;
   });
   return ordered;
@@ -659,12 +662,22 @@ function updatePromptContent() {
   $('#prompt-content').textContent = content;
 }
 
+async function trackQueuedJob(queuedJob, previousActiveId) {
+  let session = null;
+  try { session = await api('/api/jobs'); } catch { /* regular polling will retry */ }
+  if (!session && previousActiveId) return;
+  const active = session?.active_job || null;
+  if (previousActiveId && active?.id === previousActiveId) return;
+  const submitted = session?.jobs?.find((job) => job.id === queuedJob.id) || queuedJob;
+  state.job = active || submitted;
+  showJob();
+  pollJob();
+}
+
 async function startGeneration() {
   if (!state.storyboard) return;
-  if (isRenderActive()) {
-    toast('Render already active', 'The current production is already in the render pipeline.');
-    return;
-  }
+  const alreadyActive = Boolean(isRenderActive());
+  const previousActiveId = alreadyActive ? state.job.id : null;
   if (state.pendingStructural) {
     const updated = await requestStoryboardUpdate();
     if (!updated) return;
@@ -675,14 +688,17 @@ async function startGeneration() {
     setBusy(button, true, 'Queueing…');
   });
   try {
-    state.job = await api('/api/jobs', {
+    const queuedJob = await api('/api/jobs', {
       method: 'POST',
       body: JSON.stringify({ storyboard_id: state.storyboard.id, fast: state.renderMode === 'preview' }),
     });
-    showJob();
-    pollJob();
+    await trackQueuedJob(queuedJob, previousActiveId);
     switchView('outputs');
-    toast('Production queued', `${state.job.total} images sent to the render pipeline.`, 'success');
+    toast(
+      alreadyActive ? 'Added to render queue' : 'Production queued',
+      `${queuedJob.total} images queued${alreadyActive ? ` at position ${queuedJob.queue_position}` : ''}.`,
+      'success',
+    );
   } catch (error) {
     toast('Could not start generation', error.message, 'error');
   } finally {
@@ -692,20 +708,25 @@ async function startGeneration() {
 }
 
 async function startShotRender(number, button) {
-  if (!state.storyboard || isRenderActive()) return;
+  if (!state.storyboard) return;
+  const alreadyActive = Boolean(isRenderActive());
+  const previousActiveId = alreadyActive ? state.job.id : null;
   if (state.pendingStructural) {
     const updated = await requestStoryboardUpdate();
     if (!updated || number > updated.total) return;
   }
   setBusy(button, true, 'Queueing…');
   try {
-    state.job = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/render`, {
+    const queuedJob = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/render`, {
       method: 'POST', body: JSON.stringify({ fast: false }),
     });
-    showJob();
-    pollJob();
+    await trackQueuedJob(queuedJob, previousActiveId);
     switchView('outputs');
-    toast('Shot queued', `Shot ${number} was sent to the render pipeline.`, 'success');
+    toast(
+      alreadyActive ? 'Shot added to queue' : 'Shot queued',
+      `Shot ${number} queued${alreadyActive ? ` at position ${queuedJob.queue_position}` : ''}.`,
+      'success',
+    );
   } catch (error) {
     toast('Could not render shot', error.message, 'error');
   } finally {
@@ -733,6 +754,18 @@ function formatLoggedPrompt(prompt) {
   return prompt ? String(prompt).replaceAll(', ', ',\n') : 'Waiting for a frame…';
 }
 
+function inspectedJobPrompt(job) {
+  if (state.loggerInspection?.jobId !== job?.id) return job?.current_prompt || null;
+  const entry = job.logs?.[state.loggerInspection.logIndex];
+  return entry?.positive != null && entry?.negative != null ? entry : job.current_prompt || null;
+}
+
+function displayedLoggerPrompt() {
+  const preview = state.previewJob;
+  const usePreview = preview && (!state.job || new Date(preview.created_at) >= new Date(state.job.created_at));
+  return usePreview ? preview : inspectedJobPrompt(state.job);
+}
+
 function renderLogger() {
   const preview = state.previewJob;
   const usePreview = preview && (!state.job || new Date(preview.created_at) >= new Date(state.job.created_at));
@@ -758,6 +791,7 @@ function renderLogger() {
     $('#logger-percent').textContent = preview.status === 'completed' ? 'Ready' : 'Rendering one shot';
     $('#logger-elapsed').textContent = formatDuration(preview.elapsed_seconds);
     $('#logger-eta').textContent = preview.status === 'completed' ? 'Complete' : 'Calculating';
+    $('#logger-shot-label').textContent = 'Current shot';
     $('#logger-shot').textContent = `Shot ${preview.shot}`;
     $('#logger-seed').textContent = `Seed ${preview.seed}`;
     $('#logger-positive').textContent = formatLoggedPrompt(preview.positive);
@@ -778,22 +812,32 @@ function renderLogger() {
   $('#logger-percent').textContent = `${job.progress || 0}% complete`;
   $('#logger-elapsed').textContent = formatDuration(job.elapsed_seconds);
   $('#logger-eta').textContent = job.status === 'completed' ? 'Complete' : formatDuration(job.eta_seconds);
-  $('#logger-shot').textContent = job.current_prompt ? `Shot ${job.current_prompt.shot}` : '—';
-  $('#logger-seed').textContent = job.current_prompt ? `Seed ${job.current_prompt.seed}` : 'Seed —';
-  $('#logger-positive').textContent = formatLoggedPrompt(job.current_prompt?.positive);
-  $('#logger-negative').textContent = formatLoggedPrompt(job.current_prompt?.negative);
+  const inspectedPrompt = inspectedJobPrompt(job);
+  const inspectingHistory = state.loggerInspection?.jobId === job.id
+    && inspectedPrompt !== job.current_prompt;
+  $('#logger-shot-label').textContent = inspectingHistory ? 'Inspected shot' : 'Current shot';
+  $('#logger-shot').textContent = inspectedPrompt ? `Shot ${inspectedPrompt.shot}` : '—';
+  $('#logger-seed').textContent = inspectedPrompt ? `Seed ${inspectedPrompt.seed}` : 'Seed —';
+  $('#logger-positive').textContent = formatLoggedPrompt(inspectedPrompt?.positive);
+  $('#logger-negative').textContent = formatLoggedPrompt(inspectedPrompt?.negative);
   $('#logger-job-id').textContent = `Job ${job.id.slice(0, 10)}`;
-  $('#logger-event-list').innerHTML = [...logs].reverse().map((entry) => {
+  $('#logger-event-list').innerHTML = logs.map((entry, logIndex) => ({ entry, logIndex })).reverse().map(({ entry, logIndex }) => {
     const time = new Date(entry.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const count = entry.position ? `${entry.position}/${entry.total}` : `0/${entry.total}`;
     const detail = entry.duration_seconds != null ? `${entry.message} · ${formatDuration(entry.duration_seconds)}` : entry.message;
-    return `<div class="logger-event ${escapeHtml(entry.type)}"><time>${escapeHtml(time)}</time><i>${escapeHtml(entry.type.replaceAll('_', ' '))}</i><span>${escapeHtml(detail)}</span><em>${escapeHtml(count)}</em></div>`;
+    const inspectable = entry.positive != null && entry.negative != null;
+    const selected = state.loggerInspection?.jobId === job.id
+      && state.loggerInspection.logIndex === logIndex;
+    return `<div class="logger-event ${escapeHtml(entry.type)}${inspectable ? ' inspectable' : ''}${selected ? ' selected' : ''}"${inspectable ? ` data-log-index="${logIndex}" role="button" tabindex="0" aria-label="Inspect prompts for shot ${entry.shot}"` : ''}><time>${escapeHtml(time)}</time><i>${escapeHtml(entry.type.replaceAll('_', ' '))}</i><span>${escapeHtml(detail)}</span><em>${escapeHtml(count)}</em></div>`;
   }).join('');
 }
 
 function showJob() {
   const job = state.job;
   if (!job) return;
+  const queueSuffix = job.queued_after
+    ? ` · ${job.queued_after} job${job.queued_after === 1 ? '' : 's'} queued`
+    : '';
   syncRenderControls();
   $('#job-dock').classList.remove('hidden');
   $('#job-percent').textContent = `${job.progress || 0}%`;
@@ -801,8 +845,8 @@ function showJob() {
   $('#job-detail').textContent = job.cancel_requested
     ? 'Cancelling… current image will finish'
     : (job.status === 'queued'
-      ? 'Preparing workflow…'
-      : `Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}`);
+      ? `Waiting to start${queueSuffix}`
+      : `Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}${queueSuffix}`);
   $('#cancel-job').disabled = Boolean(job.cancel_requested);
   renderLogger();
 }
@@ -825,7 +869,7 @@ async function pollJob() {
   }
 }
 
-function finishJob() {
+async function finishJob() {
   const job = state.job;
   syncRenderControls();
   $('#job-dock').classList.add('hidden');
@@ -836,6 +880,16 @@ function finishJob() {
     toast('Production cancelled', `${job.completed} of ${job.total} images completed.`);
   } else {
     toast('Production failed', job.error || 'Unknown render error', 'error');
+  }
+  try {
+    const session = await api('/api/jobs');
+    if (session.active_job && session.active_job.id !== job.id) {
+      state.job = session.active_job;
+      showJob();
+      pollJob();
+    }
+  } catch (error) {
+    toast('Could not continue render queue', error.message, 'error');
   }
 }
 
@@ -871,15 +925,13 @@ function syncRenderControls() {
   });
   $$('[data-render-mode]').forEach((select) => {
     select.value = state.renderMode;
-    select.disabled = active;
+    select.disabled = false;
   });
   $$('[data-render-action]').forEach((button) => {
-    button.disabled = active;
-    button.textContent = active
-      ? (state.job?.cancel_requested ? '◌ Cancelling…' : '◌ Rendering…')
-      : idleLabel;
+    button.disabled = false;
+    button.textContent = idleLabel;
     button.title = active
-      ? 'A render job is already active'
+      ? 'Add this storyboard after the current render jobs'
       : `${idleLabel} using the ${preview ? 'faster draft' : 'full production'} workflow`;
   });
   form.elements.inference_seed.disabled = active;
@@ -1034,7 +1086,7 @@ function renderOutputs() {
   const groups = photoshootGroups();
   $('#outputs-title').textContent = group
     ? (group.identity?.kind === 'photoshoot'
-      ? `Photoshoot ${group.identity.number}`
+      ? `Photoshoot ${group.displayNumber}`
       : (group.identity?.kind === 'random'
         ? `Random ${group.displayNumber}`
         : (group.identity?.kind === 'legacy' ? 'Render run' : 'Ungrouped outputs')))
@@ -1091,7 +1143,7 @@ function outputCardHtml(item, index, layout) {
 function photoshootCardHtml(group, index) {
   const representative = group.items[0].item;
   const title = group.identity?.kind === 'photoshoot'
-    ? `Photoshoot ${group.identity.number}`
+    ? `Photoshoot ${group.displayNumber}`
     : (group.identity?.kind === 'random'
       ? `Random ${group.displayNumber}`
       : (group.identity?.kind === 'legacy' ? 'Render run' : 'Ungrouped'));
@@ -2099,16 +2151,39 @@ $('#capture-button').addEventListener('click', () => $('#capture-dialog').showMo
 $$('.capture-close').forEach((button) => button.addEventListener('click', () => $('#capture-dialog').close()));
 $('#capture-confirm').addEventListener('click', captureWorkflow);
 $$('.nav-item').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
+
+function inspectLoggerEvent(element) {
+  if (!state.job || !element?.dataset.logIndex) return;
+  const logIndex = Number(element.dataset.logIndex);
+  const alreadySelected = state.loggerInspection?.jobId === state.job.id
+    && state.loggerInspection.logIndex === logIndex;
+  state.loggerInspection = alreadySelected ? null : { jobId: state.job.id, logIndex };
+  renderLogger();
+}
+
 $('#logger-view').addEventListener('click', async (event) => {
+  const timelineEvent = event.target.closest('.logger-event.inspectable');
+  if (timelineEvent) {
+    inspectLoggerEvent(timelineEvent);
+    return;
+  }
   const button = event.target.closest('[data-copy-log]');
-  if (!button || !state.job?.current_prompt) return;
+  const prompt = displayedLoggerPrompt();
+  if (!button || !prompt) return;
   const key = button.dataset.copyLog;
   try {
-    await navigator.clipboard.writeText(state.job.current_prompt[key] || '');
+    await navigator.clipboard.writeText(prompt[key] || '');
     toast('Prompt copied', `${key[0].toUpperCase()}${key.slice(1)} prompt copied.`, 'success');
   } catch (error) {
     toast('Could not copy prompt', error.message, 'error');
   }
+});
+$('#logger-view').addEventListener('keydown', (event) => {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const timelineEvent = event.target.closest('.logger-event.inspectable');
+  if (!timelineEvent) return;
+  event.preventDefault();
+  inspectLoggerEvent(timelineEvent);
 });
 $('#clear-logger').addEventListener('click', async () => {
   const button = $('#clear-logger');
@@ -2117,6 +2192,7 @@ $('#clear-logger').addEventListener('click', async () => {
     const result = await api('/api/logger', { method: 'DELETE' });
     state.job = null;
     state.previewJob = null;
+    state.loggerInspection = null;
     renderLogger();
     toast('Logger cleared', `${result.cleared} log source${result.cleared === 1 ? '' : 's'} removed.`, 'success');
   } catch (error) {
