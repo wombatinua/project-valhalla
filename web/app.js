@@ -47,6 +47,7 @@ const state = {
     ? sessionStorage.getItem('valhalla-accent') : 'lavender',
   typeSize: ['small', 'normal', 'large'].includes(sessionStorage.getItem('valhalla-type-size'))
     ? sessionStorage.getItem('valhalla-type-size') : 'normal',
+  workflowProfiles: null,
 };
 
 const form = $('#run-form');
@@ -249,7 +250,15 @@ async function refreshStatus(showToast = false) {
     const status = await api('/api/status');
     $('#comfy-status').textContent = status.comfy.online ? 'Online' : 'Offline';
     $('#comfy-dot').className = `status-dot ${status.comfy.online ? 'online' : 'error'}`;
-    $('#workflow-status').textContent = status.workflow.ready ? 'Ready' : 'Missing';
+    const productionProfile = status.workflow.profiles.find(
+      (profile) => profile.id === status.workflow.production,
+    );
+    $('#workflow-status').textContent = status.workflow.ready
+      ? productionProfile.name
+      : (status.workflow.profiles.length ? 'Select profiles' : 'Missing');
+    $('#workflow-status').title = productionProfile
+      ? `Production: ${productionProfile.file}\nPreview: ${status.workflow.preview}`
+      : '';
     $('#workflow-dot').className = `status-dot ${status.workflow.ready ? 'online' : 'error'}`;
     $('#catalog-status').textContent = status.catalog_records.toLocaleString();
     if (showToast) toast('Status refreshed', status.comfy.online ? 'ComfyUI is connected.' : 'ComfyUI is currently offline.', status.comfy.online ? 'success' : 'error');
@@ -815,7 +824,7 @@ function renderLogger() {
     $('#logger-seed').textContent = `Seed ${preview.seed}`;
     $('#logger-positive').textContent = formatLoggedPrompt(preview.positive);
     $('#logger-negative').textContent = formatLoggedPrompt(preview.negative);
-    $('#logger-job-id').textContent = `Preview ${preview.id.slice(0, 10)}`;
+    $('#logger-job-id').textContent = `${preview.workflow_profile} · Preview ${preview.id.slice(0, 10)}`;
     const time = new Date(preview.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     $('#logger-event-list').innerHTML = `<div class="logger-event ${escapeHtml(preview.status)}"><time>${escapeHtml(time)}</time><i>Preview</i><span>${escapeHtml(`Shot ${preview.shot} preview ${preview.status}`)}</span><em>1/1</em></div>`;
     return;
@@ -836,7 +845,7 @@ function renderLogger() {
   $('#logger-seed').textContent = inspectedPrompt ? `Seed ${inspectedPrompt.seed}` : 'Seed —';
   $('#logger-positive').textContent = formatLoggedPrompt(inspectedPrompt?.positive);
   $('#logger-negative').textContent = formatLoggedPrompt(inspectedPrompt?.negative);
-  $('#logger-job-id').textContent = `Job ${job.id.slice(0, 10)}`;
+  $('#logger-job-id').textContent = `${job.workflow_profile} · Job ${job.id.slice(0, 10)}`;
   $('#logger-event-list').innerHTML = logs.map((entry, logIndex) => ({ entry, logIndex })).reverse().map(({ entry, logIndex }) => {
     const time = new Date(entry.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const count = entry.position ? `${entry.position}/${entry.total}` : `0/${entry.total}`;
@@ -942,16 +951,17 @@ function setRenderMode(mode) {
 function syncRenderControls() {
   const active = Boolean(isRenderActive());
   const preview = state.renderMode === 'preview';
-  const baseLabel = preview ? '◉ Preview storyboard' : '▶ Render storyboard';
+  const baseLabel = preview ? 'Preview storyboard' : 'Render storyboard';
   const idleLabel = state.pendingStructural
-    ? (preview ? '↻ Update & Preview' : '↻ Update & Render')
+    ? (preview ? 'Update & Preview' : 'Update & Render')
     : baseLabel;
   $$('[data-render-control]').forEach((control) => {
     control.classList.toggle('preview', preview);
   });
-  $$('[data-render-mode]').forEach((select) => {
-    select.value = state.renderMode;
-    select.disabled = false;
+  $$('[data-render-mode-choice]').forEach((button) => {
+    const selected = button.dataset.renderModeChoice === state.renderMode;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
   });
   $$('[data-render-action]').forEach((button) => {
     button.disabled = false;
@@ -1384,6 +1394,11 @@ function syncSlideshowControls() {
   button.querySelector('span').textContent = active ? '■' : '▶';
   button.querySelector('strong').textContent = active ? 'Stop' : 'Play';
   button.setAttribute('aria-label', active ? 'Stop slideshow' : 'Start slideshow');
+  $$('[data-slideshow-delay]').forEach((choice) => {
+    const selected = Number(choice.dataset.slideshowDelay) === state.slideshowDelay;
+    choice.classList.toggle('active', selected);
+    choice.setAttribute('aria-pressed', String(selected));
+  });
 }
 
 function scheduleSlideshow() {
@@ -1514,11 +1529,24 @@ $('#image-zoom').addEventListener('input', (event) => setPreviewZoom(event.targe
 $('#image-zoom').addEventListener('dblclick', () => setPreviewZoom(100));
 $('#image-true-fullscreen').addEventListener('click', toggleTrueFullscreen);
 $('#image-slideshow-toggle').addEventListener('click', toggleSlideshow);
-$('#image-slideshow-delay').value = String(state.slideshowDelay);
-$('#image-slideshow-delay').addEventListener('change', (event) => {
-  state.slideshowDelay = Math.min(10, Math.max(1, Number(event.target.value) || 3));
+$$('[data-slideshow-delay]').forEach((button) => button.addEventListener('click', (event) => {
+  state.slideshowDelay = Math.min(10, Math.max(1, Number(event.currentTarget.dataset.slideshowDelay) || 3));
   sessionStorage.setItem('valhalla-slideshow-delay', String(state.slideshowDelay));
+  syncSlideshowControls();
+  $('#image-slideshow-delay').open = false;
   if (state.slideshowActive) scheduleSlideshow();
+}));
+document.addEventListener('click', (event) => {
+  const menu = $('#image-slideshow-delay');
+  if (menu.open && !event.target.closest('#image-slideshow-delay')) menu.open = false;
+});
+document.addEventListener('keydown', (event) => {
+  const menu = $('#image-slideshow-delay');
+  if (event.key === 'Escape' && menu.open) {
+    event.preventDefault();
+    event.stopPropagation();
+    menu.open = false;
+  }
 });
 document.addEventListener('fullscreenchange', () => {
   syncTrueFullscreenControl();
@@ -1646,10 +1674,23 @@ function directorShotButton(shot) {
   const active = shot.number === state.directorShot ? 'active' : '';
   const stage = shot.stage.plateau_kind || shot.stage.level;
   return `<button class="director-shot ${active}" data-director-shot="${shot.number}">
-    <i>${String(shot.number).padStart(2, '0')}</i>
-    <span><strong>Set ${shot.photoshoot_index + 1} · Shot ${shot.shot_index + 1}</strong><span title="${escapeHtml(displayValue(shot.action.prompt))}">${escapeHtml(displayValue(shot.action.prompt))}</span></span>
-    <em class="${shot.stage.manual ? 'manual' : ''}" title="${shot.stage.manual ? 'Stage selected manually' : 'Automatic stage'}">${shot.stage.manual ? 'M · ' : ''}${escapeHtml(displayValue(stage.replaceAll('_', ' ')))}</em>
+    <i title="Shot ${shot.shot_index + 1}">${shot.shot_index + 1}</i>
+    <span class="director-shot-copy">
+      <strong>${escapeHtml(displayValue(stage.replaceAll('_', ' ')))}</strong>
+      <span class="director-shot-action" title="${escapeHtml(displayValue(shot.action.prompt))}">${escapeHtml(displayValue(shot.action.prompt))}</span>
+    </span>
   </button>`;
+}
+
+function directorShotList(shots) {
+  let previousSet = -1;
+  return shots.map((shot) => {
+    const heading = shot.photoshoot_index === previousSet
+      ? ''
+      : `<div class="director-set-heading">Set ${shot.photoshoot_index + 1}</div>`;
+    previousSet = shot.photoshoot_index;
+    return heading + directorShotButton(shot);
+  }).join('');
 }
 
 function directorField(field) {
@@ -1666,7 +1707,7 @@ function directorField(field) {
     : '';
   const search = [field.label, field.custom, ...field.options.map((option) => `${option.label} ${option.prompt}`)].join(" ").toLowerCase();
   return `<div class="director-field" data-director-search="${escapeHtml(search)}">
-    <div class="director-field-head"><label for="director-${escapeHtml(field.key)}">${escapeHtml(field.label)}</label><span class="director-scope">${field.scope === 'set' ? 'Entire set' : 'This shot'}</span></div>
+    <div class="director-field-head"><label for="director-${escapeHtml(field.key)}">${escapeHtml(field.label)}</label><span class="director-scope">${field.scope === 'set' ? 'This set' : 'This shot'}</span></div>
     <select id="director-${escapeHtml(field.key)}" data-director-field="${escapeHtml(field.key)}">${optionHtml}</select>
     <div class="director-field-footer"><p class="director-field-note">${field.custom ? '' : fieldNote}</p><button type="button" class="director-custom-button ${field.custom ? "active" : ""}" data-director-custom="${escapeHtml(field.key)}">${field.custom ? "Edit custom" : "+ Custom"}</button></div>
   </div>`;
@@ -1682,13 +1723,12 @@ function renderDirector() {
   }
   empty.classList.add('hidden');
   workspace.classList.remove('hidden');
-  $('#director-shot-list').innerHTML = state.storyboard.shots.map(directorShotButton).join('');
+  $('#director-shot-list').innerHTML = directorShotList(state.storyboard.shots);
   const sets = new Set(state.storyboard.shots.map((shot) => shot.photoshoot_index)).size;
   $('#director-set-count').textContent = `${sets} set${sets === 1 ? '' : 's'}`;
   const data = state.director;
   const shot = data.summary;
   $('#director-title').textContent = `Set ${shot.photoshoot_index + 1} · Shot ${shot.shot_index + 1}`;
-  $('#director-subtitle').textContent = 'SET changes propagate across the photoshoot; direction changes affect this shot only.';
   $('#director-summary').innerHTML = [
     ['Subject', shot.subject], ['Wardrobe', shot.wardrobe],
     ['Location', shot.location], ['Treatment', shot.photography],
@@ -1697,10 +1737,9 @@ function renderDirector() {
     const display = displayValue(value);
     return `<div class="director-summary-${label.toLowerCase()}"><span>${label}</span><strong title="${escapeHtml(display)}">${escapeHtml(display)}</strong></div>`;
   }).join('');
-  const icons = { identity: 'ID', face: '◉', hair: '≈', body: '◇', styling: '✦', wardrobe: '◫', scene: '⌂', camera: '⌾', direction: '↗' };
-  $('#director-groups').innerHTML = data.groups.map((group) => `
+  $('#director-groups').innerHTML = data.groups.map((group, groupIndex) => `
     <details class="director-group" data-director-group="${escapeHtml(group.id)}" ${state.directorOpenGroup === group.id ? 'open' : ''}>
-      <summary><span class="director-group-title"><i>${icons[group.id] || '•'}</i>${escapeHtml(group.label)}</span><small>${group.fields.length} settings · ${['direction', 'camera'].includes(group.id) ? 'shot' : 'set'}</small></summary>
+      <summary><span class="director-group-title"><i>${String(groupIndex + 1).padStart(2, '0')}</i>${escapeHtml(group.label)}</span><small>${group.fields.length} settings · ${['direction', 'camera'].includes(group.id) ? 'shot' : 'set'}</small></summary>
       <div class="director-fields">${group.fields.map(directorField).join('')}</div>
     </details>
   `).join('');
@@ -1812,7 +1851,7 @@ async function saveDirectorCustom(clear = false) {
     directorCustomDialog.close();
     renderStoryboard();
     renderDirector();
-    toast(value ? "Custom direction applied" : "Custom direction cleared", value ? (field.scope === "set" ? "The complete set was updated." : "This shot was updated.") : "The database preset is active again.", "success");
+    toast(value ? "Custom direction applied" : "Custom direction cleared", value ? (field.scope === "set" ? "Only the current set was updated." : "This shot was updated.") : "The database preset is active again.", "success");
   } catch (error) {
     toast("Could not apply custom value", error.message, "error");
   } finally {
@@ -2001,16 +2040,105 @@ function switchView(name) {
   if (name === 'outputs') scheduleVirtualOutputRender(true);
 }
 
+function renderWorkflowProfiles(profiles) {
+  state.workflowProfiles = profiles;
+  const options = profiles.profiles
+    .map((profile) => `<option value="${escapeHtml(profile.id)}"${profile.valid ? '' : ' disabled'}>${escapeHtml(profile.name)}${profile.valid ? '' : ' · invalid'}</option>`)
+    .join('');
+  for (const [mode, selector] of [['production', '#production-profile'], ['preview', '#preview-profile']]) {
+    const select = $(selector);
+    select.innerHTML = options || '<option value="">No captured profiles</option>';
+    select.value = profiles[mode] || '';
+    select.disabled = !profiles.profiles.some((profile) => profile.valid);
+  }
+  $('#save-profile-selection').disabled = !profiles.profiles.some((profile) => profile.valid);
+  $('#workflow-profile-list').innerHTML = profiles.profiles.length
+    ? profiles.profiles.map((profile) => `
+      <div class="workflow-profile-item${profile.valid ? '' : ' invalid'}" data-profile-id="${escapeHtml(profile.id)}">
+        <div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.file)}${profile.valid ? '' : ` · ${profile.error}`}</small></div>
+        <button type="button" class="text-button" data-profile-action="rename">Rename</button>
+        <button type="button" class="text-button danger" data-profile-action="delete">Delete</button>
+      </div>`).join('')
+    : '<p class="profile-empty">No profiles captured yet.</p>';
+}
+
+async function manageWorkflowProfile(button) {
+  const item = button.closest('[data-profile-id]');
+  const profileId = item?.dataset.profileId;
+  if (!profileId) return;
+  const action = button.dataset.profileAction;
+  let name = '';
+  if (action === 'rename') {
+    name = window.prompt('New rendering profile name', item.querySelector('strong').textContent);
+    if (!name?.trim()) return;
+  } else if (!window.confirm(`Delete ${item.querySelector('strong').textContent}?`)) return;
+  setBusy(button, true, action === 'rename' ? 'Saving…' : 'Deleting…');
+  try {
+    const profiles = await api(
+      `/api/workflow/profiles/${encodeURIComponent(profileId)}${action === 'rename' ? '/rename' : ''}`,
+      action === 'rename'
+        ? { method: 'POST', body: JSON.stringify({ name }) }
+        : { method: 'DELETE' },
+    );
+    renderWorkflowProfiles(profiles);
+    refreshStatus();
+    toast(`Profile ${action === 'rename' ? 'renamed' : 'deleted'}`, 'Rendering profile library updated.', 'success');
+  } catch (error) {
+    toast(`Could not ${action} profile`, error.message, 'error');
+    setBusy(button, false);
+  }
+}
+
+async function openWorkflowProfiles() {
+  $('#studio-files-menu').open = false;
+  $('#capture-dialog').showModal();
+  $('#capture-candidate-status').textContent = 'Inspecting the latest successful ComfyUI run…';
+  try {
+    const [profiles, candidate] = await Promise.all([
+      api('/api/workflow/profiles'), api('/api/workflow/capture-candidate'),
+    ]);
+    renderWorkflowProfiles(profiles);
+    $('#capture-profile-name').value = candidate.suggested_name;
+    $('#capture-candidate-status').textContent = `Detected from ComfyUI · ${candidate.suggested_id}.workflow.json`;
+  } catch (error) {
+    try { renderWorkflowProfiles(await api('/api/workflow/profiles')); } catch { /* status already explains failure */ }
+    $('#capture-candidate-status').textContent = error.message;
+  }
+}
+
+async function saveWorkflowProfileSelection() {
+  const button = $('#save-profile-selection');
+  setBusy(button, true, 'Saving…');
+  try {
+    const profiles = await api('/api/workflow/profiles/select', {
+      method: 'POST',
+      body: JSON.stringify({
+        production: $('#production-profile').value,
+        preview: $('#preview-profile').value,
+      }),
+    });
+    renderWorkflowProfiles(profiles);
+    toast('Rendering profiles updated', 'New jobs will use the selected workflows.', 'success');
+    refreshStatus();
+  } catch (error) {
+    toast('Could not select profiles', error.message, 'error');
+  } finally { setBusy(button, false); }
+}
+
 async function captureWorkflow() {
   const button = $('#capture-confirm');
   setBusy(button, true, 'Capturing…');
   try {
     const result = await api('/api/workflow/capture', {
       method: 'POST',
-      body: JSON.stringify({ force: $('#capture-force').checked }),
+      body: JSON.stringify({
+        name: $('#capture-profile-name').value,
+        replace: $('#capture-force').checked,
+      }),
     });
-    $('#capture-dialog').close();
-    toast('Workflow captured', result.message, 'success');
+    renderWorkflowProfiles(await api('/api/workflow/profiles'));
+    $('#capture-force').checked = false;
+    toast('Workflow profile captured', `${result.profile.file} is ready to select.`, 'success');
     refreshStatus();
   } catch (error) {
     toast('Capture failed', error.message, 'error');
@@ -2057,9 +2185,18 @@ document.addEventListener('click', (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') studioFilesMenu.open = false;
 });
-$$('[data-render-mode]').forEach((select) => select.addEventListener('change', (event) => {
-  setRenderMode(event.target.value);
+$$('[data-render-mode-choice]').forEach((button) => button.addEventListener('click', (event) => {
+  setRenderMode(event.currentTarget.dataset.renderModeChoice);
+  event.currentTarget.closest('[data-render-mode]').open = false;
 }));
+document.addEventListener('click', (event) => {
+  $$('[data-render-mode][open]').forEach((menu) => {
+    if (!event.target.closest('[data-render-mode]') || !menu.contains(event.target)) menu.open = false;
+  });
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') $$('[data-render-mode][open]').forEach((menu) => { menu.open = false; });
+});
 $$('[data-render-action]').forEach((button) => button.addEventListener('click', startGeneration));
 $('#director-open-studio').addEventListener('click', () => switchView('studio'));
 $('#director-search').addEventListener('input', (event) => {
@@ -2208,9 +2345,14 @@ $('#copy-prompt').addEventListener('click', async () => {
   toast('Copied', 'Prompt copied to clipboard.', 'success');
 });
 
-$('#capture-button').addEventListener('click', () => $('#capture-dialog').showModal());
+$('#capture-button').addEventListener('click', openWorkflowProfiles);
 $$('.capture-close').forEach((button) => button.addEventListener('click', () => $('#capture-dialog').close()));
 $('#capture-confirm').addEventListener('click', captureWorkflow);
+$('#save-profile-selection').addEventListener('click', saveWorkflowProfileSelection);
+$('#workflow-profile-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-profile-action]');
+  if (button) manageWorkflowProfile(button);
+});
 $$('.nav-item').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
 
 function inspectLoggerEvent(element) {

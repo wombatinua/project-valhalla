@@ -10,7 +10,7 @@ The application now uses a web-first architecture:
 - `web/` contains the responsive production interface.
 - `launcher.sh` checks the Python dependency, starts the local server, and opens the browser.
 - `database.json` is the manually editable production content catalog.
-- `workflow.json` is the captured ComfyUI API workflow.
+- `workflows/` contains named ComfyUI API workflows and the active Production/Preview selections.
 - `outputs/` contains downloaded generated images.
 
 There is no terminal wizard and no `fzf` dependency. The terminal is used only for server startup and operational logs.
@@ -119,7 +119,10 @@ The Web UI is served from `/`. All application endpoints are under `/api`.
 | `GET` | `/api/previews/{id}` | Read temporary preview status |
 | `GET` | `/api/previews/{id}/image` | Read the completed in-memory preview image |
 | `DELETE` | `/api/previews/{id}` | Discard the temporary preview and its in-memory bytes |
-| `POST` | `/api/workflow/capture` | Capture the latest successful ComfyUI workflow |
+| `GET` | `/api/workflow/profiles` | List captured rendering profiles and active selections |
+| `GET` | `/api/workflow/capture-candidate` | Inspect the latest successful ComfyUI workflow and suggest a model-based name |
+| `POST` | `/api/workflow/capture` | Capture or explicitly replace a named rendering profile |
+| `POST` | `/api/workflow/profiles/select` | Select Production and Preview profiles |
 | `GET` | `/api/outputs` | List generated image files in the output directory |
 | `GET` | `/api/outputs/{filename}` | View or download a generated output |
 | `DELETE` | `/api/outputs/{filename}` | Permanently delete one generated image |
@@ -181,9 +184,9 @@ Breast size and shape presets define a separate `covered_prompt` for clothing an
 
 ## Workflow capture
 
-First complete a representative workflow successfully in ComfyUI. Then choose **Capture workflow** in the top bar.
+First complete a representative workflow successfully in ComfyUI. Then open **Studio files → Rendering profiles**. The manager detects the main model name, proposes an editable profile name, and saves the graph as a recognizable `<profile>.workflow.json` file under `workflows/`.
 
-Safe capture refuses to overwrite an existing `workflow.json`. Enable **Replace existing workflow** only when the active template should be replaced. Capture detects positive and negative prompt inputs, inference seed targets, and the fast-test sampler/output mapping before saving.
+Safe capture refuses to overwrite a matching profile unless **Replace matching profile** is enabled. Production and Preview can select different profiles. Profiles are independently validated, can be renamed or deleted from the manager, and every queued render snapshots its selected profile name. Active selections are stored in `workflows/profiles.json`; selected profiles cannot be deleted, and profile files cannot be renamed or deleted while the render queue is active.
 
 ## Preview render
 

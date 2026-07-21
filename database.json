@@ -1,7 +1,7 @@
 {
   "settings": {
     "comfy_url": "http://127.0.0.1:8188",
-    "workflow_file": "./workflow.json",
+    "workflows_dir": "./workflows",
     "output_dir": "./outputs",
     "human_defaults": {
       "pools": {

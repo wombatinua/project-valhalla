@@ -27,7 +27,7 @@
       <section class="system-card" aria-label="System status">
         <div class="system-title"><span>System</span><button class="icon-button" id="refresh-status" title="Refresh status" aria-label="Refresh status">↻</button></div>
         <div class="status-row"><span><i class="status-dot" id="comfy-dot"></i>ComfyUI</span><strong id="comfy-status">Checking</strong></div>
-        <div class="status-row"><span><i class="status-dot" id="workflow-dot"></i>Workflow</span><strong id="workflow-status">Checking</strong></div>
+        <div class="status-row workflow-status-row"><span><i class="status-dot" id="workflow-dot"></i>Workflow</span><strong id="workflow-status">Checking</strong></div>
         <div class="status-row"><span>Catalog</span><strong id="catalog-status">—</strong></div>
         <div class="system-theme-row">
           <span>Appearance</span>
@@ -54,7 +54,7 @@
           </div>
         </div>
       </section>
-      <div class="sidebar-footer"><span>Local workspace</span><span class="version">v2.0</span></div>
+      <div class="sidebar-footer"><span>Local workspace</span><span class="version">v2.1.0</span></div>
     </aside>
 
     <main class="main-area">
@@ -72,8 +72,8 @@
               <button type="button" id="import-storyboard"><span><strong>Import storyboard</strong><small>Open a compact JSON file</small></span></button>
               <button type="button" id="export-storyboard" disabled><span><strong>Export storyboard</strong><small>Save the current production</small></span></button>
               <hr>
-              <p>Workflow</p>
-              <button type="button" id="capture-button"><span><strong>Capture workflow</strong><small>Read the active ComfyUI graph</small></span></button>
+              <p>Rendering</p>
+              <button type="button" id="capture-button"><span><strong>Rendering profiles</strong><small>Capture and select ComfyUI workflows</small></span></button>
             </div>
           </details>
           <input class="hidden" id="storyboard-file" type="file" accept="application/json,.json">
@@ -153,8 +153,15 @@
               <div class="storyboard-actions hidden" id="storyboard-actions">
                 <button class="button warning" id="reroll-all">↻ Reroll all</button>
                 <div class="render-choice" data-render-control>
-                  <button class="button render" id="generate-button" data-render-action>▶ Render storyboard</button>
-                  <label class="render-choice-menu" title="Choose storyboard render mode"><select data-render-mode aria-label="Storyboard render mode"><option value="preview">Preview storyboard</option><option value="production" selected>Render storyboard</option></select><span aria-hidden="true">⌄</span></label>
+                  <button class="button render" id="generate-button" data-render-action>Render storyboard</button>
+                  <details class="render-choice-menu" data-render-mode>
+                    <summary aria-label="Choose storyboard render mode" title="Choose render mode"><span aria-hidden="true">⌄</span></summary>
+                    <div class="render-mode-popover">
+                      <p>Rendering mode</p>
+                      <button type="button" data-render-mode-choice="production"><strong>Production</strong><small>Full-quality workflow</small></button>
+                      <button type="button" data-render-mode-choice="preview"><strong>Preview</strong><small>Faster draft workflow</small></button>
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>
@@ -193,7 +200,6 @@
               <div>
                 <p class="eyebrow">Shot direction</p>
                 <h2 id="director-title">Selected shot</h2>
-                <p id="director-subtitle">Select a shot to begin.</p>
                 <div class="director-quick-actions">
                   <button class="randomize" data-director-remix="shot">↻ Reroll shot</button>
                   <button class="variation-action" id="director-randomize-seed">⤨ New variation</button>
@@ -207,8 +213,15 @@
               <div class="director-editor-tools">
                 <label class="director-search"><span>⌕</span><input id="director-search" type="search" placeholder="Find a setting or preset…"></label>
                 <div class="render-choice director-render" data-render-control>
-                  <button class="button render" id="director-generate-button" data-render-action>▶ Render storyboard</button>
-                  <label class="render-choice-menu" title="Choose storyboard render mode"><select data-render-mode aria-label="Storyboard render mode"><option value="preview">Preview storyboard</option><option value="production" selected>Render storyboard</option></select><span aria-hidden="true">⌄</span></label>
+                  <button class="button render" id="director-generate-button" data-render-action>Render storyboard</button>
+                  <details class="render-choice-menu" data-render-mode>
+                    <summary aria-label="Choose storyboard render mode" title="Choose render mode"><span aria-hidden="true">⌄</span></summary>
+                    <div class="render-mode-popover">
+                      <p>Rendering mode</p>
+                      <button type="button" data-render-mode-choice="production"><strong>Production</strong><small>Full-quality workflow</small></button>
+                      <button type="button" data-render-mode-choice="preview"><strong>Preview</strong><small>Faster draft workflow</small></button>
+                    </div>
+                  </details>
                 </div>
               </div>
             </header>
@@ -282,9 +295,19 @@
         <button class="viewer-tool" id="image-true-fullscreen" type="button" aria-label="Enter browser fullscreen" title="Enter browser fullscreen">⤢</button>
         <div class="viewer-slideshow-controls" aria-label="Slideshow controls">
           <button class="viewer-tool slideshow-toggle" id="image-slideshow-toggle" type="button" aria-label="Start slideshow"><span aria-hidden="true">▶</span><strong>Play</strong></button>
-          <div class="viewer-delay-menu" title="Slideshow delay"><select id="image-slideshow-delay" aria-label="Pause between slideshow images">
-            <option value="1">1 sec</option><option value="2">2 sec</option><option value="3" selected>3 sec</option><option value="4">4 sec</option><option value="5">5 sec</option><option value="6">6 sec</option><option value="7">7 sec</option><option value="8">8 sec</option><option value="9">9 sec</option><option value="10">10 sec</option>
-          </select><span aria-hidden="true">⌄</span></div>
+          <details class="viewer-delay-menu" id="image-slideshow-delay" title="Slideshow delay">
+            <summary aria-label="Choose slideshow delay"><span aria-hidden="true">⌄</span></summary>
+            <div class="slideshow-delay-popover">
+              <p>Slideshow delay</p>
+              <div>
+                <button type="button" data-slideshow-delay="1">1 sec</button><button type="button" data-slideshow-delay="2">2 sec</button>
+                <button type="button" data-slideshow-delay="3">3 sec</button><button type="button" data-slideshow-delay="4">4 sec</button>
+                <button type="button" data-slideshow-delay="5">5 sec</button><button type="button" data-slideshow-delay="6">6 sec</button>
+                <button type="button" data-slideshow-delay="7">7 sec</button><button type="button" data-slideshow-delay="8">8 sec</button>
+                <button type="button" data-slideshow-delay="9">9 sec</button><button type="button" data-slideshow-delay="10">10 sec</button>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
       <div class="image-viewer-actions">
@@ -328,10 +351,24 @@
     <div class="dialog-footer"><button class="button ghost update-storyboard-cancel">Cancel</button><button class="button warning" id="update-storyboard-confirm">Update storyboard</button></div>
   </dialog>
 
-  <dialog id="capture-dialog" class="small-dialog">
-    <div class="dialog-header"><div><p class="eyebrow">ComfyUI</p><h2>Capture workflow</h2></div><button class="icon-button capture-close" aria-label="Close">×</button></div>
-    <div class="dialog-body"><p>Capture the latest successful ComfyUI workflow and use it as the production template.</p><label class="switch-row"><span><strong>Replace existing workflow</strong><small>Overwrite workflow.json if it exists</small></span><input type="checkbox" id="capture-force"><i></i></label></div>
-    <div class="dialog-footer"><button class="button ghost capture-close">Cancel</button><button class="button primary" id="capture-confirm">Capture workflow</button></div>
+  <dialog id="capture-dialog" class="small-dialog workflow-profiles-dialog">
+    <div class="dialog-header"><div><p class="eyebrow">ComfyUI</p><h2>Rendering profiles</h2></div><button class="icon-button capture-close" aria-label="Close">×</button></div>
+    <div class="dialog-body">
+      <section class="profile-selection">
+        <p>Select the captured workflow used by each rendering mode.</p>
+        <label class="field"><span>Production rendering</span><select id="production-profile"></select></label>
+        <label class="field"><span>Preview rendering</span><select id="preview-profile"></select></label>
+        <button class="button ghost full" id="save-profile-selection">Save selection</button>
+        <div class="workflow-profile-list" id="workflow-profile-list"></div>
+      </section>
+      <section class="profile-capture">
+        <p class="setup-section-title">Capture latest successful workflow</p>
+        <label class="field"><span>Profile name</span><input id="capture-profile-name" maxlength="80" placeholder="Detected model name"></label>
+        <p class="field-help" id="capture-candidate-status">Open the manager to inspect the latest ComfyUI run.</p>
+        <label class="switch-row"><span><strong>Replace matching profile</strong><small>Required when this profile filename already exists</small></span><input type="checkbox" id="capture-force"><i></i></label>
+      </section>
+    </div>
+    <div class="dialog-footer"><button class="button ghost capture-close">Close</button><button class="button primary" id="capture-confirm">Capture profile</button></div>
   </dialog>
 
   <div class="toast-region" id="toast-region" aria-live="polite"></div>

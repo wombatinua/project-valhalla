@@ -272,6 +272,14 @@ class CatalogQualityTests(unittest.TestCase):
 
 
 class DirectorRegressionTests(unittest.TestCase):
+    def setUp(self):
+        self.profile_registry = patch.object(
+            app, "load_workflow_profile_registry",
+            return_value={"production": "test-model", "preview": "test-model"},
+        )
+        self.profile_registry.start()
+        self.addCleanup(self.profile_registry.stop)
+
     def make_storyboard(self, **overrides):
         state = app.WebState()
         config = {
@@ -645,6 +653,32 @@ class DirectorRegressionTests(unittest.TestCase):
             },
         )
         self.assertIn("vivid copper hair", updated["summary"]["subject"])
+
+    def test_set_scoped_subject_change_does_not_cross_photoshoots(self):
+        state, storyboard_id = self.make_storyboard(photoshoots=2, count=3)
+        record = state.get_storyboard(storyboard_id)
+        second_set_before = [
+            shot["scene"]["human"]["hair_color"]["id"]
+            for shot in record["shots"] if shot["photoshoot_index"] == 1
+        ]
+        field = director_fields(state.director_payload(storyboard_id, 1))["human.hair_color"]
+        replacement = next(
+            option["id"] for option in field["options"]
+            if option["id"] and option["id"] != field["value"]
+        )
+        state.update_director(
+            storyboard_id,
+            {"shot": 1, "field": "human.hair_color", "value": replacement},
+        )
+        shots = state.get_storyboard(storyboard_id)["shots"]
+        self.assertTrue(all(
+            shot["scene"]["human"]["hair_color"]["id"] == replacement
+            for shot in shots if shot["photoshoot_index"] == 0
+        ))
+        self.assertEqual(second_set_before, [
+            shot["scene"]["human"]["hair_color"]["id"]
+            for shot in shots if shot["photoshoot_index"] == 1
+        ])
 
     def test_stage_change_is_manual_and_rebuilds_compatible_direction(self):
         state, storyboard_id = self.make_storyboard()
@@ -1072,6 +1106,14 @@ class DirectorRegressionTests(unittest.TestCase):
 
 
 class PreviewRegressionTests(unittest.TestCase):
+    def setUp(self):
+        self.profile_registry = patch.object(
+            app, "load_workflow_profile_registry",
+            return_value={"production": "test-model", "preview": "test-model"},
+        )
+        self.profile_registry.start()
+        self.addCleanup(self.profile_registry.stop)
+
     def test_preview_lifecycle_keeps_image_in_memory(self):
         state = app.WebState()
         board = state.create_storyboard(
@@ -1473,8 +1515,9 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('id="image-slideshow-toggle"', html)
         self.assertNotIn("<span>Pause</span>", html)
         self.assertIn('class="viewer-delay-menu"', html)
-        slideshow = html.split('id="image-slideshow-delay"', 1)[1].split("</select>", 1)[0]
-        self.assertEqual(slideshow.count('<option value="'), 10)
+        slideshow = html.split('id="image-slideshow-delay"', 1)[1].split("</details>", 1)[0]
+        self.assertEqual(slideshow.count('data-slideshow-delay="'), 10)
+        self.assertIn('class="slideshow-delay-popover"', slideshow)
         self.assertIn("function scheduleSlideshow()", js)
         self.assertIn("if (state.slideshowActive) scheduleSlideshow();", js)
         self.assertIn("document.fullscreenElement === target", js)
@@ -1614,8 +1657,8 @@ class FrontendContractTests(unittest.TestCase):
         css = (root / "web" / "styles.css").read_text(encoding="utf-8")
 
         self.assertIn(".field input, .field select, .director-field select", css)
-        self.assertIn(".render-choice { display: inline-grid;", css)
-        self.assertIn("overflow: hidden; border: 1px solid", css)
+        self.assertIn(".render-choice { position: relative; display: inline-grid;", css)
+        self.assertIn(".render-mode-popover { position: absolute;", css)
         self.assertIn(".render-choice:focus-within", css)
         self.assertIn(".render-choice:hover .button.render", css)
 
@@ -1640,8 +1683,9 @@ class FrontendContractTests(unittest.TestCase):
         html = (root / "web" / "index.html").read_text(encoding="utf-8")
         javascript = (root / "web" / "app.js").read_text(encoding="utf-8")
         self.assertNotIn('name="fast"', html)
-        self.assertEqual(html.count("data-render-mode"), 2)
-        self.assertIn("Preview storyboard", html)
+        self.assertEqual(html.count('class="render-choice-menu" data-render-mode'), 2)
+        self.assertEqual(html.count('data-render-mode-choice="preview"'), 2)
+        self.assertIn("Faster draft workflow", html)
         self.assertIn("Render storyboard", html)
         self.assertIn("state.renderMode === 'preview'", javascript)
         self.assertNotIn("retry_count", html)
@@ -1916,6 +1960,34 @@ class VisualCompatibilityRegressionTests(unittest.TestCase):
             if checked >= 10:
                 break
         self.assertGreaterEqual(checked, 10)
+
+
+class WorkflowProfileTests(unittest.TestCase):
+    def test_model_name_becomes_a_readable_safe_profile_filename(self):
+        workflow = {
+            "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "models/Lumina_2-F16.safetensors"}},
+        }
+        name = app.workflow_model_name(workflow)
+        self.assertEqual(name, "Lumina 2-F16")
+        self.assertEqual(app.workflow_profile_slug(name), "lumina-2-f16")
+
+    def test_profile_selection_rename_and_delete_are_deterministic(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            db = {"settings": {"workflows_dir": "./profiles"}}
+            directory = root / "profiles"
+            directory.mkdir()
+            (directory / "model-a.workflow.json").write_text("{}\n", encoding="utf-8")
+            (directory / "model-b.workflow.json").write_text("{}\n", encoding="utf-8")
+            with patch.object(app, "detect_node_mapping", return_value={}):
+                selected = app.select_workflow_profiles(db, root / "database.json", "model-a", "model-b")
+                self.assertEqual(selected["production"], "model-a")
+                self.assertEqual(selected["preview"], "model-b")
+                renamed = app.rename_workflow_profile(db, root / "database.json", "model-a", "Editorial Model")
+                self.assertEqual(renamed["production"], "editorial-model")
+                self.assertTrue((directory / "editorial-model.workflow.json").is_file())
+                with self.assertRaisesRegex(app.AppError, "Select another"):
+                    app.delete_workflow_profile(db, root / "database.json", "model-b")
 
 
 if __name__ == "__main__":

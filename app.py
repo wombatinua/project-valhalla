@@ -162,7 +162,7 @@ def validate_database(db: dict[str, Any]) -> None:
         if section not in db:
             raise AppError(f"database.json is missing the '{section}' section")
     settings = db["settings"]
-    for key in ("comfy_url", "workflow_file", "output_dir"):
+    for key in ("comfy_url", "workflows_dir", "output_dir"):
         if not isinstance(settings.get(key), str) or not settings[key]:
             raise AppError(f"settings.{key} must be a non-empty string")
     positive_prefix = db["prompt_defaults"].get("positive_prefix")
@@ -2172,7 +2172,7 @@ def comfy_session(db: dict[str, Any]) -> tuple[Any, str, float]:
     return session, url, timeout
 
 
-def capture(db: dict[str, Any], db_path: Path, force: bool) -> None:
+def latest_comfy_workflow(db: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     session, url, timeout = comfy_session(db)
     try:
         response = session.get(f"{url}/history", timeout=timeout)
@@ -2195,21 +2195,142 @@ def capture(db: dict[str, Any], db_path: Path, force: bool) -> None:
     prompt_record = item.get("prompt", [])
     if len(prompt_record) < 3 or not isinstance(prompt_record[2], dict):
         raise AppError(f"History item {prompt_id} does not contain an API workflow in prompt[2]")
-    workflow = prompt_record[2]
+    return prompt_id, prompt_record[2]
+
+
+def workflow_profile_directory(db: dict[str, Any], db_path: Path) -> Path:
+    return resolve_path(db_path.parent, db["settings"]["workflows_dir"])
+
+
+def workflow_profile_slug(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    if not slug:
+        raise AppError("Profile name must contain letters or numbers")
+    return slug[:80]
+
+
+def workflow_model_name(workflow: dict[str, Any]) -> str:
+    keys = ("ckpt_name", "unet_name", "model_name", "checkpoint", "model")
+    for node in workflow.values():
+        inputs = node.get("inputs", {}) if isinstance(node, dict) else {}
+        for key in keys:
+            value = inputs.get(key)
+            if isinstance(value, str) and value.strip():
+                return Path(value).name.rsplit(".", 1)[0].replace("_", " ").strip()
+    return "ComfyUI model"
+
+
+def load_workflow_profile_registry(db: dict[str, Any], db_path: Path) -> dict[str, Any]:
+    directory = workflow_profile_directory(db, db_path)
+    path = directory / "profiles.json"
+    if not path.exists():
+        return {"production": None, "preview": None}
+    try:
+        registry = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise AppError(f"Invalid workflow profile registry {path}: {exc}") from exc
+    if not isinstance(registry, dict):
+        raise AppError(f"Workflow profile registry must be a JSON object: {path}")
+    return registry
+
+
+def save_workflow_profile_registry(db: dict[str, Any], db_path: Path, registry: dict[str, Any]) -> None:
+    directory = workflow_profile_directory(db, db_path)
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / "profiles.json"
+    temporary = directory / ".profiles.json.tmp"
+    temporary.write_text(json.dumps(registry, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    temporary.replace(target)
+
+
+def list_workflow_profiles(db: dict[str, Any], db_path: Path) -> dict[str, Any]:
+    directory = workflow_profile_directory(db, db_path)
+    registry = load_workflow_profile_registry(db, db_path)
+    profiles = []
+    if directory.is_dir():
+        for path in sorted(directory.glob("*.workflow.json")):
+            profile_id = path.name.removesuffix(".workflow.json")
+            try:
+                workflow = json.loads(path.read_text(encoding="utf-8"))
+                detect_node_mapping(workflow, include_fast=True)
+                valid, error = True, None
+            except Exception as exc:
+                valid, error = False, str(exc)
+            profiles.append({"id": profile_id, "name": profile_id.replace("-", " ").title(), "file": path.name, "valid": valid, "error": error})
+    ids = {item["id"] for item in profiles if item["valid"]}
+    for mode in ("production", "preview"):
+        if registry.get(mode) not in ids:
+            registry[mode] = None
+    return {"profiles": profiles, "production": registry.get("production"), "preview": registry.get("preview")}
+
+
+def workflow_capture_candidate(db: dict[str, Any]) -> dict[str, Any]:
+    prompt_id, workflow = latest_comfy_workflow(db)
+    detect_node_mapping(workflow, include_fast=True)
+    name = workflow_model_name(workflow)
+    return {"prompt_id": prompt_id, "suggested_name": name, "suggested_id": workflow_profile_slug(name)}
+
+
+def capture_workflow_profile(db: dict[str, Any], db_path: Path, name: str, replace: bool) -> dict[str, Any]:
+    prompt_id, workflow = latest_comfy_workflow(db)
     mapping = detect_node_mapping(workflow, include_fast=True)
-    fast_mode = mapping["fast_mode"]
-    workflow_path = resolve_path(db_path.parent, db["settings"]["workflow_file"])
-    if workflow_path.exists() and not force:
-        raise AppError(f"Workflow already exists: {workflow_path}. Use capture --force to replace it")
-    workflow_path.parent.mkdir(parents=True, exist_ok=True)
-    workflow_path.write_text(json.dumps(workflow, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Captured prompt_id: {prompt_id}")
-    print(f"Workflow: {workflow_path}")
-    print(f"Positive node: {mapping['positive_prompt']['node']}")
-    print(f"Negative node: {mapping['negative_prompt']['node']}")
-    print(f"Seed targets: {len(mapping['inference_seed'])}")
-    print(f"Fast base sampler: {fast_mode['base_sampler']}")
-    print(f"Fast output targets: {len(fast_mode['output_targets'])}")
+    profile_id = workflow_profile_slug(name)
+    directory = workflow_profile_directory(db, db_path)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{profile_id}.workflow.json"
+    if path.exists() and not replace:
+        raise AppError(f"Workflow profile '{name}' already exists. Confirm replacement to overwrite it")
+    temporary = directory / f".{profile_id}.{uuid.uuid4().hex}.tmp"
+    temporary.write_text(json.dumps(workflow, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    temporary.replace(path)
+    registry = load_workflow_profile_registry(db, db_path)
+    if not registry.get("production"):
+        registry["production"] = profile_id
+    if not registry.get("preview"):
+        registry["preview"] = profile_id
+    save_workflow_profile_registry(db, db_path, registry)
+    return {"id": profile_id, "name": name.strip(), "file": path.name, "prompt_id": prompt_id, "seed_targets": len(mapping["inference_seed"])}
+
+
+def select_workflow_profiles(db: dict[str, Any], db_path: Path, production: str, preview: str) -> dict[str, Any]:
+    available = list_workflow_profiles(db, db_path)
+    valid = {item["id"] for item in available["profiles"] if item["valid"]}
+    if production not in valid or preview not in valid:
+        raise AppError("Production and Preview must each select a valid workflow profile")
+    registry = {"production": production, "preview": preview}
+    save_workflow_profile_registry(db, db_path, registry)
+    return list_workflow_profiles(db, db_path)
+
+
+def rename_workflow_profile(db: dict[str, Any], db_path: Path, profile_id: str, name: str) -> dict[str, Any]:
+    old_id = workflow_profile_slug(profile_id)
+    new_id = workflow_profile_slug(name)
+    directory = workflow_profile_directory(db, db_path)
+    source = directory / f"{old_id}.workflow.json"
+    target = directory / f"{new_id}.workflow.json"
+    if not source.is_file():
+        raise AppError(f"Workflow profile not found: {old_id}")
+    if target != source and target.exists():
+        raise AppError(f"Workflow profile filename already exists: {target.name}")
+    source.replace(target)
+    registry = load_workflow_profile_registry(db, db_path)
+    for mode in ("production", "preview"):
+        if registry.get(mode) == old_id:
+            registry[mode] = new_id
+    save_workflow_profile_registry(db, db_path, registry)
+    return list_workflow_profiles(db, db_path)
+
+
+def delete_workflow_profile(db: dict[str, Any], db_path: Path, profile_id: str) -> dict[str, Any]:
+    profile_id = workflow_profile_slug(profile_id)
+    registry = load_workflow_profile_registry(db, db_path)
+    if profile_id in {registry.get("production"), registry.get("preview")}:
+        raise AppError("Select another Production and Preview profile before deleting this one")
+    path = workflow_profile_directory(db, db_path) / f"{profile_id}.workflow.json"
+    if not path.is_file():
+        raise AppError(f"Workflow profile not found: {profile_id}")
+    path.unlink()
+    return list_workflow_profiles(db, db_path)
 
 
 def patch_workflow(workflow: dict[str, Any], mapping: dict[str, Any], positive: str, negative: str, seed: int) -> None:
@@ -2313,13 +2434,19 @@ def wait_for_outputs(session: Any, url: str, prompt_id: str, settings: dict[str,
 
 
 def load_workflow_runtime(
-    db: dict[str, Any], db_path: Path, fast: bool
+    db: dict[str, Any], db_path: Path, fast: bool, profile_id: str | None = None
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    workflow_path = resolve_path(db_path.parent, db["settings"]["workflow_file"])
+    mode = "preview" if fast else "production"
+    registry = load_workflow_profile_registry(db, db_path)
+    selected = profile_id or registry.get(mode)
+    if not selected:
+        raise AppError(f"No {mode} workflow profile is selected. Capture or select one in Studio files")
+    selected = workflow_profile_slug(str(selected))
+    workflow_path = workflow_profile_directory(db, db_path) / f"{selected}.workflow.json"
     try:
         workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
-        raise AppError(f"Workflow not found: {workflow_path}. Run capture first") from exc
+        raise AppError(f"Selected {mode} workflow profile is missing: {workflow_path.name}") from exc
     except json.JSONDecodeError as exc:
         raise AppError(f"Invalid workflow JSON in {workflow_path}: {exc}") from exc
     if not isinstance(workflow, dict) or not workflow:
@@ -4147,6 +4274,11 @@ class WebState:
 
     def create_job(self, storyboard_id: str, fast: bool, shot_numbers: list[int] | None = None) -> dict[str, Any]:
         record = self.get_storyboard(storyboard_id)
+        _, db_path = load_database()
+        profile_mode = "preview" if fast else "production"
+        workflow_profile = load_workflow_profile_registry(record["db"], db_path).get(profile_mode)
+        if not workflow_profile:
+            raise AppError(f"No {profile_mode} workflow profile is selected")
         shot_numbers = shot_numbers or [shot["number"] for shot in record["shots"]]
         if not shot_numbers or any(number < 1 or number > len(record["shots"]) for number in shot_numbers):
             raise AppError("Render selection contains an invalid shot")
@@ -4159,6 +4291,7 @@ class WebState:
             "storyboard_id": storyboard_id,
             "status": "queued",
             "fast": bool(fast),
+            "workflow_profile": workflow_profile,
             "created_at": _iso_now(),
             "started_at": None,
             "finished_at": None,
@@ -4211,6 +4344,10 @@ class WebState:
         self, storyboard_id: str, number: int, fast: bool
     ) -> dict[str, Any]:
         record = self.get_storyboard(storyboard_id)
+        _, db_path = load_database()
+        workflow_profile = load_workflow_profile_registry(record["db"], db_path).get("preview")
+        if not workflow_profile:
+            raise AppError("No Preview workflow profile is selected")
         if not 1 <= number <= len(record["shots"]):
             raise AppError("Shot number is out of range")
         shot = record["shots"][number - 1]
@@ -4233,6 +4370,7 @@ class WebState:
             "positive": positive,
             "negative": negative,
             "seed": shot["inference_seed"],
+            "workflow_profile": workflow_profile,
         }
         with self.lock:
             if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
@@ -4266,6 +4404,7 @@ class WebState:
             "seed": preview["seed"],
             "started_at": preview["started_at"],
             "elapsed_seconds": preview["elapsed_seconds"],
+            "workflow_profile": preview["workflow_profile"],
         }
         if preview["status"] == "running" and preview.get("_started_monotonic") is not None:
             payload["elapsed_seconds"] = round(
@@ -4308,7 +4447,7 @@ class WebState:
         try:
             db = preview["db"]
             _, db_path = load_database()
-            workflow, mapping = load_workflow_runtime(db, db_path, True)
+            workflow, mapping = load_workflow_runtime(db, db_path, True, preview["workflow_profile"])
             prompt_id, image_bytes, mime_type = generate_preview_image(
                 db,
                 preview["positive"],
@@ -4412,6 +4551,12 @@ class WebState:
                 "previews": visible_previews,
             }
 
+    def has_active_render(self) -> bool:
+        with self.lock:
+            return any(job["status"] in {"queued", "running"} for job in self.jobs.values()) or any(
+                preview["status"] in {"queued", "running"} for preview in self.previews.values()
+            )
+
     def cancel_job(self, job_id: str) -> dict[str, Any]:
         with self.lock:
             job = self.jobs.get(job_id)
@@ -4470,7 +4615,7 @@ class WebState:
         try:
             db = job["_db"]
             _, db_path = load_database()
-            workflow, mapping = load_workflow_runtime(db, db_path, job["fast"])
+            workflow, mapping = load_workflow_runtime(db, db_path, job["fast"], job["workflow_profile"])
             run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             with self.lock:
                 job["_run_id"] = run_id
@@ -4746,7 +4891,7 @@ def delete_all_output_images() -> dict[str, Any]:
 def application_status(check_comfy: bool = True) -> dict[str, Any]:
     db, db_path = load_database()
     settings = db["settings"]
-    workflow_path = resolve_path(db_path.parent, settings["workflow_file"])
+    workflow_profiles = list_workflow_profiles(db, db_path)
     output_path = resolve_path(db_path.parent, settings["output_dir"])
     selectable = sum(1 for item in iter_content_items(db) if not item.get("disabled", False))
     comfy = {"url": settings["comfy_url"], "online": False, "message": "Not checked"}
@@ -4761,9 +4906,13 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
     progression = settings.get("photoshoot_progression", {})
     return {
         "app": "Valhalla Photo Studio",
-        "version": "2.0-web",
+        "version": "2.1.0",
         "comfy": comfy,
-        "workflow": {"ready": workflow_path.is_file(), "name": workflow_path.name},
+        "workflow": {
+            "ready": bool(workflow_profiles["production"] and workflow_profiles["preview"]),
+            "name": f"{len(workflow_profiles['profiles'])} profiles",
+            **workflow_profiles,
+        },
         "output": {"path": str(output_path), "exists": output_path.is_dir()},
         "catalog_records": selectable,
         "defaults": {
@@ -4774,7 +4923,7 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
 
 
 class ValhallaHandler(BaseHTTPRequestHandler):
-    server_version = "Valhalla/2.0"
+    server_version = "Valhalla/2.1.0"
 
     def log_message(self, fmt: str, *args: Any) -> None:
         print(f"[{self.log_date_time_string()}] {fmt % args}")
@@ -4808,6 +4957,12 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == "/api/status":
                 self.send_json(application_status())
+            elif path == "/api/workflow/profiles":
+                db, db_path = load_database()
+                self.send_json(list_workflow_profiles(db, db_path))
+            elif path == "/api/workflow/capture-candidate":
+                db, _ = load_database()
+                self.send_json(workflow_capture_candidate(db))
             elif path.endswith("/export") and path.startswith("/api/storyboards/"):
                 storyboard_id = path.split("/")[3]
                 self.send_json(WEB_STATE.export_storyboard(storyboard_id))
@@ -4893,10 +5048,28 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             elif path.endswith("/cancel") and path.startswith("/api/jobs/"):
                 self.send_json(WEB_STATE.cancel_job(path.split("/")[3]))
             elif path == "/api/workflow/capture":
+                if WEB_STATE.has_active_render():
+                    raise AppError("Workflow profiles cannot be captured while rendering is active")
                 payload = self.read_json()
                 db, db_path = load_database()
-                capture(db, db_path, bool(payload.get("force", False)))
-                self.send_json({"ok": True, "message": "Workflow captured successfully"})
+                profile = capture_workflow_profile(
+                    db, db_path, str(payload.get("name", "")), bool(payload.get("replace", False))
+                )
+                self.send_json({"ok": True, "message": "Workflow profile captured", "profile": profile})
+            elif path == "/api/workflow/profiles/select":
+                payload = self.read_json()
+                db, db_path = load_database()
+                self.send_json(select_workflow_profiles(
+                    db, db_path, str(payload.get("production", "")), str(payload.get("preview", ""))
+                ))
+            elif path.endswith("/rename") and path.startswith("/api/workflow/profiles/"):
+                if WEB_STATE.has_active_render():
+                    raise AppError("Workflow profiles cannot be renamed while the render queue is active")
+                payload = self.read_json()
+                db, db_path = load_database()
+                self.send_json(rename_workflow_profile(
+                    db, db_path, path.split("/")[4], str(payload.get("name", ""))
+                ))
             else:
                 self.send_json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
         except AppError as exc:
@@ -4916,6 +5089,11 @@ class ValhallaHandler(BaseHTTPRequestHandler):
                 self.send_json(delete_output_image(name))
             elif path.startswith("/api/previews/"):
                 self.send_json(WEB_STATE.delete_preview(path.split("/")[3]))
+            elif path.startswith("/api/workflow/profiles/"):
+                if WEB_STATE.has_active_render():
+                    raise AppError("Workflow profiles cannot be deleted while the render queue is active")
+                db, db_path = load_database()
+                self.send_json(delete_workflow_profile(db, db_path, path.split("/")[4]))
             else:
                 self.send_json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
         except AppError as exc:

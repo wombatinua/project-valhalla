@@ -6,7 +6,7 @@ Unchecked items are planned work, not claims about missing historical features.
 
 ## Project constraints
 
-- Keep one `app.py`, one manually editable `database.json`, one active local `workflow.json`, one `launcher.sh`, and static assets under `web/`.
+- Keep one `app.py`, one manually editable `database.json`, a server-side `workflows/` library, one `launcher.sh`, and static assets under `web/`.
 - Preserve compatibility with different checkpoint families through the captured workflow.
 - Do not add FaceID, IPAdapter, PuLID, reference-image, or architecture-specific identity pipelines.
 - Do not add an image-quality detector or external vision model in the current roadmap.
@@ -232,20 +232,20 @@ Ready when:
 
 ## P1 — Named workflow rendering profiles
 
-- [ ] Replace the single captured-workflow model with a server-side directory of workflow profiles.
-- [ ] Extract the main checkpoint/model name from each captured workflow and use a sanitized form as the default profile name.
-- [ ] Allow the user to review and edit the proposed profile name before saving.
-- [ ] Include the sanitized profile name in its workflow filename so the profile directory remains understandable without the Web UI.
-- [ ] Store each captured workflow as an independently selectable profile file without overwriting unrelated profiles.
-- [ ] Rename the profile file atomically when its profile name changes, and reject filename collisions before modifying anything.
-- [ ] List available profiles in the Web UI and clearly show the active profile.
-- [ ] Allow selecting which profile is used for production rendering and Preview rendering.
-- [ ] Validate every profile independently, including prompt, seed, sampler, VAE, save-output, and preview-bypass mappings.
-- [ ] Prevent ambiguous duplicate profile names and report exact invalid or missing profile files.
-- [ ] Preserve safe capture behavior when replacing an existing profile and require explicit confirmation for replacement.
-- [ ] Keep profile selection in storyboard/job metadata so Logger and recovered render state identify the workflow used.
-- [ ] Define deterministic behavior when a selected profile is renamed, deleted, invalid, or unavailable after server restart.
-- [ ] Update `launcher.sh`, status reporting, capture endpoints, documentation, and regression tests for the profile directory.
+- [x] Replace the single captured-workflow model with a server-side directory of workflow profiles.
+- [x] Extract the main checkpoint/model name from each captured workflow and use a sanitized form as the default profile name.
+- [x] Allow the user to review and edit the proposed profile name before saving.
+- [x] Include the sanitized profile name in its workflow filename so the profile directory remains understandable without the Web UI.
+- [x] Store each captured workflow as an independently selectable profile file without overwriting unrelated profiles.
+- [x] Rename the profile file atomically when its profile name changes, and reject filename collisions before modifying anything.
+- [x] List available profiles in the Web UI and clearly show the active profile.
+- [x] Allow selecting which profile is used for production rendering and Preview rendering.
+- [x] Validate every profile independently, including prompt, seed, sampler, VAE, save-output, and preview-bypass mappings.
+- [x] Prevent ambiguous duplicate profile names and report exact invalid or missing profile files.
+- [x] Preserve safe capture behavior when replacing an existing profile and require explicit confirmation for replacement.
+- [x] Keep profile selection in storyboard/job metadata so Logger and recovered render state identify the workflow used.
+- [x] Define deterministic behavior when a selected profile is renamed, deleted, invalid, or unavailable after server restart.
+- [x] Update status reporting, capture endpoints, documentation, and regression tests for the profile directory.
 
 Ready when:
 
