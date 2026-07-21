@@ -206,7 +206,6 @@ function setTheme(theme) {
   state.theme = theme;
   sessionStorage.setItem('valhalla-theme', state.theme);
   applyTheme();
-  toast('Theme updated', `${state.theme[0].toUpperCase()}${state.theme.slice(1)} appearance`);
 }
 
 function applyTypeSize() {
@@ -223,7 +222,6 @@ function setTypeSize(size) {
   state.typeSize = size;
   sessionStorage.setItem('valhalla-type-size', size);
   applyTypeSize();
-  toast('Text size updated', `${size[0].toUpperCase()}${size.slice(1)}`);
 }
 
 function applyAccent() {
@@ -240,7 +238,6 @@ function setAccent(accent) {
   state.accent = accent;
   sessionStorage.setItem('valhalla-accent', accent);
   applyAccent();
-  toast('Accent updated', `${accent[0].toUpperCase()}${accent.slice(1)} palette`);
 }
 
 async function refreshStatus(showToast = false) {
@@ -261,7 +258,6 @@ async function refreshStatus(showToast = false) {
       : '';
     $('#workflow-dot').className = `status-dot ${status.workflow.ready ? 'online' : 'error'}`;
     $('#catalog-status').textContent = status.catalog_records.toLocaleString();
-    if (showToast) toast('Status refreshed', status.comfy.online ? 'ComfyUI is connected.' : 'ComfyUI is currently offline.', status.comfy.online ? 'success' : 'error');
   } catch (error) {
     $('#comfy-status').textContent = 'Error';
     $('#comfy-dot').className = 'status-dot error';
@@ -452,11 +448,6 @@ async function resolveStoryboard(event, options = {}) {
     form.elements.prompt_seed.value = storyboard.config.prompt_seed ?? '';
     form.elements.inference_seed.value = storyboard.config.inference_seed ?? '';
     renderStoryboard();
-    toast(
-      options.automatic ? 'Seeds applied' : 'Storyboard ready',
-      `${state.storyboard.total} compatible shots resolved${options.automatic ? ' and Director updated' : ''}.`,
-      'success',
-    );
     return storyboard;
   } catch (error) {
     if (version !== state.resolveVersion) return;
@@ -528,7 +519,6 @@ async function applyVariationSettings() {
     form.elements.inference_seed.value = storyboard.config.inference_seed ?? '';
     renderStoryboard();
     $('#variation-seed-status').textContent = 'Applied';
-    toast('Image variations updated', 'Director custom values and shot directions were preserved.', 'success');
   } catch (error) {
     if (version !== state.resolveVersion) return;
     toast('Could not update image variations', error.message, 'error');
@@ -648,7 +638,6 @@ async function rerollShot(number, button) {
     const shot = await api(`/api/storyboards/${state.storyboard.id}/shots/${number}/reroll`, { method: 'POST', body: '{}' });
     state.storyboard.director_edited = true;
     renderOneShot(shot);
-    toast(`Shot ${number} redirected`, 'Composition and prompt were updated.', 'success');
   } catch (error) {
     setBusy(button, false);
     toast('Could not reroll shot', error.message, 'error');
@@ -665,7 +654,6 @@ async function randomizeShotSeed(number, button) {
     state.storyboard.director_edited = true;
     renderOneShot(shot);
     if (state.director && state.directorShot === number) await loadDirector(number);
-    toast('New image variation', `Shot ${number} now uses seed ${shot.inference_seed}.`, 'success');
   } catch (error) {
     toast('Could not change variation', error.message, 'error');
   } finally {
@@ -1036,7 +1024,6 @@ async function deleteOutput(index) {
         showPreview(next.outputIndex);
       }
     }
-    toast('Image deleted', item.name, 'success');
   } catch (error) {
     toast('Could not delete image', error.message, 'error');
   }
@@ -1098,11 +1085,6 @@ async function restoreApplication() {
       }
       showJob();
       if (session.active_job) pollJob();
-      toast(
-        session.active_job ? 'Active render restored' : 'Latest render restored',
-        `${state.job.completed} of ${state.job.total} images completed.`,
-        'success',
-      );
     }
   } catch (error) {
     toast('Could not restore render state', error.message, 'error');
@@ -1810,7 +1792,6 @@ async function remixDirector(target, button) {
     state.storyboard = await api(`/api/storyboards/${state.storyboard.id}`);
     renderStoryboard();
     renderDirector();
-    toast('Remix complete', target === 'shot' ? 'This shot was redirected.' : `The set’s ${target} was refreshed.`, 'success');
   } catch (error) {
     toast('Could not remix', error.message, 'error');
   } finally {
@@ -1851,7 +1832,6 @@ async function saveDirectorCustom(clear = false) {
     directorCustomDialog.close();
     renderStoryboard();
     renderDirector();
-    toast(value ? "Custom direction applied" : "Custom direction cleared", value ? (field.scope === "set" ? "Only the current set was updated." : "This shot was updated.") : "The database preset is active again.", "success");
   } catch (error) {
     toast("Could not apply custom value", error.message, "error");
   } finally {
@@ -1865,7 +1845,6 @@ async function applyDirectorChange(select) {
   const card = select.closest('.director-field');
   const activeField = directorFieldByKey(field);
   const previous = activeField?.custom ? '__director_custom__' : activeField?.value;
-  const randomChoice = select.value === '__director_random__';
   if (select.value === '__director_custom__') {
     openDirectorCustom(field);
     return;
@@ -1885,7 +1864,6 @@ async function applyDirectorChange(select) {
     state.storyboard = await api(`/api/storyboards/${state.storyboard.id}`);
     renderStoryboard();
     renderDirector();
-    toast(randomChoice ? 'Random choice applied' : 'Direction applied', field.startsWith('shot.') ? 'This shot was updated.' : 'The complete set was updated.', 'success');
   } catch (error) {
     select.value = previous ?? '';
     card.classList.remove('changed');
@@ -2005,7 +1983,6 @@ async function startShotPreview(number, button) {
       }),
     });
     renderLogger();
-    toast('Preview queued', `Rendering shot ${number} with the preview workflow.`);
     pollShotPreview(button);
   } catch (error) {
     setPreviewBusy(button, false);
@@ -2082,7 +2059,6 @@ async function manageWorkflowProfile(button) {
     );
     renderWorkflowProfiles(profiles);
     refreshStatus();
-    toast(`Profile ${action === 'rename' ? 'renamed' : 'deleted'}`, 'Rendering profile library updated.', 'success');
   } catch (error) {
     toast(`Could not ${action} profile`, error.message, 'error');
     setBusy(button, false);
@@ -2118,7 +2094,6 @@ async function saveWorkflowProfileSelection() {
       }),
     });
     renderWorkflowProfiles(profiles);
-    toast('Rendering profiles updated', 'New jobs will use the selected workflows.', 'success');
     refreshStatus();
   } catch (error) {
     toast('Could not select profiles', error.message, 'error');
@@ -2165,7 +2140,6 @@ $('#reset-config').addEventListener('click', () => {
   setRenderMode('production');
   syncForm({ target: form.elements.nsfw_percent });
   syncPendingState();
-  toast('Setup reset', 'Default production settings restored.');
 });
 $('#randomize-storyboard-seed').addEventListener('click', () => randomizeSeedField('prompt_seed'));
 $('#randomize-variation-seed').addEventListener('click', () => randomizeSeedField('inference_seed'));
@@ -2342,7 +2316,6 @@ updateStoryboardDialog.addEventListener('cancel', (event) => {
 $$('.dialog-close').forEach((button) => button.addEventListener('click', () => promptDialog.close()));
 $('#copy-prompt').addEventListener('click', async () => {
   await navigator.clipboard.writeText($('#prompt-content').textContent);
-  toast('Copied', 'Prompt copied to clipboard.', 'success');
 });
 
 $('#capture-button').addEventListener('click', openWorkflowProfiles);
@@ -2376,7 +2349,6 @@ $('#logger-view').addEventListener('click', async (event) => {
   const key = button.dataset.copyLog;
   try {
     await navigator.clipboard.writeText(prompt[key] || '');
-    toast('Prompt copied', `${key[0].toUpperCase()}${key.slice(1)} prompt copied.`, 'success');
   } catch (error) {
     toast('Could not copy prompt', error.message, 'error');
   }
@@ -2392,12 +2364,11 @@ $('#clear-logger').addEventListener('click', async () => {
   const button = $('#clear-logger');
   setBusy(button, true, 'Clearing…');
   try {
-    const result = await api('/api/logger', { method: 'DELETE' });
+    await api('/api/logger', { method: 'DELETE' });
     state.job = null;
     state.previewJob = null;
     state.loggerInspection = null;
     renderLogger();
-    toast('Logbook cleared', `${result.cleared} log source${result.cleared === 1 ? '' : 's'} removed.`, 'success');
   } catch (error) {
     toast('Could not clear logbook', error.message, 'error');
   } finally {
