@@ -15,6 +15,7 @@ const state = {
   job: null,
   jobTimer: null,
   outputs: [],
+  galleryBenchmark: false,
   deletedOutputs: new Set(),
   renderMode: sessionStorage.getItem('valhalla-render-mode') === 'preview'
     ? 'preview'
@@ -815,8 +816,10 @@ function syncRenderControls() {
 
 function syncDeleteControls() {
   const disabled = Boolean(isRenderActive());
-  $('#delete-all-outputs').classList.toggle('hidden', state.outputs.length === 0);
-  $('#delete-all-outputs').disabled = disabled;
+  $('#delete-all-outputs').classList.toggle(
+    'hidden', state.outputs.length === 0 || state.galleryBenchmark,
+  );
+  $('#delete-all-outputs').disabled = disabled || state.galleryBenchmark;
   $('#delete-all-outputs').title = disabled
     ? 'Bulk deletion is unavailable while rendering'
     : '';
@@ -895,6 +898,7 @@ async function loadOutputs() {
   try {
     const result = await api('/api/outputs');
     state.outputs = result.outputs || [];
+    state.galleryBenchmark = Boolean(result.benchmark);
   } catch (error) {
     toast('Could not load outputs', error.message, 'error');
   }
@@ -903,6 +907,10 @@ async function loadOutputs() {
 
 async function restoreApplication() {
   await loadOutputs();
+  if (state.galleryBenchmark) {
+    switchView('outputs');
+    return;
+  }
   try {
     const session = await api('/api/jobs');
     state.previewJob = session.latest_preview || null;
@@ -938,7 +946,9 @@ function renderOutputs() {
   $('#output-count').textContent = count;
   $('#outputs-empty').classList.toggle('hidden', count > 0);
   $('#outputs-summary').textContent = count
-    ? `${count} generated image${count === 1 ? '' : 's'}.`
+    ? (state.galleryBenchmark
+      ? `Benchmark: ${count.toLocaleString()} synthetic records.`
+      : `${count} generated image${count === 1 ? '' : 's'}.`)
     : 'No generated images.';
   outputRenderSignature = '';
   renderVirtualOutputs(true);
@@ -965,8 +975,13 @@ function outputCardHtml(item, index, layout) {
   return `<article class="output-card" data-output-index="${index}" tabindex="0" role="button"
     aria-label="Maximize ${escapeHtml(shotLabel)}" aria-posinset="${index + 1}" aria-setsize="${state.outputs.length}">
     <img src="${encodeURI(item.thumbnail_url || item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy" decoding="async">
-    <footer><span>${escapeHtml(shotLabel)}</span><span class="output-actions"><button class="output-delete" data-action="delete-output" aria-label="Delete ${escapeHtml(item.name)}">Delete</button><a href="${encodeURI(item.url)}" download="${escapeHtml(item.name)}">Download</a></span></footer>
+    <footer><span>${escapeHtml(shotLabel)}</span><span class="output-actions">${state.galleryBenchmark ? '' : `<button class="output-delete" data-action="delete-output" aria-label="Delete ${escapeHtml(item.name)}">Delete</button>`}<a href="${encodeURI(item.url)}" download="${escapeHtml(item.name)}">Download</a></span></footer>
   </article>`;
+}
+
+function updateGalleryBenchmarkSummary() {
+  if (!state.galleryBenchmark) return;
+  $('#outputs-summary').textContent = `Benchmark: ${state.outputs.length.toLocaleString()} records · ${outputGrid.childElementCount} cards in DOM.`;
 }
 
 function renderVirtualOutputs(force = false) {
@@ -989,6 +1004,7 @@ function renderVirtualOutputs(force = false) {
       .map((item, index) => outputCardHtml(item, index, outputLayout))
       .join('');
     syncDeleteControls();
+    updateGalleryBenchmarkSummary();
     return;
   }
   outputGrid.classList.add('virtualized');
@@ -1019,6 +1035,7 @@ function renderVirtualOutputs(force = false) {
     .map((item, offset) => outputCardHtml(item, start + offset, outputLayout))
     .join('');
   syncDeleteControls();
+  updateGalleryBenchmarkSummary();
 }
 
 function scheduleVirtualOutputRender(force = false) {

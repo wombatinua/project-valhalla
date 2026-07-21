@@ -1132,6 +1132,33 @@ class PreviewRegressionTests(unittest.TestCase):
 
 
 class OutputDeletionRegressionTests(unittest.TestCase):
+    def test_gallery_benchmark_creates_synthetic_records_without_copying_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            first = output_dir / "first.png"
+            second = output_dir / "second.png"
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+            with (
+                patch.object(app, "output_directory", return_value=output_dir),
+                patch.object(app, "GALLERY_BENCHMARK_COUNT", 2000),
+                patch.object(app, "GALLERY_BENCHMARK_SOURCES", 10),
+            ):
+                outputs = app.list_output_images()
+                self.assertEqual(len(outputs), 2000)
+                self.assertEqual(len({item["name"] for item in outputs}), 2000)
+                self.assertEqual(len({item["url"] for item in outputs}), 2)
+                self.assertEqual(len({item["thumbnail_url"] for item in outputs}), 2000)
+                self.assertIn("benchmark=2000", outputs[-1]["thumbnail_url"])
+                self.assertEqual(sorted(path.name for path in output_dir.iterdir()), ["first.png", "second.png"])
+                with self.assertRaisesRegex(app.AppError, "benchmark mode"):
+                    app.delete_output_image(outputs[0]["name"])
+
+    def test_gallery_benchmark_cli_defaults_to_two_thousand_records(self):
+        args = app.build_parser().parse_args(["gallery-benchmark", "--no-browser"])
+        self.assertEqual(args.command, "gallery-benchmark")
+        self.assertEqual(args.count, 2000)
+
     def test_output_payload_provides_versioned_thumbnail_url(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "result.png"
@@ -1317,6 +1344,13 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_gallery_benchmark_is_read_only_and_reports_bounded_dom_size(self):
+        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("state.galleryBenchmark = Boolean(result.benchmark)", js)
+        self.assertIn("outputGrid.childElementCount", js)
+        self.assertIn("state.outputs.length === 0 || state.galleryBenchmark", js)
+        self.assertIn("if (state.galleryBenchmark)", js)
+
     def test_sfw_is_a_structural_content_mode(self):
         root = Path(app.__file__).parent
         html = (root / "web" / "index.html").read_text(encoding="utf-8")

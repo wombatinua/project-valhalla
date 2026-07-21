@@ -4366,6 +4366,8 @@ WEB_STATE = WebState()
 
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+GALLERY_BENCHMARK_COUNT = 0
+GALLERY_BENCHMARK_SOURCES = 10
 
 
 def output_directory() -> Path:
@@ -4472,6 +4474,20 @@ def list_output_images() -> list[dict[str, Any]]:
         if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
     ]
     paths.sort(key=lambda path: (path.stat().st_mtime, path.name))
+    if GALLERY_BENCHMARK_COUNT:
+        if not paths:
+            raise AppError("Gallery benchmark requires at least one existing output image")
+        sources = paths[-GALLERY_BENCHMARK_SOURCES:]
+        outputs = []
+        for index in range(GALLERY_BENCHMARK_COUNT):
+            source = sources[index % len(sources)]
+            payload = output_payload(source)
+            payload["name"] = f"benchmark_{index + 1:05d}_{source.name}"
+            separator = "&" if "?" in payload["thumbnail_url"] else "?"
+            payload["thumbnail_url"] += f"{separator}benchmark={index + 1}"
+            payload["shot"] = index + 1
+            outputs.append(payload)
+        return outputs
     return [output_payload(path) for path in paths]
 
 
@@ -4483,6 +4499,8 @@ def ensure_outputs_idle() -> None:
 
 
 def delete_output_image(name: str) -> dict[str, Any]:
+    if GALLERY_BENCHMARK_COUNT:
+        raise AppError("Output deletion is disabled in gallery benchmark mode")
     if not name or Path(name).name != name:
         raise AppError("Invalid output filename")
     target = output_directory() / name
@@ -4515,6 +4533,8 @@ def delete_output_image(name: str) -> dict[str, Any]:
 
 
 def delete_all_output_images() -> dict[str, Any]:
+    if GALLERY_BENCHMARK_COUNT:
+        raise AppError("Output deletion is disabled in gallery benchmark mode")
     ensure_outputs_idle()
     directory = output_directory()
     if not directory.is_dir():
@@ -4621,7 +4641,10 @@ class ValhallaHandler(BaseHTTPRequestHandler):
             elif path.startswith("/api/previews/"):
                 self.send_json(WEB_STATE.get_preview(path.split("/")[3]))
             elif path == "/api/outputs":
-                self.send_json({"outputs": list_output_images()})
+                self.send_json({
+                    "outputs": list_output_images(),
+                    "benchmark": bool(GALLERY_BENCHMARK_COUNT),
+                })
             elif path.startswith("/api/thumbnails/"):
                 self.serve_thumbnail(unquote(path.removeprefix("/api/thumbnails/")))
             elif path.startswith("/api/outputs/"):
@@ -4778,7 +4801,8 @@ def serve(host: str, port: int, open_browser: bool) -> None:
     server = ThreadingHTTPServer((host, port), ValhallaHandler)
     browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
     url = f"http://{browser_host}:{server.server_port}/"
-    print(f"Project Valhalla Web UI: {url}")
+    label = "Gallery benchmark" if GALLERY_BENCHMARK_COUNT else "Project Valhalla Web UI"
+    print(f"{label}: {url}")
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:
@@ -4791,15 +4815,27 @@ def serve(host: str, port: int, open_browser: bool) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Project Valhalla local Web UI server")
+    parser.add_argument(
+        "command", nargs="?", choices=("serve", "gallery-benchmark"), default="serve",
+        help="Start the production server or an isolated synthetic gallery benchmark",
+    )
     parser.add_argument("--host", default="127.0.0.1", help="HTTP bind address")
     parser.add_argument("--port", type=int, default=8765, help="HTTP port")
     parser.add_argument("--no-browser", action="store_true", help="Do not open the browser automatically")
+    parser.add_argument("--count", type=int, default=2000, help="Synthetic gallery size in benchmark mode")
     return parser
 
 
 def main() -> int:
+    global GALLERY_BENCHMARK_COUNT
     args = build_parser().parse_args()
     try:
+        if args.command == "gallery-benchmark":
+            GALLERY_BENCHMARK_COUNT = _safe_int(
+                args.count, "Gallery benchmark count", 101, 10_000
+            )
+            # Fail before binding the port rather than opening an unusable benchmark.
+            list_output_images()
         serve(args.host, args.port, not args.no_browser)
         return 0
     except AppError as exc:

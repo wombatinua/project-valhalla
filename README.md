@@ -83,6 +83,18 @@ python3 app.py --host 127.0.0.1 --port 9000
 python3 app.py --no-browser
 ```
 
+### Gallery benchmark
+
+Test large-gallery behavior without rendering or copying thousands of images:
+
+```bash
+python3 app.py gallery-benchmark --count 2000
+```
+
+The read-only benchmark requires at least one existing image in `outputs/`. It exposes 2,000 unique synthetic gallery records that cycle through at most ten real images, gives every thumbnail a unique browser URL to exercise network transfer and decoding, opens directly on Outputs, disables deletion, and reports both the record count and current `.output-card` DOM count. The server still reuses its RAM thumbnail cache, so no image copies are created. Stop it with `Ctrl+C`, then start the normal production server again.
+
+In browser developer tools, record initial network transfer and browser memory, scroll from the first record to the last, open and navigate the lightbox, and confirm that the displayed DOM-card count remains bounded rather than approaching 2,000.
+
 Keep the default loopback host unless access from another machine is explicitly required. The application has no user authentication and is intended for a trusted local environment.
 
 ## HTTP layout
