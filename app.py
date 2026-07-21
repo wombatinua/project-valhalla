@@ -714,6 +714,86 @@ def compatible_with_requirements(item: dict[str, Any], available_tags: set[str])
     )
 
 
+INTIMATE_SHOT_SIZE_IDS = {
+    "shot_three_quarter", "shot_torso_closeup", "shot_intimate_macro",
+}
+
+
+def validate_camera_grammar(scene: dict[str, Any]) -> None:
+    """Reject semantically contradictory cross-field camera combinations."""
+    shot_size = scene["shot_size"]
+    angle = scene["camera_angle"]
+    framing = scene["framing"]
+    focus = scene["focus_target"]
+    recipe = scene.get("explicit_recipe")
+    action = scene["action"]
+
+    def conflict(reason: str, *items: dict[str, Any] | None) -> None:
+        ids = [item["id"] for item in items if item]
+        raise AppError(f"Camera conflict [{', '.join(ids)}]: {reason}")
+
+    if shot_size["id"] == "shot_intimate_macro":
+        if framing["id"] == "framing_environmental":
+            conflict(
+                "intimate macro cannot use environmental framing",
+                shot_size, framing,
+            )
+        if focus["id"] != "focus_intimate":
+            conflict(
+                "intimate macro requires intimate focus",
+                shot_size, focus,
+            )
+
+    rear_display = (
+        focus["id"] == "focus_rear"
+        or recipe is not None and recipe.get("focus_target") == "focus_rear"
+        or scene["stage"].get("plateau_kind") == "provocative_rear"
+    )
+    if rear_display:
+        if "rear_angle" not in tags(angle):
+            conflict("rear display requires a rear-compatible angle", recipe, angle)
+        if focus["id"] != "focus_rear":
+            conflict("rear display requires rear focus", recipe, focus)
+        if framing["id"] == "framing_environmental":
+            conflict(
+                "rear display cannot use environmental framing",
+                recipe, framing,
+            )
+
+    intimate_action = (
+        bool(tags(action) & {"masturbation_action", "explicit_intimate_action"})
+        or recipe is not None and recipe.get("focus_target") == "focus_intimate"
+    )
+    if intimate_action:
+        if focus["id"] != "focus_intimate":
+            conflict(
+                "intimate action requires intimate focus",
+                recipe, action, focus,
+            )
+        if shot_size["id"] not in INTIMATE_SHOT_SIZE_IDS:
+            conflict(
+                "intimate action requires three-quarter or closer treatment",
+                recipe, action, shot_size,
+            )
+        if framing["id"] == "framing_environmental":
+            conflict(
+                "intimate action cannot use environmental framing",
+                recipe, action, framing,
+            )
+
+
+def camera_candidate_compatible(
+    scene: dict[str, Any], key: str, candidate: dict[str, Any]
+) -> bool:
+    trial = dict(scene)
+    trial[key] = candidate
+    try:
+        validate_camera_grammar(trial)
+    except AppError:
+        return False
+    return True
+
+
 NSFW_LEVELS = ("topless", "nude", "explicit")
 SFW_BLOCKED_VISIBILITY = {"breasts", "nipples", "pubic_area", "genitals"}
 SFW_BLOCKED_GARMENT_TAGS = {
@@ -1574,6 +1654,7 @@ class Composer:
                 raise AppError(
                     f"Action {scene['action']['id']} conflicts with recipe focus {recipe['id']}"
                 )
+        validate_camera_grammar(scene)
 
 
 ALWAYS_HUMAN_PARTS = (
@@ -2457,6 +2538,38 @@ def build_storyboard(
     return storyboard
 
 
+def camera_grammar_stress_test(
+    db: dict[str, Any], count: int = 10_000, seed: int = 20260721
+) -> dict[str, Any]:
+    """Resolve a deterministic scene sample and fail on the first camera conflict."""
+    rng = random.Random(seed)
+    composer = Composer(db, rng)
+    checked = 0
+    recipes: set[str] = set()
+    tuples: set[tuple[str, str, str, str]] = set()
+    context: dict[str, Any] | None = None
+    stages: list[dict[str, Any]] = []
+    for index in range(count):
+        if context is None or index % 100 == 0:
+            context = composer.fixed_context()
+            stages = effective_photoshoot_stages(context["outfit"]["template"])
+        stage = stages[index % len(stages)]
+        scene = composer.resolve_scene(context, stage)
+        validate_camera_grammar(scene)
+        checked += 1
+        if scene.get("explicit_recipe"):
+            recipes.add(scene["explicit_recipe"]["id"])
+        tuples.add(tuple(
+            scene[key]["id"]
+            for key in ("shot_size", "camera_angle", "framing", "focus_target")
+        ))
+    return {
+        "checked": checked,
+        "recipes": sorted(recipes),
+        "camera_tuples": len(tuples),
+    }
+
+
 
 # ---------------------------------------------------------------------------
 # Web application
@@ -3145,6 +3258,11 @@ class WebState:
                     and compatible_with_requirements(item, camera_tags)
                 )
             ]
+            if key in {"shot_size", "camera_angle", "framing", "focus_target"}:
+                compatible = [
+                    item for item in compatible
+                    if camera_candidate_compatible(shot["scene"], key, item)
+                ]
             camera_fields.append({
                 "key": f"shot.{key}", "label": label, "scope": "shot",
                 "value": current_item["id"],
@@ -3937,6 +4055,7 @@ class WebState:
             self._apply_director_customs(shot, scene, context)
             if shot["number"] != position:
                 raise AppError("Storyboard shot numbers must be consecutive")
+            composer.validate_scene_rules(scene)
             serialize_shot(db, shot)
             shots.append(shot)
         storyboard_id = uuid.uuid4().hex

@@ -173,6 +173,8 @@ Subject, wardrobe, location, mood, and render-style changes apply to the complet
 
 The planner keeps the model, wardrobe, location, mood, and treatment coherent per set while varying compatible surfaces and compositions. It assigns every shot an editorial role and resolves shot size, angle, framing, and focus against stage, pose, action, and surface. Exact garment-state differences are added as transition instructions only when a present garment disappears. Explicit stages use concrete database recipes with constrained pose/action/camera grammar.
 
+Cross-field camera validation rejects contradictory tuples after resolution, during Director edits, and on storyboard import. Intimate actions require intimate focus and a three-quarter-or-closer treatment; intimate macro cannot use environmental framing; and rear-display recipes require rear-compatible angle, focus, and framing. Diagnostics include the exact conflicting catalog IDs.
+
 Quick actions provide constrained remixes for the subject, current wardrobe recipe, complete scene/treatment, or selected shot. Director edits remain part of the in-memory storyboard and are preserved by compact JSON export.
 
 Breast size and shape presets define a separate `covered_prompt` for clothing and lingerie stages. These prompts describe only the clothed bust silhouette and are paired with `prompt_defaults.covered_chest_negative`, which rejects bare breasts and visible nipples while the stage marks the chest as covered. Topless/nude stages continue to use the anatomical prompt instead. Areola, nipple, pubic-hair, and genital details remain strictly visibility-gated because they should not affect a covered silhouette.

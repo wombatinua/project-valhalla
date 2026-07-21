@@ -58,6 +58,7 @@ The next work is deliberately split into independently testable increments.
 - [x] Keep keyboard navigation, deletion indexes, lightbox navigation, and scroll position correct with virtualization.
 - [x] Add regression coverage for cache eviction, invalidation, concurrent cache misses, and thumbnail-generation failures.
 - [ ] Measure a gallery containing at least 2,000 outputs and record network transfer, decoded browser memory, and scroll responsiveness.
+  - Manual checkpoint: 4,000 unique synthetic thumbnail URLs remained responsive; exact network and decoded-memory figures are still pending.
 
 Ready when:
 
@@ -70,11 +71,11 @@ Ready when:
 
 - [x] Add `shot_sizes`, `camera_angles`, `framings`, and `focus_targets` to `database.json`.
 - [x] Resolve camera candidates against stage, pose, action, furniture, recipe tags, and visibility requirements.
-- [ ] Add explicit cross-field rules that reject intimate macro with full-body or environmental framing.
-- [ ] Require rear-compatible angles and framing for rear-display recipes.
-- [ ] Require suitable close-ups and focus targets for intimate actions.
-- [ ] Report the exact conflicting IDs when a camera combination is rejected.
-- [ ] Add a deterministic camera-aware stress test covering at least 10,000 planned scenes.
+- [x] Add explicit cross-field rules that reject intimate macro with full-body or environmental framing.
+- [x] Require rear-compatible angles and framing for rear-display recipes.
+- [x] Require suitable close-ups and focus targets for intimate actions.
+- [x] Report the exact conflicting IDs when a camera combination is rejected.
+- [x] Add a deterministic camera-aware stress test covering at least 10,000 planned scenes.
 
 Ready when:
 
@@ -209,6 +210,49 @@ Ready when:
 - [ ] Include sufficient metadata to reproduce a frame manually without JSONL output.
 - [ ] Reuse the existing thumbnail endpoint/cache rather than generating a second thumbnail system.
 
+## P1 — Output Gallery photoshoot grouping
+
+- [ ] Add a frontend-only toggle between the current flat Outputs grid and a grouped Photoshoots view.
+- [ ] Derive photoshoot groups entirely from existing output metadata and filenames without moving, copying, or rewriting output files.
+- [ ] Represent each photoshoot as one thumbnail card using a representative frame and show its frame count.
+- [ ] Open a photoshoot card into a focused grid containing only that photoshoot’s outputs.
+- [ ] Provide an immediate, obvious way to return from an opened photoshoot to the photoshoot-thumbnail list.
+- [ ] Allow switching back to the current flat representation at any time.
+- [ ] Keep lightbox navigation, downloads, deletion, live render additions, and virtualized rendering correct in flat and grouped views.
+- [ ] Remember the user’s scroll position and last focused output in flat view while they inspect grouped photoshoots, and restore both when returning.
+- [ ] Persist the selected gallery representation for the browser session.
+
+Ready when:
+
+- A large multi-photoshoot output collection can be browsed by set without changing server files or API state.
+- Entering and leaving a photoshoot requires one obvious action in either direction.
+- Returning to flat view restores the user’s previous browsing position.
+- Outputs arriving from an active render join the correct photoshoot without resetting navigation.
+
+## P1 — Named workflow rendering profiles
+
+- [ ] Replace the single captured-workflow model with a server-side directory of workflow profiles.
+- [ ] Extract the main checkpoint/model name from each captured workflow and use a sanitized form as the default profile name.
+- [ ] Allow the user to review and edit the proposed profile name before saving.
+- [ ] Include the sanitized profile name in its workflow filename so the profile directory remains understandable without the Web UI.
+- [ ] Store each captured workflow as an independently selectable profile file without overwriting unrelated profiles.
+- [ ] Rename the profile file atomically when its profile name changes, and reject filename collisions before modifying anything.
+- [ ] List available profiles in the Web UI and clearly show the active profile.
+- [ ] Allow selecting which profile is used for production rendering and Preview rendering.
+- [ ] Validate every profile independently, including prompt, seed, sampler, VAE, save-output, and preview-bypass mappings.
+- [ ] Prevent ambiguous duplicate profile names and report exact invalid or missing profile files.
+- [ ] Preserve safe capture behavior when replacing an existing profile and require explicit confirmation for replacement.
+- [ ] Keep profile selection in storyboard/job metadata so Logger and recovered render state identify the workflow used.
+- [ ] Define deterministic behavior when a selected profile is renamed, deleted, invalid, or unavailable after server restart.
+- [ ] Update `launcher.sh`, status reporting, capture endpoints, documentation, and regression tests for the profile directory.
+
+Ready when:
+
+- Multiple checkpoint families can each retain their own captured workflow and preview mapping.
+- A user can capture, name, select, replace, and diagnose profiles without manually renaming JSON files, while filenames remain recognizable from their profile names.
+- Every render and preview records the exact selected profile.
+- Missing or invalid profiles fail before GPU work with an actionable diagnostic.
+
 The old `python app.py plan` proposal is removed from the active roadmap because Studio already provides a richer GPU-free plan. CLI work is reserved for `validate` and `stats`.
 
 ## Regression checklist
@@ -223,17 +267,18 @@ The old `python app.py plan` proposal is removed from the active roadmap because
 - [x] Outdoor locations are private rather than public.
 - [x] Python compilation, JSON validation, shell syntax, unit tests, and `git diff --check` pass.
 - [ ] No garment is removed twice or restored after removal.
-- [ ] Camera-aware stress test of 10,000 planned scenes passes.
+- [x] Camera-aware stress test of 10,000 planned scenes passes.
 - [ ] A 2,000-output gallery remains responsive with bounded DOM and thumbnail memory.
 
 ## Planned implementation order
 
 1. Measure and document the 2,000-output gallery acceptance case.
-2. Implement explicit camera tuple validation and the 10,000-scene stress test.
+2. Add frontend-only photoshoot grouping while preserving the flat gallery workflow and position.
 3. Add standalone `validate`, then `stats`, using the same resolver and validation rules as the Web UI.
-4. Replace broad Full-XXX kinds with deterministic recipe planning and weighted shuffle bags.
-5. Integrate the intensity system with progressive and Full-XXX planning.
-6. Implement explicit garment-state tracking and matching transition actions.
-7. Refactor Prompt Compiler v2 and visual-trait ordering.
-8. Add location zones and physical surface capabilities.
+4. Replace the single captured workflow with named, selectable workflow profiles.
+5. Replace broad Full-XXX kinds with deterministic recipe planning and weighted shuffle bags.
+6. Integrate the intensity system with progressive and Full-XXX planning.
+7. Implement explicit garment-state tracking and matching transition actions.
+8. Refactor Prompt Compiler v2 and visual-trait ordering.
+9. Add location zones and physical surface capabilities.
 10. Reassess whether an HTML contact sheet adds value beyond the optimized Output Gallery.

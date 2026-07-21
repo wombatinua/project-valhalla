@@ -1414,6 +1414,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("focusOutputCard(state.previewIndex, { alignTop: true })", js)
         self.assertIn("ArrowUp: -columns, ArrowDown: columns", js)
 
+
     def test_typography_presets_use_relative_scale_with_normal_default(self):
         root = Path(__file__).resolve().parents[1]
         html = (root / "web" / "index.html").read_text(encoding="utf-8")
@@ -1509,6 +1510,76 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("form.elements.plateau_percent.max = String(nsfw)", javascript)
         self.assertIn("form.elements.plateau_percent.disabled", javascript)
         self.assertIn("if (state.pendingStructural)", javascript)
+
+
+class CameraGrammarRegressionTests(unittest.TestCase):
+    def setUp(self):
+        self.database, _ = app.load_database()
+        self.index = {
+            item["id"]: item for item in app.iter_content_items(self.database)
+        }
+
+    def explicit_scene(self, recipe_id):
+        composer = app.Composer(self.database, app.random.Random(20260721))
+        context = composer.fixed_context()
+        stage = next(
+            stage for stage in app.effective_photoshoot_stages(
+                context["outfit"]["template"]
+            )
+            if stage["level"] == "explicit"
+        )
+        return composer.resolve_scene(
+            context, stage, {"explicit_recipe": recipe_id}
+        )
+
+    def test_intimate_macro_rejects_environmental_framing_with_exact_ids(self):
+        scene = self.explicit_scene("recipe_intimate_macro")
+        scene["framing"] = self.index["framing_environmental"]
+        with self.assertRaisesRegex(
+            app.AppError,
+            r"Camera conflict \[shot_intimate_macro, framing_environmental\]",
+        ):
+            app.validate_camera_grammar(scene)
+
+    def test_rear_recipe_requires_rear_angle_with_exact_ids(self):
+        scene = self.explicit_scene("recipe_rear_standing")
+        scene["camera_angle"] = self.index["angle_eye_level"]
+        with self.assertRaisesRegex(
+            app.AppError,
+            r"Camera conflict \[recipe_rear_standing, angle_eye_level\]",
+        ):
+            app.validate_camera_grammar(scene)
+        self.assertFalse(app.camera_candidate_compatible(
+            self.explicit_scene("recipe_rear_standing"),
+            "camera_angle",
+            self.index["angle_eye_level"],
+        ))
+
+    def test_intimate_action_requires_intimate_focus_and_close_treatment(self):
+        scene = self.explicit_scene("recipe_hands_only")
+        scene["focus_target"] = self.index["focus_face"]
+        with self.assertRaisesRegex(
+            app.AppError,
+            r"recipe_hands_only.*focus_face",
+        ):
+            app.validate_camera_grammar(scene)
+        scene = self.explicit_scene("recipe_hands_only")
+        scene["shot_size"] = self.index["shot_full_body"]
+        with self.assertRaisesRegex(
+            app.AppError,
+            r"recipe_hands_only.*shot_full_body",
+        ):
+            app.validate_camera_grammar(scene)
+
+    def test_deterministic_camera_stress_resolves_ten_thousand_scenes(self):
+        result = app.camera_grammar_stress_test(self.database)
+        enabled_recipes = {
+            item["id"] for item in self.database["explicit_recipes"]
+            if not item.get("disabled", False)
+        }
+        self.assertEqual(result["checked"], 10_000)
+        self.assertEqual(set(result["recipes"]), enabled_recipes)
+        self.assertGreater(result["camera_tuples"], 100)
 
 
 class StoryboardEditStateTests(unittest.TestCase):
