@@ -54,6 +54,7 @@ const directorCustomDialog = $("#director-custom-dialog");
 const updateStoryboardDialog = $('#update-storyboard-dialog');
 const outputGrid = $('#output-grid');
 const OUTPUT_OVERSCAN_ROWS = 3;
+const OUTPUT_VIRTUALIZATION_THRESHOLD = 100;
 let outputLayout = null;
 let outputRenderFrame = null;
 let outputRenderSignature = '';
@@ -166,16 +167,18 @@ function syncForm(event) {
   const count = Math.max(1, Number(form.elements.count.value) || 1);
   const total = (mode === 'photoshoot' ? photoshoots : 1) * count;
   $('#photoshoots-field').classList.toggle('hidden', mode === 'random');
-  const progressionDisabled = mode === 'random' || content === 'xxx';
+  const progressionDisabled = mode === 'random' || content !== 'progressive';
   $('#progression-fields').classList.toggle('hidden', progressionDisabled);
   $('#mode-help').textContent = mode === 'photoshoot'
     ? 'One consistent subject, wardrobe and set per photoshoot.'
     : 'Every image receives an independently assembled production context.';
-  $('#content-help').textContent = content === 'xxx'
-    ? 'Every frame starts at an explicit stage; progression sliders are not used.'
-    : (mode === 'photoshoot'
-      ? 'Begins clothed and progresses toward the configured NSFW ending.'
-      : 'Each independent frame receives a compatible stage selected from the full progression.');
+  $('#content-help').textContent = content === 'sfw'
+    ? 'Every frame keeps breasts and genitals fully covered.'
+    : (content === 'xxx'
+      ? 'Every frame starts at an explicit stage; progression sliders are not used.'
+      : (mode === 'photoshoot'
+        ? 'Begins clothed and progresses toward the configured NSFW ending.'
+        : 'Each independent frame receives a compatible stage selected from the full progression.'));
   const nsfw = Math.max(0, Math.min(100, Number(form.elements.nsfw_percent.value) || 0));
   let plateau = Math.max(0, Math.min(100, Number(form.elements.plateau_percent.value) || 0));
   if (event?.target?.name === 'nsfw_percent' && plateau > nsfw) {
@@ -202,14 +205,14 @@ function syncForm(event) {
 
 function structuralConfigFromForm() {
   const mode = form.elements.mode.value;
-  const xxxOnly = form.elements.content.value === 'xxx';
+  const contentMode = form.elements.content.value;
   return {
     mode,
     count: Number(form.elements.count.value),
     photoshoots: mode === 'photoshoot' ? Number(form.elements.photoshoots.value) : 1,
-    xxx_only: xxxOnly,
-    nsfw_percent: mode === 'photoshoot' && !xxxOnly ? Number(form.elements.nsfw_percent.value) : null,
-    plateau_percent: mode === 'photoshoot' && !xxxOnly ? Number(form.elements.plateau_percent.value) : null,
+    content_mode: contentMode,
+    nsfw_percent: mode === 'photoshoot' && contentMode === 'progressive' ? Number(form.elements.nsfw_percent.value) : null,
+    plateau_percent: mode === 'photoshoot' && contentMode === 'progressive' ? Number(form.elements.plateau_percent.value) : null,
     prompt_seed: form.elements.prompt_seed.value === '' ? null : String(form.elements.prompt_seed.value),
   };
 }
@@ -221,9 +224,9 @@ function structuralConfigFromBoard(board) {
     mode: config.mode,
     count: Number(config.count),
     photoshoots: config.mode === 'photoshoot' ? Number(config.photoshoots) : 1,
-    xxx_only: Boolean(config.xxx_only),
-    nsfw_percent: config.mode === 'photoshoot' && !config.xxx_only ? Number(config.nsfw_percent) : null,
-    plateau_percent: config.mode === 'photoshoot' && !config.xxx_only ? Number(config.plateau_percent) : null,
+    content_mode: config.content_mode,
+    nsfw_percent: config.mode === 'photoshoot' && config.content_mode === 'progressive' ? Number(config.nsfw_percent) : null,
+    plateau_percent: config.mode === 'photoshoot' && config.content_mode === 'progressive' ? Number(config.plateau_percent) : null,
     prompt_seed: config.prompt_seed == null ? null : String(config.prompt_seed),
   };
 }
@@ -231,7 +234,8 @@ function structuralConfigFromBoard(board) {
 function configSummary(config) {
   if (!config) return '';
   const mode = config.mode === 'photoshoot' ? `${config.photoshoots} set${Number(config.photoshoots) === 1 ? '' : 's'}` : 'Independent shots';
-  const content = config.xxx_only ? 'Full XXX' : (config.nsfw_percent == null ? 'Progressive' : `NSFW ${config.nsfw_percent}% · Explicit ${config.plateau_percent}%`);
+  const contentMode = config.content_mode;
+  const content = contentMode === 'sfw' ? 'SFW only' : (contentMode === 'xxx' ? 'Full XXX' : `NSFW ${config.nsfw_percent}% · Explicit ${config.plateau_percent}%`);
   return `${mode} · ${config.count} shots · ${content} · Storyboard seed ${config.prompt_seed ?? 'automatic'}`;
 }
 
@@ -244,7 +248,7 @@ function syncPendingState() {
     : [];
   const changedLabels = {
     mode: 'mode', count: 'shot count', photoshoots: 'set count',
-    xxx_only: 'content mode', nsfw_percent: 'NSFW ending',
+    content_mode: 'content mode', nsfw_percent: 'NSFW ending',
     plateau_percent: 'explicit plateau', prompt_seed: 'Storyboard seed',
   };
   $('#config-notice-copy').textContent = changedKeys.length
@@ -252,7 +256,7 @@ function syncPendingState() {
     : 'Update the storyboard before rendering.';
   const pendingElements = {
     mode: form.elements.mode[0].closest('fieldset'),
-    xxx_only: form.elements.content[0].closest('fieldset'),
+    content_mode: form.elements.content[0].closest('fieldset'),
     count: form.elements.count.closest('.field'),
     photoshoots: form.elements.photoshoots.closest('.field'),
     nsfw_percent: $('#progression-fields'),
@@ -282,7 +286,8 @@ function syncPendingState() {
 
 function restoreConfig(config, job) {
   const mode = form.querySelector(`[name="mode"][value="${config.mode}"]`);
-  const content = form.querySelector(`[name="content"][value="${config.xxx_only ? 'xxx' : 'progressive'}"]`);
+  const contentMode = config.content_mode;
+  const content = form.querySelector(`[name="content"][value="${contentMode}"]`);
   if (mode) mode.checked = true;
   if (content) content.checked = true;
   form.elements.count.value = config.count;
@@ -308,7 +313,7 @@ function configPayload() {
     mode: value('mode'),
     count: Number(value('count')),
     photoshoots: Number(value('photoshoots')),
-    xxx_only: value('content') === 'xxx',
+    content_mode: value('content'),
     nsfw_percent: Number(value('nsfw_percent')),
     plateau_percent: Number(value('plateau_percent')),
     prompt_seed: value('prompt_seed') === '' ? null : value('prompt_seed'),
@@ -506,7 +511,9 @@ function renderStoryboard() {
   }
   shotGrid.innerHTML = board.shots.map(shotCard).join('');
   const sets = board.config.mode === 'photoshoot' ? board.config.photoshoots : 'Independent';
-  storyboardMeta.innerHTML = `<span>Mode <strong>${escapeHtml(board.config.mode)}</strong></span><span>Sets <strong>${sets}</strong></span><span>Shots <strong>${board.total}</strong></span><span>Diversity <strong>${board.diversity}%</strong></span><span>Content <strong>${board.config.xxx_only ? 'Full XXX' : 'Progressive'}</strong></span>`;
+  const contentMode = board.config.content_mode;
+  const contentLabel = { sfw: 'SFW only', progressive: 'Progressive', xxx: 'Full XXX' }[contentMode];
+  storyboardMeta.innerHTML = `<span>Mode <strong>${escapeHtml(board.config.mode)}</strong></span><span>Sets <strong>${sets}</strong></span><span>Shots <strong>${board.total}</strong></span><span>Diversity <strong>${board.diversity}%</strong></span><span>Content <strong>${contentLabel}</strong></span>`;
   emptyState.classList.add('hidden');
   storyboardActions.classList.remove('hidden');
   storyboardMeta.classList.remove('hidden');
@@ -955,11 +962,8 @@ function measureOutputGrid() {
 
 function outputCardHtml(item, index, layout) {
   const shotLabel = item.shot == null ? 'Output' : `Shot ${item.shot}`;
-  const row = Math.floor(index / layout.columns);
-  const column = index % layout.columns;
   return `<article class="output-card" data-output-index="${index}" tabindex="0" role="button"
-    aria-label="Maximize ${escapeHtml(shotLabel)}" aria-posinset="${index + 1}" aria-setsize="${state.outputs.length}"
-    style="width:${layout.cardWidth}px;height:${layout.cardHeight}px;transform:translate(${column * (layout.cardWidth + layout.gap)}px,${row * layout.rowStride}px)">
+    aria-label="Maximize ${escapeHtml(shotLabel)}" aria-posinset="${index + 1}" aria-setsize="${state.outputs.length}">
     <img src="${encodeURI(item.thumbnail_url || item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy" decoding="async">
     <footer><span>${escapeHtml(shotLabel)}</span><span class="output-actions"><button class="output-delete" data-action="delete-output" aria-label="Delete ${escapeHtml(item.name)}">Delete</button><a href="${encodeURI(item.url)}" download="${escapeHtml(item.name)}">Download</a></span></footer>
   </article>`;
@@ -968,13 +972,27 @@ function outputCardHtml(item, index, layout) {
 function renderVirtualOutputs(force = false) {
   outputLayout = measureOutputGrid();
   if (!outputLayout || !state.outputs.length) {
-    outputGrid.style.height = '';
+    outputGrid.classList.remove('virtualized');
+    outputGrid.style.paddingTop = '';
+    outputGrid.style.paddingBottom = '';
     outputGrid.innerHTML = '';
     return;
   }
+  if (state.outputs.length <= OUTPUT_VIRTUALIZATION_THRESHOLD) {
+    outputGrid.classList.remove('virtualized');
+    outputGrid.style.paddingTop = '';
+    outputGrid.style.paddingBottom = '';
+    const signature = `native:${outputLayout.width}:${state.outputs.length}`;
+    if (!force && signature === outputRenderSignature) return;
+    outputRenderSignature = signature;
+    outputGrid.innerHTML = state.outputs
+      .map((item, index) => outputCardHtml(item, index, outputLayout))
+      .join('');
+    syncDeleteControls();
+    return;
+  }
+  outputGrid.classList.add('virtualized');
   const { rows, rowStride, cardHeight, columns } = outputLayout;
-  const totalHeight = Math.max(0, rows * rowStride - outputLayout.gap);
-  outputGrid.style.height = `${totalHeight}px`;
   const rect = outputGrid.getBoundingClientRect();
   const firstVisibleRow = Math.max(0, Math.floor(-rect.top / rowStride));
   const lastVisibleRow = Math.min(
@@ -988,6 +1006,11 @@ function renderVirtualOutputs(force = false) {
   );
   const start = firstRow * columns;
   const end = Math.min(state.outputs.length, (lastRow + 1) * columns);
+  outputGrid.style.setProperty('--output-columns', String(columns));
+  outputGrid.style.setProperty('--output-card-width', `${outputLayout.cardWidth}px`);
+  outputGrid.style.setProperty('--output-gap', `${outputLayout.gap}px`);
+  outputGrid.style.paddingTop = `${firstRow * rowStride}px`;
+  outputGrid.style.paddingBottom = `${Math.max(0, rows - lastRow - 1) * rowStride}px`;
   const signature = `${start}:${end}:${columns}:${outputLayout.width}:${state.outputs.length}`;
   if (!force && signature === outputRenderSignature) return;
   outputRenderSignature = signature;

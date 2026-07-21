@@ -40,6 +40,7 @@ Unchecked items are planned work, not claims about missing historical features.
 - [x] Provide true browser fullscreen and a configurable 1–10 second lightbox slideshow that survives manual image skips.
 - [x] Auto-hide the fullscreen control panel and reveal it when the pointer returns to the top edge.
 - [x] Support `disabled: true` across selectable database records.
+- [x] Provide an enforced SFW-only content mode across Studio, Director, rerolls, and imports.
 - [x] Maintain more than 1,100 semantically distinct catalog records with validated IDs, tags, dependencies, stage rules, and compatible modifiers.
 - [x] Reject duplicate, internal, or overlong catalog fragments and preserve the complete deduplicated prompt without destructive truncation.
 

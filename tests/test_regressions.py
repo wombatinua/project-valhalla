@@ -38,6 +38,21 @@ class StudioGenerationLimitTests(unittest.TestCase):
         self.assertNotIn('name="photoshoots" min="1" max=', html)
         self.assertNotIn('name="count" min="1" max=', html)
 
+    def test_content_mode_rejects_obsolete_boolean_flags(self):
+        database, _ = app.load_database()
+        with self.assertRaisesRegex(app.AppError, "Obsolete content configuration"):
+            app.parse_run_config({"xxx_only": True}, database)
+
+    def test_content_mode_accepts_only_current_values(self):
+        database, _ = app.load_database()
+        for mode in ("sfw", "progressive", "xxx"):
+            self.assertEqual(
+                app.parse_run_config({"content_mode": mode}, database).content_mode,
+                mode,
+            )
+        with self.assertRaisesRegex(app.AppError, "content_mode"):
+            app.parse_run_config({"content_mode": "legacy"}, database)
+
 
 class CatalogQualityTests(unittest.TestCase):
     def test_custom_mast_actions_are_wired_as_hands_only_actions(self):
@@ -254,13 +269,95 @@ class DirectorRegressionTests(unittest.TestCase):
         board = state.create_storyboard(config)
         return state, board["id"]
 
-    def test_all_stage_levels_are_available_even_for_xxx_only(self):
-        state, storyboard_id = self.make_storyboard(xxx_only=True)
+    def test_all_stage_levels_are_available_even_for_full_xxx(self):
+        state, storyboard_id = self.make_storyboard(content_mode="xxx")
         fields = director_fields(state.director_payload(storyboard_id, 1))
         levels = {option["prompt"] for option in fields["shot.stage"]["options"]}
         self.assertTrue(
             {"covered", "lingerie", "topless", "nude", "explicit"}.issubset(levels)
         )
+
+    def test_sfw_only_resolves_fully_covered_scenes_in_both_modes(self):
+        blocked = app.SFW_BLOCKED_VISIBILITY
+        for mode in ("photoshoot", "random"):
+            state = app.WebState()
+            board = state.create_storyboard({
+                "mode": mode,
+                "content_mode": "sfw",
+                "count": 64,
+                "photoshoots": 1,
+                "prompt_seed": 20260721,
+                "inference_seed": 42,
+            })
+            record = state.get_storyboard(board["id"])
+            self.assertEqual(board["config"]["content_mode"], "sfw")
+            self.assertIsNone(board["config"]["nsfw_percent"])
+            for shot in record["shots"]:
+                self.assertTrue(app.is_sfw_stage(shot["stage"]))
+                self.assertEqual(shot["stage"]["level"], "covered")
+                self.assertFalse(blocked & set(shot["stage"].get("body_visibility", [])))
+                app.validate_sfw_outfit(shot["context"]["outfit"])
+                visible_slots = set(shot["stage"].get("visible_slots", []))
+                for slot, garment in shot["context"]["outfit"]["garments"].items():
+                    if slot in visible_slots:
+                        self.assertFalse(app.tags(garment) & app.SFW_BLOCKED_GARMENT_TAGS)
+                self.assertIsNone(shot["scene"].get("explicit_recipe"))
+                self.assertIn(shot["scene"]["intensity"], {"fashion", "sensual"})
+                self.assertFalse(
+                    app.tags(shot["scene"]["pose"]) & app.SFW_BLOCKED_DIRECTION_TAGS
+                )
+                self.assertFalse(
+                    app.tags(shot["scene"]["action"]) & app.SFW_BLOCKED_DIRECTION_TAGS
+                )
+
+    def test_sfw_rejects_erotic_cutout_swimwear_and_strengthens_coverage_negative(self):
+        database, _ = app.load_database()
+        garment = next(
+            item for item in database["garments"]["full_body"]
+            if item["id"] == "swimsuit_cutout"
+        )
+        self.assertIn("erotic", app.tags(garment))
+        self.assertTrue(app.tags(garment) & app.SFW_BLOCKED_GARMENT_TAGS)
+        negative = database["prompt_defaults"]["covered_chest_negative"]
+        for phrase in ("missing top", "absent upper garment", "breasts outside clothing"):
+            self.assertIn(phrase, negative)
+
+    def test_sfw_director_exposes_only_covered_stages_and_safe_intensity(self):
+        state, storyboard_id = self.make_storyboard(content_mode="sfw")
+        fields = director_fields(state.director_payload(storyboard_id, 1))
+        self.assertEqual(
+            {option["prompt"] for option in fields["shot.stage"]["options"]},
+            {"covered"},
+        )
+        self.assertEqual(
+            {option["id"] for option in fields["shot.intensity"]["options"]},
+            {"fashion", "sensual"},
+        )
+        with self.assertRaisesRegex(app.AppError, "SFW only"):
+            state.update_director(storyboard_id, {
+                "shot": 1, "field": "shot.intensity", "value": "explicit",
+            })
+        record = state.get_storyboard(storyboard_id)
+        topless = next(
+            stage for stage in app.effective_photoshoot_stages(
+                record["shots"][0]["context"]["outfit"]["template"]
+            )
+            if stage["level"] == "topless"
+        )
+        with self.assertRaisesRegex(app.AppError, "Unknown stage"):
+            state.update_director(storyboard_id, {
+                "shot": 1, "field": "shot.stage", "value": topless["id"],
+            })
+
+    def test_sfw_import_rejects_noncovered_stage_and_obsolete_config(self):
+        state, storyboard_id = self.make_storyboard(content_mode="xxx")
+        exported = state.export_storyboard(storyboard_id)
+        exported["config"]["content_mode"] = "sfw"
+        with self.assertRaisesRegex(app.AppError, "not allowed in SFW only mode"):
+            state.import_storyboard(exported)
+        exported["config"].pop("content_mode")
+        with self.assertRaisesRegex(app.AppError, "missing its content mode"):
+            state.import_storyboard(exported)
 
     def test_camera_grammar_is_visible_and_editable_in_director(self):
         state, storyboard_id = self.make_storyboard()
@@ -415,7 +512,7 @@ class DirectorRegressionTests(unittest.TestCase):
         poses, actions, recipes, plateau_kinds = set(), set(), set(), set()
         for seed in range(20):
             state, storyboard_id = self.make_storyboard(
-                count=12, prompt_seed=seed, xxx_only=True
+                count=12, prompt_seed=seed, content_mode="xxx"
             )
             for shot in state.get_storyboard(storyboard_id)["shots"]:
                 scene = shot["scene"]
@@ -568,7 +665,8 @@ class DirectorRegressionTests(unittest.TestCase):
         levels = {"covered": 0, "lingerie": 1, "topless": 2, "nude": 3, "explicit": 4}
         for seed in range(40):
             state, storyboard_id = self.make_storyboard(
-                count=12, prompt_seed=seed, xxx_only=bool(seed % 2)
+                count=12, prompt_seed=seed,
+                content_mode="xxx" if seed % 2 else "progressive",
             )
             shots = state.get_storyboard(storyboard_id)["shots"]
             progression = [levels[shot["scene"]["stage"]["level"]] for shot in shots]
@@ -665,7 +763,7 @@ class DirectorRegressionTests(unittest.TestCase):
         checked = 0
         for seed in range(20):
             state, storyboard_id = self.make_storyboard(
-                count=8, prompt_seed=seed, xxx_only=True
+                count=8, prompt_seed=seed, content_mode="xxx"
             )
             record = state.get_storyboard(storyboard_id)
             for position, shot in enumerate(record["shots"], 1):
@@ -1219,6 +1317,15 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_sfw_is_a_structural_content_mode(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn('name="content" value="sfw"', html)
+        self.assertIn("content_mode: value('content')", js)
+        self.assertIn("content !== 'progressive'", js)
+        self.assertNotIn("xxx_only:", js)
+
     def test_lightbox_close_aligns_grid_to_last_viewed_output(self):
         js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("function syncOutputGridToPreview()", js)
@@ -1252,10 +1359,19 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('loading="lazy" decoding="async"', js)
 
     def test_output_gallery_virtualizes_rows_with_bounded_overscan(self):
-        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        root = Path(app.__file__).parent
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
         self.assertIn("const OUTPUT_OVERSCAN_ROWS = 3", js)
+        self.assertIn("const OUTPUT_VIRTUALIZATION_THRESHOLD = 100", js)
+        self.assertIn("state.outputs.length <= OUTPUT_VIRTUALIZATION_THRESHOLD", js)
         self.assertIn(".slice(start, end)", js)
         self.assertIn("renderVirtualOutputs", js)
+        self.assertIn("outputGrid.classList.add('virtualized')", js)
+        self.assertIn("repeat(var(--output-columns), var(--output-card-width))", css)
+        self.assertIn("outputGrid.style.paddingTop", js)
+        self.assertNotIn("position: absolute; inset: 0 auto auto 0", css)
+        self.assertIn(".output-grid:not(.virtualized)", css)
         self.assertNotIn("state.outputs.map((item, index)", js)
 
     def test_virtual_output_navigation_uses_stable_absolute_indexes(self):

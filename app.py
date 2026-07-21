@@ -715,6 +715,50 @@ def compatible_with_requirements(item: dict[str, Any], available_tags: set[str])
 
 
 NSFW_LEVELS = ("topless", "nude", "explicit")
+SFW_BLOCKED_VISIBILITY = {"breasts", "nipples", "pubic_area", "genitals"}
+SFW_BLOCKED_GARMENT_TAGS = {
+    "explicit", "erotic", "exposing", "sheer", "transparent", "open_cup", "crotchless",
+}
+SFW_BLOCKED_DIRECTION_TAGS = {
+    "explicit_pose", "erotic_pose", "masturbation_pose", "open_legs",
+    "explicit_action", "erotic_action", "masturbation_action", "undressing_action",
+    "provocative_action", "provocative_rear",
+}
+
+
+def is_sfw_stage(stage: dict[str, Any]) -> bool:
+    """Return whether a stage guarantees a fully covered composition."""
+    return (
+        stage.get("level") == "covered"
+        and not (set(stage.get("body_visibility", [])) & SFW_BLOCKED_VISIBILITY)
+    )
+
+
+def template_supports_sfw(template: dict[str, Any]) -> bool:
+    return any(is_sfw_stage(stage) for stage in effective_photoshoot_stages(template))
+
+
+def validate_sfw_outfit(outfit: dict[str, Any]) -> None:
+    template = outfit["template"]
+    stages = [stage for stage in effective_photoshoot_stages(template) if is_sfw_stage(stage)]
+    if not stages:
+        raise AppError(f"Outfit template {template['id']} has no SFW-compatible covered stage")
+    garments = outfit["garments"]
+    for stage in stages:
+        visible_slots = set(stage.get("visible_slots", []))
+        visible = {
+            slot: garment for slot, garment in garments.items() if slot in visible_slots
+        }
+        unsafe = [
+            garment["id"] for garment in visible.values()
+            if tags(garment) & SFW_BLOCKED_GARMENT_TAGS
+        ]
+        chest_covered = bool(visible_slots & {"upperwear", "full_body", "outerwear", "bra"} & set(visible))
+        genitals_covered = bool(visible_slots & {"lowerwear", "full_body", "panties"} & set(visible))
+        if unsafe or not chest_covered or not genitals_covered:
+            raise AppError(
+                f"Outfit template {template['id']} stage {stage['id']} is not fully opaque and covered"
+            )
 
 
 def effective_photoshoot_stages(template: dict[str, Any]) -> list[dict[str, Any]]:
@@ -896,7 +940,9 @@ class Composer:
             selected_tags |= tags(choice)
         return human
 
-    def choose_template(self, selected_category: str | None = None) -> dict[str, Any]:
+    def choose_template(
+        self, selected_category: str | None = None, content_mode: str = "progressive"
+    ) -> dict[str, Any]:
         allowed = set(
             self.db["settings"]["scene_defaults"]["wardrobe_categories"]
         )
@@ -907,6 +953,7 @@ class Composer:
             template for template in self.db["outfit_templates"]
             if not template.get("disabled", False)
             and template["catalog_category"] == selected_category
+            and (content_mode != "sfw" or template_supports_sfw(template))
         ]
         return weighted_choice(self.rng, candidates)
 
@@ -1056,6 +1103,7 @@ class Composer:
         self,
         template: dict[str, Any],
         interior: dict[str, Any] | None = None,
+        content_mode: str = "progressive",
     ) -> dict[str, Any]:
         attempts = int(self.db["settings"].get("max_scene_attempts", 100))
         last_error = "no compatible outfit"
@@ -1063,6 +1111,8 @@ class Composer:
             try:
                 outfit = self._choose_outfit_once(template)
                 self.validate_outfit_stage_coverage(outfit)
+                if content_mode == "sfw":
+                    validate_sfw_outfit(outfit)
                 if interior is not None:
                     self.validate_outfit_environment(outfit, interior)
                 return outfit
@@ -1072,7 +1122,7 @@ class Composer:
             f"Could not resolve outfit template {template['id']} after {attempts} attempts: {last_error}"
         )
 
-    def fixed_context(self) -> dict[str, Any]:
+    def fixed_context(self, content_mode: str = "progressive") -> dict[str, Any]:
         attempts = int(self.db["settings"].get("max_scene_attempts", 100))
         last_error = "no compatible fixed context"
         allowed_wardrobes = set(
@@ -1089,7 +1139,7 @@ class Composer:
         )
         for _ in range(attempts):
             try:
-                template = self.choose_template(selected_wardrobe_category)
+                template = self.choose_template(selected_wardrobe_category, content_mode)
                 interiors = [
                     interior for interior in self.db["interiors"]
                     if not interior.get("disabled", False)
@@ -1124,7 +1174,7 @@ class Composer:
                     photography_candidates = [
                         item for item in photography_candidates if item["id"] in allowed_ids
                     ]
-                outfit = self.choose_outfit(template, interior)
+                outfit = self.choose_outfit(template, interior, content_mode)
                 return {
                     "human": self.choose_human(),
                     "outfit": outfit,
@@ -1193,6 +1243,8 @@ class Composer:
             if stage["level"] in item.get("allowed_levels", [stage["level"]])
             and compatible_with_requirements(item, available_tags)
         ]
+        if stage.get("sfw"):
+            poses = [item for item in poses if not (tags(item) & SFW_BLOCKED_DIRECTION_TAGS)]
         if stage["level"] == "explicit":
             poses = [item for item in poses if "explicit_pose" in tags(item)]
         elif stage["level"] in {"topless", "nude"}:
@@ -1226,6 +1278,8 @@ class Composer:
             and compatible_with_requirements(item, action_tags)
             and hands_required(pose) + hands_required(item) <= 2
         ]
+        if stage.get("sfw"):
+            actions = [item for item in actions if not (tags(item) & SFW_BLOCKED_DIRECTION_TAGS)]
         if stage["level"] == "explicit":
             actions = [item for item in actions if "explicit_action" in tags(item)]
         elif stage["level"] in {"topless", "nude"}:
@@ -1984,7 +2038,7 @@ def stage_for_index(
     return weighted_choice(rng, stages)
 
 
-def xxx_only_stage(
+def full_xxx_stage(
     template: dict[str, Any], index: int, count: int, mode: str, rng: random.Random
 ) -> dict[str, Any]:
     """Build an immediately explicit stage for full-XXX photoshoot or random mode."""
@@ -1998,13 +2052,28 @@ def xxx_only_stage(
     if kind == "intimate_closeup" and "panties" in template.get("slots", {}) and rng.random() < 0.5:
         kind = "panties_aside"
     result = copy.deepcopy(explicit)
-    result["id"] = f"{explicit['id']}_xxx_only_{kind}"
+    result["id"] = f"{explicit['id']}_full_xxx_{kind}"
     result["plateau_kind"] = kind
     result["visible_slots"] = (
         [slot for slot in ("panties", "legwear", "footwear", "accessories") if slot in template.get("slots", {})]
         if kind == "panties_aside" else []
     )
     result["body_visibility"] = ["breasts", "nipples", "pubic_area", "genitals"]
+    return result
+
+
+def sfw_stage(
+    template: dict[str, Any], index: int, count: int, mode: str, rng: random.Random
+) -> dict[str, Any]:
+    """Select only stages that guarantee covered breasts and genitals."""
+    stages = [stage for stage in effective_photoshoot_stages(template) if is_sfw_stage(stage)]
+    if not stages:
+        raise AppError(f"Outfit template {template['id']} has no SFW-compatible covered stage")
+    if mode == "photoshoot":
+        result = copy.deepcopy(stages[min(len(stages) - 1, index * len(stages) // count)])
+    else:
+        result = copy.deepcopy(weighted_choice(rng, stages))
+    result["sfw"] = True
     return result
 
 
@@ -2310,7 +2379,7 @@ def build_storyboard(
         if args.mode == "photoshoot":
             attempts = int(db["settings"].get("max_scene_attempts", 100))
             for _ in range(attempts):
-                candidate = composer.fixed_context()
+                candidate = composer.fixed_context(args.content_mode)
                 signature = photoshoot_signature(candidate)
                 if signature not in seen_photoshoots:
                     fixed = candidate
@@ -2322,15 +2391,19 @@ def build_storyboard(
                     f"after {attempts} attempts"
                 )
         for shot_index in range(args.count):
-            context = fixed if fixed is not None else composer.fixed_context()
+            context = fixed if fixed is not None else composer.fixed_context(args.content_mode)
             assert context is not None
             template = context["outfit"]["template"]
             stage = (
-                xxx_only_stage(template, shot_index, args.count, args.mode, rng)
-                if args.xxx_only
-                else stage_for_index(
-                    template, shot_index, args.count, args.mode, rng,
-                    nsfw_percent, plateau_percent,
+                sfw_stage(template, shot_index, args.count, args.mode, rng)
+                if args.content_mode == "sfw"
+                else (
+                    full_xxx_stage(template, shot_index, args.count, args.mode, rng)
+                    if args.content_mode == "xxx"
+                    else stage_for_index(
+                        template, shot_index, args.count, args.mode, rng,
+                        nsfw_percent, plateau_percent,
+                    )
                 )
             )
             role_id = "role_peak" if shot_index == args.count - 1 and stage["level"] == "explicit" else {
@@ -2455,6 +2528,11 @@ def _safe_percent(value: Any, name: str) -> float:
 
 
 def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNamespace:
+    obsolete = {"xxx_only", "sfw_only"} & set(payload)
+    if obsolete:
+        raise AppError(
+            f"Obsolete content configuration: {', '.join(sorted(obsolete))}; use content_mode"
+        )
     mode = payload.get("mode", "photoshoot")
     if mode not in {"photoshoot", "random"}:
         raise AppError("mode must be photoshoot or random")
@@ -2469,7 +2547,9 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
         raise AppError("Inference seed strategy must be random, fixed, or sequence")
     if inference_strategy in {"fixed", "sequence"} and inference_seed is None:
         inference_seed = secrets.randbelow(2**63)
-    xxx_only = bool(payload.get("xxx_only", False))
+    content_mode = payload.get("content_mode", "progressive")
+    if content_mode not in {"sfw", "progressive", "xxx"}:
+        raise AppError("content_mode must be sfw, progressive, or xxx")
     progression = db["settings"].get("photoshoot_progression", {})
     nsfw = _safe_percent(
         payload.get("nsfw_percent", progression.get("nsfw_final_percent", 50)),
@@ -2488,9 +2568,9 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
         prompt_seed=prompt_seed,
         inference_seed=inference_seed,
         inference_strategy=inference_strategy,
-        xxx_only=xxx_only,
-        nsfw_percent=None if xxx_only or mode == "random" else nsfw,
-        plateau_percent=None if xxx_only or mode == "random" else plateau,
+        content_mode=content_mode,
+        nsfw_percent=None if content_mode != "progressive" or mode == "random" else nsfw,
+        plateau_percent=None if content_mode != "progressive" or mode == "random" else plateau,
         fast=bool(payload.get("fast", False)),
     )
 
@@ -2628,9 +2708,14 @@ DIRECTOR_LABELS = {
 }
 
 
-def director_stage_options(shot: dict[str, Any], xxx_only: bool) -> list[dict[str, Any]]:
+def director_stage_options(shot: dict[str, Any], content_mode: str) -> list[dict[str, Any]]:
     template = shot["context"]["outfit"]["template"]
     effective = effective_photoshoot_stages(template)
+    if content_mode == "sfw":
+        stages = [copy.deepcopy(stage) for stage in effective if is_sfw_stage(stage)]
+        for stage in stages:
+            stage["sfw"] = True
+        return stages
     unique: dict[str, dict[str, Any]] = {}
     for stage in effective:
         unique[stage["id"]] = stage
@@ -2897,7 +2982,12 @@ class WebState:
                         )
                     },
                 )
-                for item in db["outfit_templates"] if not item.get("disabled", False)
+                for item in db["outfit_templates"]
+                if not item.get("disabled", False)
+                and (
+                    record["args"].content_mode != "sfw"
+                    or template_supports_sfw(item)
+                )
             ],
         }]
         for slot, rule in template["slots"].items():
@@ -2914,6 +3004,10 @@ class WebState:
                 and not set(rule.get("excludes_tags", [])) & tags(item)
                 and set(item.get("requires_environment_tags", [])).issubset(tags(context["interior"]))
                 and not set(item.get("excludes_environment_tags", [])) & tags(context["interior"])
+                and (
+                    record["args"].content_mode != "sfw"
+                    or not (tags(item) & SFW_BLOCKED_GARMENT_TAGS)
+                )
             ]
             layer_compatible = []
             for item in candidates:
@@ -2924,6 +3018,11 @@ class WebState:
                         db,
                         {"template": template, "garments": candidate_garments},
                     )
+                    if record["args"].content_mode == "sfw":
+                        validate_sfw_outfit({
+                            "template": template,
+                            "garments": candidate_garments,
+                        })
                 except AppError:
                     continue
                 layer_compatible.append(item)
@@ -3097,13 +3196,17 @@ class WebState:
                     "current": level == shot["scene"]["intensity"],
                     "default": level == shot["scene"]["intensity"],
                 }
-                for level in ("fashion", "sensual", "erotic", "nude", "explicit", "peak")
+                for level in (
+                    ("fashion", "sensual")
+                    if record["args"].content_mode == "sfw"
+                    else ("fashion", "sensual", "erotic", "nude", "explicit", "peak")
+                )
             ],
         })
         groups.append({"id": "camera", "label": "Camera & editorial", "fields": camera_fields})
 
         direction_fields = []
-        stages = director_stage_options(shot, record["args"].xxx_only)
+        stages = director_stage_options(shot, record["args"].content_mode)
         direction_fields.append({
             "key": "shot.stage", "label": "Stage / content", "scope": "shot",
             "value": shot["stage"]["id"],
@@ -3280,10 +3383,15 @@ class WebState:
             stage = old["stage"]
             if recalculate_stages:
                 stage = (
-                    xxx_only_stage(context["outfit"]["template"], old["shot_index"], args.count, args.mode, record["rng"])
-                    if args.xxx_only else stage_for_index(
-                        context["outfit"]["template"], old["shot_index"], args.count,
-                        args.mode, record["rng"], nsfw, plateau,
+                    sfw_stage(context["outfit"]["template"], old["shot_index"], args.count, args.mode, record["rng"])
+                    if args.content_mode == "sfw"
+                    else (
+                        full_xxx_stage(context["outfit"]["template"], old["shot_index"], args.count, args.mode, record["rng"])
+                        if args.content_mode == "xxx"
+                        else stage_for_index(
+                            context["outfit"]["template"], old["shot_index"], args.count,
+                            args.mode, record["rng"], nsfw, plateau,
+                        )
                     )
                 )
             scene = record["composer"].resolve_scene(context, stage)
@@ -3410,7 +3518,8 @@ class WebState:
                 )
             elif target == "wardrobe":
                 context["outfit"] = record["composer"].choose_outfit(
-                    context["outfit"]["template"], context["interior"]
+                    context["outfit"]["template"], context["interior"],
+                    record["args"].content_mode,
                 )
             elif target == "scene":
                 interiors = [
@@ -3445,7 +3554,8 @@ class WebState:
                     )
                 except AppError:
                     context["outfit"] = record["composer"].choose_outfit(
-                        context["outfit"]["template"], context["interior"]
+                        context["outfit"]["template"], context["interior"],
+                        record["args"].content_mode,
                     )
                 preserve_photography = True
             else:
@@ -3493,7 +3603,11 @@ class WebState:
             template = index.get(value)
             if template not in db["outfit_templates"]:
                 raise AppError("Unknown outfit recipe")
-            context["outfit"] = record["composer"].choose_outfit(template, context["interior"])
+            if record["args"].content_mode == "sfw" and not template_supports_sfw(template):
+                raise AppError("This outfit recipe has no SFW-compatible covered stage")
+            context["outfit"] = record["composer"].choose_outfit(
+                template, context["interior"], record["args"].content_mode
+            )
             recalculate_stages = True
         elif field.startswith("outfit."):
             _, section, slot = field.split(".", 2)
@@ -3555,6 +3669,8 @@ class WebState:
             else:
                 raise AppError("Unknown wardrobe field")
             validate_outfit_layers(db, outfit)
+            if record["args"].content_mode == "sfw":
+                validate_sfw_outfit(outfit)
             record["composer"].validate_outfit_environment(outfit, context["interior"])
         elif field.startswith("scene."):
             key = field.split(".", 1)[1]
@@ -3578,13 +3694,14 @@ class WebState:
                     record["composer"].validate_outfit_environment(context["outfit"], context["interior"])
                 except AppError:
                     context["outfit"] = record["composer"].choose_outfit(
-                        context["outfit"]["template"], context["interior"]
+                        context["outfit"]["template"], context["interior"],
+                        record["args"].content_mode,
                     )
             preserve_photography = key == "photography_style"
         elif field.startswith("shot."):
             key = field.split(".", 1)[1]
             if key == "stage":
-                stages = director_stage_options(shot, record["args"].xxx_only)
+                stages = director_stage_options(shot, record["args"].content_mode)
                 stage = next((item for item in stages if item["id"] == value), None)
                 if stage is None:
                     raise AppError("Unknown stage")
@@ -3597,6 +3714,8 @@ class WebState:
             elif key == "intensity":
                 if value not in {"fashion", "sensual", "erotic", "nude", "explicit", "peak"}:
                     raise AppError("Unknown intensity")
+                if record["args"].content_mode == "sfw" and value not in {"fashion", "sensual"}:
+                    raise AppError("SFW only storyboards allow fashion or sensual intensity")
                 shot["scene"]["intensity"] = value
                 if clear_custom:
                     shot.setdefault("custom_values", {}).pop(field, None)
@@ -3759,6 +3878,8 @@ class WebState:
         compact_shots = payload.get("shots")
         if not isinstance(config, dict) or not isinstance(compact_shots, list):
             raise AppError("Storyboard file is missing its configuration or shots")
+        if "content_mode" not in config:
+            raise AppError("Storyboard file is missing its content mode")
         if not compact_shots or len(compact_shots) > 10_000:
             raise AppError("Storyboard must contain between 1 and 10000 shots")
         args = parse_run_config(
@@ -3783,6 +3904,11 @@ class WebState:
             scene_delta = decode_database_refs(compact.get("scene"), index)
             if not all(isinstance(value, dict) for value in (context, stage, scene_delta)):
                 raise AppError(f"Storyboard shot {position} is incomplete")
+            if args.content_mode == "sfw" and not is_sfw_stage(stage):
+                raise AppError(
+                    f"Storyboard shot {position} uses stage {stage.get('id', 'unknown')}, "
+                    "which is not allowed in SFW only mode"
+                )
             scene = dict(context)
             scene.update(scene_delta)
             custom_values = compact.get("custom", {})

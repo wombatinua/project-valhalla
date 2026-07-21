@@ -2,6 +2,8 @@
 
 Project Valhalla is a local, browser-based production interface for composing rule-compatible image prompts and rendering them through a captured Stability Matrix / ComfyUI workflow.
 
+The project intentionally does not preserve backward compatibility for internal configuration or storyboard formats. When a format changes, keep the current implementation direct and reject obsolete files instead of adding legacy fields, aliases, or migration paths.
+
 The application now uses a web-first architecture:
 
 - `app.py` contains the composition engine, ComfyUI client, HTTP API, background job runner, and static-file server.
@@ -114,6 +116,10 @@ The Web UI is served from `/`. All application endpoints are under `/api`.
 Storyboard and job state is intentionally in memory. Restarting the server clears browser-session planning state but never removes generated files.
 
 ## Production modes
+
+### SFW only
+
+SFW only keeps every frame fully covered. It excludes lingerie, topless, nude, and explicit stages; prevents visible breasts, nipples, pubic area, or genitals; removes explicit recipes from resolution; and limits Director stage and intensity controls to compatible covered choices. The rule is enforced by the server for automatic resolution, rerolls, Director edits, and storyboard imports.
 
 ### Photoshoot
 
