@@ -14,20 +14,23 @@ die() {
     exit 1
 }
 
-ensure_requests() {
-    if "$PYTHON_BIN" -c 'import requests' >/dev/null 2>&1; then
+ensure_dependency() {
+    module=$1
+    package=$2
+    if "$PYTHON_BIN" -c "import $module" >/dev/null 2>&1; then
         return
     fi
-    printf 'Installing required Python dependency: requests\n'
+    printf 'Installing required Python dependency: %s\n' "$package"
     if ! "$PYTHON_BIN" -m pip --version >/dev/null 2>&1; then
         "$PYTHON_BIN" -m ensurepip --upgrade || die "Could not initialize pip"
     fi
-    "$PYTHON_BIN" -m pip install requests || die "Could not install requests"
+    "$PYTHON_BIN" -m pip install "$package" || die "Could not install $package"
 }
 
 command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python not found: $PYTHON_BIN"
 [ -f "$APP" ] || die "Application not found: $APP"
 
-ensure_requests
+ensure_dependency requests requests
+ensure_dependency PIL Pillow
 printf 'Starting Project Valhalla at http://%s:%s/\n' "$VALHALLA_HOST" "$VALHALLA_PORT"
 exec "$PYTHON_BIN" "$APP" --host "$VALHALLA_HOST" --port "$VALHALLA_PORT"

@@ -928,7 +928,7 @@ function renderOutputs() {
     const shotLabel = item.shot == null ? 'Output' : `Shot ${item.shot}`;
     return `
     <article class="output-card" data-output-index="${index}" tabindex="0" role="button" aria-label="Maximize ${escapeHtml(shotLabel)}">
-      <img src="${encodeURI(item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy">
+      <img src="${encodeURI(item.thumbnail_url || item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy" decoding="async">
       <footer><span>${escapeHtml(shotLabel)}</span><span class="output-actions"><button class="output-delete" data-action="delete-output" aria-label="Delete ${escapeHtml(item.name)}">Delete</button><a href="${encodeURI(item.url)}" download="${escapeHtml(item.name)}">Download</a></span></footer>
     </article>`;
   }).join('');

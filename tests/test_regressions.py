@@ -17,6 +17,26 @@ def director_fields(payload):
     }
 
 
+class StudioGenerationLimitTests(unittest.TestCase):
+    def test_run_config_accepts_counts_above_the_previous_limits(self):
+        database, _ = app.load_database()
+        config = app.parse_run_config(
+            {"mode": "photoshoot", "count": 201, "photoshoots": 51}, database
+        )
+        self.assertEqual(config.count, 201)
+        self.assertEqual(config.photoshoots, 51)
+
+    def test_run_config_still_rejects_non_positive_counts(self):
+        database, _ = app.load_database()
+        with self.assertRaisesRegex(app.AppError, "Images must be at least 1"):
+            app.parse_run_config({"count": 0}, database)
+
+    def test_studio_number_inputs_have_no_maximum(self):
+        html = (Path(app.__file__).parent / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn('name="photoshoots" min="1" max=', html)
+        self.assertNotIn('name="count" min="1" max=', html)
+
+
 class CatalogQualityTests(unittest.TestCase):
     def test_wardrobe_environment_and_surface_catalogs_use_one_explicit_category(self):
         database, _ = app.load_database()
@@ -945,6 +965,30 @@ class PreviewRegressionTests(unittest.TestCase):
 
 
 class OutputDeletionRegressionTests(unittest.TestCase):
+    def test_output_payload_provides_versioned_thumbnail_url(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "result.png"
+            target.write_bytes(b"image")
+            payload = app.output_payload(target)
+        self.assertEqual(payload["url"], "/api/outputs/result.png")
+        self.assertRegex(payload["thumbnail_url"], r"^/api/thumbnails/result\.png\?v=\d+$")
+
+    def test_generated_thumbnail_is_reused_from_memory_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "result.png"
+            target.write_bytes(b"image")
+            app._thumbnail_cache_remove()
+            with (
+                patch.object(app, "output_directory", return_value=Path(directory)),
+                patch.object(app, "Image", None),
+            ):
+                key = (target.name, target.stat().st_mtime_ns, target.stat().st_size)
+                with app.THUMBNAIL_CACHE_LOCK:
+                    app.THUMBNAIL_CACHE[key] = b"thumbnail"
+                    app.THUMBNAIL_CACHE_BYTES = len(b"thumbnail")
+                self.assertEqual(app.output_thumbnail(target.name), b"thumbnail")
+            app._thumbnail_cache_remove()
+
     def test_completed_frame_can_be_deleted_while_batch_is_rendering(self):
         state = app.WebState()
         name = "run_photoshoot_001_shot_001_1_image_01.png"
@@ -984,6 +1028,11 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_output_cards_use_lazy_async_thumbnails(self):
+        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("item.thumbnail_url || item.url", js)
+        self.assertIn('loading="lazy" decoding="async"', js)
+
     def test_typography_presets_use_relative_scale_with_normal_default(self):
         root = Path(__file__).resolve().parents[1]
         html = (root / "web" / "index.html").read_text(encoding="utf-8")

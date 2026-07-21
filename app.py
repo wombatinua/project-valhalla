@@ -2365,29 +2365,47 @@ def build_storyboard(
 import mimetypes
 import threading
 import webbrowser
+from collections import OrderedDict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
 from types import SimpleNamespace
 from urllib.parse import parse_qs, unquote, urlparse
+
+try:
+    from PIL import Image, ImageOps
+except ImportError:
+    Image = ImageOps = None  # type: ignore[assignment]
 
 WEB_ROOT = Path(__file__).resolve().with_name("web")
 MAX_STORYBOARDS = 20
 MAX_JOBS = 40
 MAX_PREVIEWS = 8
+THUMBNAIL_MAX_EDGE = 512
+THUMBNAIL_CACHE_MAX_BYTES = 128 * 1024 * 1024
+THUMBNAIL_CACHE: OrderedDict[tuple[str, int, int], bytes] = OrderedDict()
+THUMBNAIL_CACHE_BYTES = 0
+THUMBNAIL_CACHE_LOCK = threading.Lock()
 
 
 def _iso_now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-def _safe_int(value: Any, name: str, minimum: int = 1, maximum: int = 500) -> int:
+def _safe_int(
+    value: Any, name: str, minimum: int = 1, maximum: int | None = 500
+) -> int:
     if isinstance(value, bool):
         raise AppError(f"{name} must be a whole number")
     try:
         parsed = int(value)
     except (TypeError, ValueError) as exc:
         raise AppError(f"{name} must be a whole number") from exc
-    if not minimum <= parsed <= maximum:
+    if parsed < minimum:
+        if maximum is None:
+            raise AppError(f"{name} must be at least {minimum}")
+        raise AppError(f"{name} must be between {minimum} and {maximum}")
+    if maximum is not None and parsed > maximum:
         raise AppError(f"{name} must be between {minimum} and {maximum}")
     return parsed
 
@@ -2412,8 +2430,8 @@ def parse_run_config(payload: dict[str, Any], db: dict[str, Any]) -> SimpleNames
     mode = payload.get("mode", "photoshoot")
     if mode not in {"photoshoot", "random"}:
         raise AppError("mode must be photoshoot or random")
-    count = _safe_int(payload.get("count", 12), "Images", 1, 200)
-    photoshoots = _safe_int(payload.get("photoshoots", 1), "Photoshoots", 1, 50)
+    count = _safe_int(payload.get("count", 12), "Images", 1, None)
+    photoshoots = _safe_int(payload.get("photoshoots", 1), "Photoshoots", 1, None)
     if mode == "random":
         photoshoots = 1
     prompt_seed = _optional_seed(payload.get("prompt_seed"), "Prompt seed", 2**63 - 1)
@@ -4196,13 +4214,72 @@ def output_directory() -> Path:
 
 def output_payload(path: Path) -> dict[str, Any]:
     match = re.search(r"_shot_(\d+)_", path.name)
+    stat = path.stat()
     return {
         "name": path.name,
         "url": f"/api/outputs/{path.name}",
+        "thumbnail_url": f"/api/thumbnails/{path.name}?v={stat.st_mtime_ns}",
         "shot": int(match.group(1)) if match else None,
-        "size": path.stat().st_size,
-        "modified_at": datetime.fromtimestamp(path.stat().st_mtime).astimezone().isoformat(timespec="seconds"),
+        "size": stat.st_size,
+        "modified_at": datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds"),
     }
+
+
+def _thumbnail_cache_remove(name: str | None = None) -> None:
+    global THUMBNAIL_CACHE_BYTES
+    with THUMBNAIL_CACHE_LOCK:
+        keys = list(THUMBNAIL_CACHE) if name is None else [
+            key for key in THUMBNAIL_CACHE if key[0] == name
+        ]
+        for key in keys:
+            THUMBNAIL_CACHE_BYTES -= len(THUMBNAIL_CACHE.pop(key))
+
+
+def output_thumbnail(name: str) -> bytes:
+    global THUMBNAIL_CACHE_BYTES
+    if not name or Path(name).name != name:
+        raise AppError("Invalid output filename")
+    target = output_directory() / name
+    if target.suffix.lower() not in IMAGE_SUFFIXES:
+        raise AppError("Only generated image files can be viewed")
+    if not target.is_file():
+        raise AppError("Output not found")
+    stat = target.stat()
+    key = (name, stat.st_mtime_ns, stat.st_size)
+    with THUMBNAIL_CACHE_LOCK:
+        cached = THUMBNAIL_CACHE.get(key)
+        if cached is not None:
+            THUMBNAIL_CACHE.move_to_end(key)
+            return cached
+    if Image is None or ImageOps is None:
+        raise AppError("Thumbnail support requires Pillow; restart with launcher.sh to install it")
+    try:
+        with Image.open(target) as source:
+            source.seek(0)
+            thumbnail = ImageOps.exif_transpose(source)
+            thumbnail.thumbnail((THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE), Image.Resampling.LANCZOS)
+            if thumbnail.mode not in {"RGB", "L"}:
+                if "A" in thumbnail.getbands():
+                    background = Image.new("RGB", thumbnail.size, "#111318")
+                    background.paste(thumbnail, mask=thumbnail.getchannel("A"))
+                    thumbnail = background
+                else:
+                    thumbnail = thumbnail.convert("RGB")
+            buffer = BytesIO()
+            thumbnail.save(buffer, format="JPEG", quality=82, optimize=True)
+            body = buffer.getvalue()
+    except (OSError, ValueError) as exc:
+        raise AppError(f"Could not create thumbnail: {exc}") from exc
+    with THUMBNAIL_CACHE_LOCK:
+        previous = THUMBNAIL_CACHE.pop(key, None)
+        if previous is not None:
+            THUMBNAIL_CACHE_BYTES -= len(previous)
+        THUMBNAIL_CACHE[key] = body
+        THUMBNAIL_CACHE_BYTES += len(body)
+        while THUMBNAIL_CACHE_BYTES > THUMBNAIL_CACHE_MAX_BYTES and len(THUMBNAIL_CACHE) > 1:
+            _, evicted = THUMBNAIL_CACHE.popitem(last=False)
+            THUMBNAIL_CACHE_BYTES -= len(evicted)
+    return body
 
 
 def list_output_images() -> list[dict[str, Any]]:
@@ -4247,6 +4324,7 @@ def delete_output_image(name: str) -> dict[str, Any]:
             target.unlink()
         except OSError as exc:
             raise AppError(f"Could not delete output: {exc}") from exc
+        _thumbnail_cache_remove(name)
         # Prevent subsequent job polling from restoring a deleted card in the UI.
         for job in WEB_STATE.jobs.values():
             job["outputs"] = [
@@ -4273,6 +4351,7 @@ def delete_all_output_images() -> dict[str, Any]:
             raise AppError(
                 f"Deleted {len(deleted)} images, then could not delete {target.name}: {exc}"
             ) from exc
+    _thumbnail_cache_remove()
     return {"ok": True, "deleted": len(deleted), "names": deleted}
 
 
@@ -4362,6 +4441,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
                 self.send_json(WEB_STATE.get_preview(path.split("/")[3]))
             elif path == "/api/outputs":
                 self.send_json({"outputs": list_output_images()})
+            elif path.startswith("/api/thumbnails/"):
+                self.serve_thumbnail(unquote(path.removeprefix("/api/thumbnails/")))
             elif path.startswith("/api/outputs/"):
                 self.serve_output(unquote(path.removeprefix("/api/outputs/")))
             elif path.startswith("/api"):
@@ -4486,6 +4567,16 @@ class ValhallaHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "private, max-age=3600")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def serve_thumbnail(self, name: str) -> None:
+        body = output_thumbnail(name)
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "image/jpeg")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "private, max-age=31536000, immutable")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 
