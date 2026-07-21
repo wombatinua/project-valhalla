@@ -24,6 +24,10 @@ const state = {
   previewFit: sessionStorage.getItem('valhalla-preview-fit') === 'true',
   previewPanX: 0,
   previewPanY: 0,
+  slideshowTimer: null,
+  slideshowActive: false,
+  slideshowDelay: Math.min(10, Math.max(1, Number(sessionStorage.getItem('valhalla-slideshow-delay')) || 3)),
+  fullscreenControlsTimer: null,
   deleteResolver: null,
   promptShot: null,
   promptTab: 'positive',
@@ -1017,6 +1021,8 @@ function showPreview(index) {
   const single = state.outputs.length < 2;
   $('#image-previous').disabled = single;
   $('#image-next').disabled = single;
+  if (single && state.slideshowActive) stopSlideshow();
+  else syncSlideshowControls();
 }
 
 function openPreview(index) {
@@ -1027,6 +1033,93 @@ function openPreview(index) {
 
 function movePreview(direction) {
   showPreview(state.previewIndex + direction);
+  if (state.slideshowActive) scheduleSlideshow();
+}
+
+function syncSlideshowControls() {
+  const button = $('#image-slideshow-toggle');
+  const active = state.slideshowActive && state.outputs.length > 1;
+  button.classList.toggle('active', active);
+  button.disabled = state.outputs.length < 2;
+  button.querySelector('span').textContent = active ? '■' : '▶';
+  button.querySelector('strong').textContent = active ? 'Stop' : 'Play';
+  button.setAttribute('aria-label', active ? 'Stop slideshow' : 'Start slideshow');
+}
+
+function scheduleSlideshow() {
+  clearTimeout(state.slideshowTimer);
+  state.slideshowTimer = null;
+  if (!state.slideshowActive || !imageDialog.open || state.outputs.length < 2) return;
+  state.slideshowTimer = setTimeout(() => {
+    showPreview(state.previewIndex + 1);
+    scheduleSlideshow();
+  }, state.slideshowDelay * 1000);
+}
+
+function stopSlideshow() {
+  state.slideshowActive = false;
+  clearTimeout(state.slideshowTimer);
+  state.slideshowTimer = null;
+  syncSlideshowControls();
+}
+
+function toggleSlideshow() {
+  if (state.slideshowActive) {
+    stopSlideshow();
+    return;
+  }
+  if (state.outputs.length < 2) return;
+  state.slideshowActive = true;
+  syncSlideshowControls();
+  scheduleSlideshow();
+}
+
+function syncTrueFullscreenControl() {
+  const button = $('#image-true-fullscreen');
+  const target = $('#image-viewer-shell');
+  const active = document.fullscreenElement === target;
+  button.textContent = active ? '⤡' : '⤢';
+  button.disabled = !target.requestFullscreen && !active;
+  button.setAttribute('aria-label', active ? 'Exit browser fullscreen' : 'Enter browser fullscreen');
+  button.title = active ? 'Exit browser fullscreen' : 'Enter browser fullscreen';
+  button.classList.toggle('active', active);
+}
+
+function hideFullscreenControls() {
+  state.fullscreenControlsTimer = null;
+  const shell = $('#image-viewer-shell');
+  if (document.fullscreenElement === shell) shell.classList.add('controls-hidden');
+}
+
+function showFullscreenControls({ autoHide = true } = {}) {
+  const shell = $('#image-viewer-shell');
+  shell.classList.remove('controls-hidden');
+  clearTimeout(state.fullscreenControlsTimer);
+  state.fullscreenControlsTimer = null;
+  if (autoHide && document.fullscreenElement === shell) {
+    state.fullscreenControlsTimer = setTimeout(hideFullscreenControls, 2200);
+  }
+}
+
+async function toggleTrueFullscreen() {
+  const target = $('#image-viewer-shell');
+  try {
+    if (document.fullscreenElement === target) await document.exitFullscreen();
+    else if (target.requestFullscreen) await target.requestFullscreen();
+    else toast('Fullscreen unavailable', 'This browser does not support the Fullscreen API.', 'error');
+  } catch (error) {
+    toast('Fullscreen unavailable', error.message, 'error');
+  }
+}
+
+function syncOutputGridToPreview() {
+  if (!state.outputs.length || !$('#outputs-view').classList.contains('active')) return;
+  const card = $(`.output-card[data-output-index="${state.previewIndex}"]`, $('#output-grid'));
+  if (!card) return;
+  requestAnimationFrame(() => {
+    card.scrollIntoView({ block: 'start', inline: 'nearest' });
+    card.focus({ preventScroll: true });
+  });
 }
 
 $('#output-grid').addEventListener('click', (event) => {
@@ -1042,6 +1135,28 @@ $('#output-grid').addEventListener('click', (event) => {
 $('#image-fit').addEventListener('change', (event) => setPreviewFit(event.target.checked));
 $('#image-zoom').addEventListener('input', (event) => setPreviewZoom(event.target.value));
 $('#image-zoom').addEventListener('dblclick', () => setPreviewZoom(100));
+$('#image-true-fullscreen').addEventListener('click', toggleTrueFullscreen);
+$('#image-slideshow-toggle').addEventListener('click', toggleSlideshow);
+$('#image-slideshow-delay').value = String(state.slideshowDelay);
+$('#image-slideshow-delay').addEventListener('change', (event) => {
+  state.slideshowDelay = Math.min(10, Math.max(1, Number(event.target.value) || 3));
+  sessionStorage.setItem('valhalla-slideshow-delay', String(state.slideshowDelay));
+  if (state.slideshowActive) scheduleSlideshow();
+});
+document.addEventListener('fullscreenchange', () => {
+  syncTrueFullscreenControl();
+  if (document.fullscreenElement === $('#image-viewer-shell')) showFullscreenControls();
+  else showFullscreenControls({ autoHide: false });
+  if (imageDialog.open) requestAnimationFrame(fitPreviewImage);
+});
+syncTrueFullscreenControl();
+$('#image-viewer-shell').addEventListener('pointermove', (event) => {
+  if (document.fullscreenElement !== event.currentTarget || event.clientY > 90) return;
+  showFullscreenControls();
+});
+$('.image-viewer-bar').addEventListener('pointermove', () => {
+  if (document.fullscreenElement === $('#image-viewer-shell')) showFullscreenControls();
+});
 $('#image-viewer-image').addEventListener('load', fitPreviewImage);
 window.addEventListener('resize', () => { if (imageDialog.open) fitPreviewImage(); });
 
@@ -1057,6 +1172,12 @@ $('#image-viewer-delete').addEventListener('click', () => deleteOutput(state.pre
 $('#image-previous').addEventListener('click', () => movePreview(-1));
 $('#image-next').addEventListener('click', () => movePreview(1));
 $('.image-viewer-close').addEventListener('click', () => imageDialog.close());
+imageDialog.addEventListener('close', () => {
+  stopSlideshow();
+  showFullscreenControls({ autoHide: false });
+  if (document.fullscreenElement === $('#image-viewer-shell')) document.exitFullscreen().catch(() => {});
+  syncOutputGridToPreview();
+});
 let suppressPreviewStageClick = false;
 $('.image-stage').addEventListener('click', (event) => {
   if (suppressPreviewStageClick) {

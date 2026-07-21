@@ -1028,6 +1028,32 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_lightbox_close_aligns_grid_to_last_viewed_output(self):
+        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("function syncOutputGridToPreview()", js)
+        self.assertIn("card.scrollIntoView({ block: 'start', inline: 'nearest' })", js)
+        self.assertIn("syncOutputGridToPreview();", js)
+
+    def test_lightbox_has_fullscreen_and_non_interrupting_slideshow_controls(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="image-true-fullscreen"', html)
+        self.assertIn('id="image-viewer-shell"', html)
+        self.assertIn('id="image-slideshow-toggle"', html)
+        self.assertNotIn("<span>Pause</span>", html)
+        self.assertIn('class="viewer-delay-menu"', html)
+        slideshow = html.split('id="image-slideshow-delay"', 1)[1].split("</select>", 1)[0]
+        self.assertEqual(slideshow.count('<option value="'), 10)
+        self.assertIn("function scheduleSlideshow()", js)
+        self.assertIn("if (state.slideshowActive) scheduleSlideshow();", js)
+        self.assertIn("document.fullscreenElement === target", js)
+        self.assertIn("target.requestFullscreen()", js)
+        self.assertIn("const target = $('#image-viewer-shell')", js)
+        self.assertIn("function hideFullscreenControls()", js)
+        self.assertIn("setTimeout(hideFullscreenControls, 2200)", js)
+        self.assertIn("event.clientY > 90", js)
+
     def test_output_cards_use_lazy_async_thumbnails(self):
         js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("item.thumbnail_url || item.url", js)

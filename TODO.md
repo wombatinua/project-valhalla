@@ -36,6 +36,9 @@ Unchecked items are planned work, not claims about missing historical features.
 - [x] Generate 512 px JPEG gallery thumbnails on demand without writing thumbnail files to disk.
 - [x] Cache encoded thumbnails in a bounded 128 MB RAM LRU cache, invalidate deleted outputs, and version replacements by file metadata.
 - [x] Load gallery thumbnails lazily with asynchronous browser decoding while reserving original files for viewer and download actions.
+- [x] Return from the fullscreen lightbox with the last viewed output aligned to the top of the thumbnail grid when layout permits.
+- [x] Provide true browser fullscreen and a configurable 1–10 second lightbox slideshow that survives manual image skips.
+- [x] Auto-hide the fullscreen control panel and reveal it when the pointer returns to the top edge.
 - [x] Support `disabled: true` across selectable database records.
 - [x] Maintain more than 1,100 semantically distinct catalog records with validated IDs, tags, dependencies, stage rules, and compatible modifiers.
 - [x] Reject duplicate, internal, or overlong catalog fragments and preserve the complete deduplicated prompt without destructive truncation.

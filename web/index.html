@@ -244,31 +244,42 @@
   </section>
 
   <dialog id="image-dialog" class="image-viewer">
-    <div class="image-viewer-bar">
+    <div class="image-viewer-shell" id="image-viewer-shell">
+      <div class="image-viewer-bar">
       <div>
         <strong id="image-viewer-title">Generated output</strong>
         <span id="image-viewer-count">1 of 1</span>
       </div>
-      <div class="viewer-scale-controls">
-        <label class="viewer-fit" for="image-fit">
-          <input id="image-fit" type="checkbox">
-          <span>Fit</span>
-        </label>
-        <label class="viewer-zoom" for="image-zoom">
-          <input id="image-zoom" type="range" min="25" max="300" step="5" value="100" aria-label="Image zoom">
-          <output id="image-zoom-output" for="image-zoom">100%</output>
-        </label>
+      <div class="viewer-controls">
+        <div class="viewer-scale-controls">
+          <label class="viewer-fit" for="image-fit">
+            <input id="image-fit" type="checkbox">
+            <span>Fit</span>
+          </label>
+          <label class="viewer-zoom" for="image-zoom">
+            <input id="image-zoom" type="range" min="25" max="300" step="5" value="100" aria-label="Image zoom">
+            <output id="image-zoom-output" for="image-zoom">100%</output>
+          </label>
+        </div>
+        <button class="viewer-tool" id="image-true-fullscreen" type="button" aria-label="Enter browser fullscreen" title="Enter browser fullscreen">⤢</button>
+        <div class="viewer-slideshow-controls" aria-label="Slideshow controls">
+          <button class="viewer-tool slideshow-toggle" id="image-slideshow-toggle" type="button" aria-label="Start slideshow"><span aria-hidden="true">▶</span><strong>Play</strong></button>
+          <div class="viewer-delay-menu" title="Slideshow delay"><select id="image-slideshow-delay" aria-label="Pause between slideshow images">
+            <option value="1">1 sec</option><option value="2">2 sec</option><option value="3" selected>3 sec</option><option value="4">4 sec</option><option value="5">5 sec</option><option value="6">6 sec</option><option value="7">7 sec</option><option value="8">8 sec</option><option value="9">9 sec</option><option value="10">10 sec</option>
+          </select><span aria-hidden="true">⌄</span></div>
+        </div>
       </div>
       <div class="image-viewer-actions">
         <button class="button viewer-delete" id="image-viewer-delete">Delete</button>
         <a class="button viewer-download" id="image-viewer-download" href="#" download>Download</a>
         <button class="icon-button image-viewer-close" aria-label="Close image preview">×</button>
       </div>
-    </div>
-    <div class="image-stage" aria-label="Image preview. Drag to pan when zoomed.">
-      <button class="viewer-nav previous" id="image-previous" aria-label="Previous image">‹</button>
-      <img id="image-viewer-image" src="" alt="Maximized generated output" draggable="false">
-      <button class="viewer-nav next" id="image-next" aria-label="Next image">›</button>
+      </div>
+      <div class="image-stage" aria-label="Image preview. Drag to pan when zoomed.">
+        <button class="viewer-nav previous" id="image-previous" aria-label="Previous image">‹</button>
+        <img id="image-viewer-image" src="" alt="Maximized generated output" draggable="false">
+        <button class="viewer-nav next" id="image-next" aria-label="Next image">›</button>
+      </div>
     </div>
   </dialog>
 
