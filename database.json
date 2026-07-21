@@ -17880,6 +17880,7 @@
       "id": "action_inserting_vagina",
       "prompt": "using one hand inserting her fingers deep in vagina",
       "menu_label": "fingers in vagina",
+      "weight": 1.4,
       "tags": [
         "explicit_action",
         "masturbation_action",
@@ -17901,6 +17902,7 @@
      "id": "action_inserting_anus",
       "prompt": "using one hand inserting her fingers deep in her anus",
       "menu_label": "fingers in anus",
+      "weight": 1.4,
       "tags": [
         "explicit_action",
         "masturbation_action",
@@ -17922,6 +17924,7 @@
       "id": "action_inserting_both",
       "prompt": "using both hands inserting her fingers deep in vagina and anus",
       "menu_label": "fingers in both",
+      "weight": 1.4,
       "tags": [
         "explicit_action",
         "masturbation_action",
