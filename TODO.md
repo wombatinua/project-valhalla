@@ -1,295 +1,236 @@
 # Project Valhalla — Roadmap
 
-This file tracks agreed future work. Unchecked items are not implemented.
+This file describes the verified implementation state and the agreed next work.
+Checked items are implemented and covered by the current application or regression suite.
+Unchecked items are planned work, not claims about missing historical features.
 
 ## Project constraints
 
 - Keep one `app.py`, one manually editable `database.json`, one active local `workflow.json`, one `launcher.sh`, and static assets under `web/`.
 - Preserve compatibility with different checkpoint families through the captured workflow.
 - Do not add FaceID, IPAdapter, PuLID, reference-image, or architecture-specific identity pipelines.
+- Do not add an image-quality detector or external vision model in the current roadmap.
 - Use adult women aged 21–23 only.
 - Keep all scenes solo and locations private.
 - Do not add mirrors, sexual toys, male subjects, or partner interactions.
+- Preserve the review-before-render, web-first workflow; add CLI commands only for validation or automation that the Web UI does not already provide.
 
 ## Completed foundation
 
-- [x] Resolve the complete batch before rendering.
+- [x] Resolve the complete batch before rendering and stop visibly when a scene or render fails.
+- [x] Support coherent photoshoots and independent random-mode shots.
 - [x] Keep model, outfit, palette, interior, mood, and photography style fixed within each photoshoot.
-- [x] Support independent context assembly for every random-mode image.
-- [x] Build a progressive stage sequence that does not move backward.
-- [x] Guarantee an explicit final plateau and support full-XXX mode from the first frame.
-- [x] Stop the batch when a scene cannot be resolved.
-- [x] Provide an interactive browser-based Director’s Desk before any GPU job.
-- [x] Support complete-storyboard reroll, single-shot reroll, stage selection, and compatible pose/action/expression selection.
-- [x] Provide Casting & Set Design for subject, wardrobe, interior, surface, mood, and photography style.
-- [x] Support constrained subject, wardrobe, interior, and surface remixing.
-- [x] Support all-groups, semantic-group, and exact-item choices across Director catalogs.
-- [x] Prevent manually edited stages from reversing photoshoot progression.
-- [x] Keep automatic operation available without storyboard review.
-- [x] Provide accessible browser-native controls for every production choice.
-- [x] Provide a responsive production dashboard with totals, advanced settings, and a clear path to Director.
-- [x] Group high-level Web UI actions into clear production sections.
-- [x] Distinguish active storyboard configuration from pending global setup changes.
-- [x] Prevent render and preview actions from using stale mode, count, progression, or Storyboard-seed settings.
-- [x] Show progression percentages as concrete frame counts and couple NSFW/explicit sliders safely.
-- [x] Apply Image variation settings immediately while confirming destructive rebuilds after manual shot edits.
-- [x] Provide draggable, resizable, memory-only Fast Preview windows with responsive viewport limits and automatic cleanup on close.
-- [x] Provide a persistent Render Logger tab with live frame counts, elapsed/remaining time, seeds, formatted prompts, errors, and generation events.
-- [x] Include Preview renders in Logger and keep the previous preview visible until its replacement finishes.
-- [x] Allow the visible preview to be rendered again directly from its popup header.
-- [x] Make preview refresh follow the currently open Director shot, spin only its glyph, and clear Logger history without deleting outputs or displayed preview data.
-- [x] Automatically re-resolve the storyboard and refresh Director after Studio seed or seed-strategy changes.
-- [x] Automatically resolve one default storyboard when the application opens with no recoverable storyboard.
-- [x] Present seeds as Storyboard and Image Variation concepts, expose generated values, and randomize one shot’s inference seed without changing its direction.
-- [x] Recalculate storyboard image-variation seeds in place without resetting custom Director fields or resolved scenes.
-- [x] Provide independent one-click regeneration controls for Storyboard and Image Variation seeds.
-- [x] Order Studio and Director frame actions by edit, inspect, vary, preview, and render workflow.
+- [x] Build progressive stages that do not move backward and support Full XXX from the first frame.
+- [x] Provide Studio, Director’s Desk, complete-storyboard reroll, single-shot reroll, exact Director controls, and compatible remixes.
+- [x] Prevent render and preview actions from using stale structural settings.
+- [x] Apply Image Variation changes without rebuilding scene direction.
+- [x] Provide deterministic Storyboard seeds plus fixed, random, and stable per-frame Image Variation strategies.
+- [x] Derive stable per-frame seeds from base seed, photoshoot index, and shot index with SHA-256 rather than Python `hash()`.
+- [x] Display the base Image Variation seed in active configuration and each effective frame seed in Studio, Director, and Logger.
+- [x] Resolve one default storyboard when no recoverable storyboard exists.
+- [x] Provide cancellable production jobs, memory-only Fast Preview, reload-safe Logger state, ETA, prompts, seeds, and generation events.
+- [x] Support one-shot render/regeneration from Studio and Director.
+- [x] Provide compact database-bound storyboard export and import.
+- [x] Remove Studio generation-count maximums while retaining positive-integer validation.
+- [x] Provide an output gallery with full-screen inspection, zoom, navigation, download, individual deletion, and bulk deletion.
+- [x] Generate 512 px JPEG gallery thumbnails on demand without writing thumbnail files to disk.
+- [x] Cache encoded thumbnails in a bounded 128 MB RAM LRU cache, invalidate deleted outputs, and version replacements by file metadata.
+- [x] Load gallery thumbnails lazily with asynchronous browser decoding while reserving original files for viewer and download actions.
 - [x] Support `disabled: true` across selectable database records.
-- [x] Remove mirrors, sexual toys, and non-functional identity-consistency prompt procedures.
-- [x] Maintain README documentation alongside implementation.
-- [x] Maintain more than 1,100 semantically unique production records while preserving tags, dependencies, stage rules, pools, and Director performance.
-- [x] Remove mechanical Studio/Editorial copies and derive variety from distinct pieces plus compatible color, pattern, fabric-texture, and surface modifiers.
-- [x] Normalize catalog prompts for Lumina2/Qwen and general image-model conditioning, reject duplicate/internal/overlong fragments, and preserve the complete deduplicated prompt.
+- [x] Maintain more than 1,100 semantically distinct catalog records with validated IDs, tags, dependencies, stage rules, and compatible modifiers.
+- [x] Reject duplicate, internal, or overlong catalog fragments and preserve the complete deduplicated prompt without destructive truncation.
 
-## P0 — Storyboard editorial planning
+## Current implementation cycle
 
-- [x] Plan shot size, camera angle, framing, pose family, action family, and expression intensity across the complete series.
-- [x] Build a deliberate editorial arc: establishing → medium → reveal → nude → explicit plateau.
-- [ ] Plan `xxx-only` as a complete explicit storyboard rather than independent explicit frames.
-- [x] Pass planned storyboard choices into the resolver without random replacement.
-- [x] Give every frame an explainable role in the series.
-- [x] Prevent unjustified duplicate compositions in adjacent frames.
+The next work is deliberately split into independently testable increments.
+
+### P0 — Output Gallery scale and memory
+
+- [x] Stop gallery cards from loading and decoding full-resolution originals.
+- [x] Add versioned thumbnail URLs and long-lived browser caching.
+- [x] Bound the server-side thumbnail cache by encoded byte size.
+- [ ] Coalesce simultaneous requests for the same uncached thumbnail so it is generated only once.
+- [ ] Stream original output files instead of reading each complete 5–10 MB file into server memory.
+- [ ] Add HTTP range support for large original-image viewing and downloads where the browser requests it.
+- [ ] Virtualize gallery cards when the collection is large, keeping the viewport plus a small overscan window in the DOM.
+- [ ] Keep keyboard navigation, deletion indexes, lightbox navigation, and scroll position correct with virtualization.
+- [ ] Add regression coverage for cache eviction, invalidation, concurrent cache misses, and thumbnail-generation failures.
+- [ ] Measure a gallery containing at least 2,000 outputs and record network transfer, decoded browser memory, and scroll responsiveness.
 
 Ready when:
 
-- The same prompt seed reproduces the identical storyboard.
-- Every frame has an explicit editorial role.
-- Progression never moves backward.
-- Adjacent frames do not repeat composition without a deliberate rule.
+- Scrolling never fetches full-resolution originals.
+- Repeated thumbnail requests are served from browser or RAM cache.
+- Server thumbnail memory remains within its configured bound.
+- A 2,000-output gallery remains responsive and DOM size remains bounded.
 
-## P0 — Camera grammar
+### P0 — Camera grammar validation
 
 - [x] Add `shot_sizes`, `camera_angles`, `framings`, and `focus_targets` to `database.json`.
-- [x] Support full body, three-quarter, medium, portrait, torso close-up, breast close-up, intimate macro, and rear close-up.
-- [x] Support eye-level, low, high, overhead, rear, and over-the-shoulder angles.
-- [x] Support centered, diagonal editorial, symmetrical, tight-crop, and environmental framing.
-- [x] Resolve camera grammar against pose, action, furniture, visibility, and exposure stage.
-- [ ] Reject combinations such as intimate macro with full-body framing.
-- [ ] Require rear angles for rear-display recipes and suitable close-ups for intimate actions.
+- [x] Resolve camera candidates against stage, pose, action, furniture, recipe tags, and visibility requirements.
+- [ ] Add explicit cross-field rules that reject intimate macro with full-body or environmental framing.
+- [ ] Require rear-compatible angles and framing for rear-display recipes.
+- [ ] Require suitable close-ups and focus targets for intimate actions.
+- [ ] Report the exact conflicting IDs when a camera combination is rejected.
+- [ ] Add a deterministic camera-aware stress test covering at least 10,000 planned scenes.
 
 Ready when:
 
 - Every resolved scene has a shot size, angle, framing, and focus target.
-- Validation finds unreachable or incompatible camera records.
-- A 5,000-frame dry-run produces no framing conflicts.
+- Invalid camera tuples cannot be produced automatically or selected in Director.
+- The 10,000-scene stress test reports no camera conflicts.
 
-## P0 — Weighted shuffle bags and diversity
+### P0 — Full-XXX storyboard planning and shuffle bags
 
-- [ ] Replace independent weighted selection for major shot categories with weighted shuffle bags.
-- [x] Avoid repeating pose, action, expression, shot size, or angle before the compatible pool is exhausted.
-- [ ] Keep separate bags for each photoshoot and stage family.
-- [ ] Permit reuse after exhaustion while preventing identical adjacent shots.
-- [x] Calculate a storyboard diversity score.
-- [x] Penalize repeated pose family, action family, camera angle, shot size, and surface.
-- [ ] Do not penalize intentionally fixed model, outfit, location, palette, or lighting.
-
-Ready when:
-
-- All available plateau recipes are used before repetition.
-- Adjacent shots do not share the same pose/action pair.
-- One prompt seed reproduces shuffle-bag order exactly.
-
-## P0 — Deterministic inference-seed sequence
-
-- [x] Preserve current fixed and random-per-image strategies.
-- [x] Add a deterministic-sequence strategy.
-- [x] Derive each frame seed from a base seed, photoshoot index, and shot index using a stable hash algorithm.
-- [x] Do not use Python `hash()`, which changes between processes.
-- [ ] Print the base seed and effective frame seed.
-- [x] Add strategy selection to the launcher Advanced menu.
-- [x] Preserve literal seed reuse in fixed mode.
+- [ ] Replace the three broad Full-XXX stage kinds with planning over the concrete enabled recipe catalog.
+- [ ] Plan Full XXX as an explicit editorial arc rather than a sequence of independently selected explicit frames.
+- [ ] Start at explicit intensity, build variation deliberately, and reserve peak intensity for a suitable closing shot.
+- [ ] Implement seeded weighted shuffle bags for explicit recipes, pose families, action families, shot sizes, and angles.
+- [ ] Keep bags separate by photoshoot and compatible stage/recipe family.
+- [ ] Exhaust compatible recipe families before reuse, then refill deterministically.
+- [ ] Prevent identical adjacent pose/action/camera tuples even after a bag refill.
+- [ ] Use the same deterministic bag rules in photoshoot and Random Full-XXX modes.
 
 Ready when:
 
-- Reusing a base seed reproduces every inference seed.
-- Different frames receive different seeds.
-- Photoshoots in one batch do not overlap seed sequences.
+- One Storyboard seed reproduces the complete recipe and shuffle-bag order.
+- Every enabled compatible recipe is used before repetition.
+- Adjacent explicit shots have deliberate, explainable variation.
+- The final shot uses a compatible peak role, intensity, expression, and camera treatment.
+
+### P0 — Standalone validation and statistics
+
+- [ ] Add `python app.py validate` without changing normal Web UI startup.
+- [ ] Stress-test every enabled outfit template through the resolver.
+- [ ] Validate camera tuples, explicit recipes, garment transitions, and stage reachability.
+- [ ] Find unreachable IDs and records unused by every recipe, template, and configured pool.
+- [ ] Return a non-zero exit code for structural, reachability, or stress-test failures.
+- [ ] Add `python app.py stats` for record counts, tags, recipe coverage, and candidate-pool sizes.
+- [ ] Document both commands and make them optionally accessible from `launcher.sh` without adding an interactive terminal wizard.
+
+Ready when:
+
+- Production validation no longer depends on redirecting a large dry-run.
+- CI or a local script can distinguish warnings from validation failures.
+- Coverage reports identify narrow or unreachable candidate pools before rendering.
 
 ## P1 — Prompt Compiler v2
 
-- [ ] Order prompts by diffusion priority: solo/adult constraint → camera → pose/action → visible anatomy → human traits → visible garments → location → expression → lighting/quality.
-- [ ] Keep each human trait in one prompt block only.
-- [x] Remove misleading prompt profiles that differed only through destructive trimming.
-- [x] Remove unsafe approximate prompt budgeting; warn about unusually long prompts without truncating them.
-- [x] Preserve every selected fragment; report long prompts diagnostically without modifying them.
-- [ ] Make negative prompts stage-specific.
-- [ ] Remove irrelevant negatives from fashion stages.
-- [ ] Strengthen coverage and censorship negatives only for explicit stages.
-- [x] Add linting for duplicate subjects, conflicting framing, contradictory clothing, and repeated fragments.
+- [x] Keep a concise solo adult subject constraint at the prompt start.
+- [x] Preserve selected prompt fragments and warn about unusual length without truncation.
+- [x] Deduplicate exact normalized fragments and lint repeated subjects, conflicting framing, and contradictory clothing.
+- [x] Add covered-chest, layered-hosiery, explicit-plateau, and recipe-specific negative additions.
+- [ ] Define and test one explicit diffusion-priority order for subject → camera/direction → anatomy → traits/garments → location/treatment.
+- [ ] Keep each human trait in exactly one semantic prompt block.
+- [ ] Replace incremental negative additions with named stage-specific negative profiles.
+- [ ] Remove explicit-anatomy and censorship negatives from covered fashion stages when they are irrelevant.
+- [ ] Strengthen coverage negatives only where clothing must remain opaque and explicit negatives only where anatomy must remain visible.
 
 Ready when:
 
-- Pose and action remain in the high-priority prompt section.
-- Compact prompts preserve subject traits and stage semantics.
-- Compiled prompts contain no repeated trait fragments.
+- Prompt ordering is intentional, documented, and regression-tested.
+- Compiled prompts contain no repeated human trait fragments.
+- Covered, lingerie, nude, and explicit stages receive distinct relevant negatives.
 - One resolved scene compiles deterministically.
 
 ## P1 — Visual trait prioritization
 
-- [ ] Keep the complete `model_signature` for reproducibility and console output.
-- [ ] Define a concise visual-trait summary for diagnostics without dropping Director choices or claiming cross-frame identity control.
-- [ ] Prioritize face, hair, skin, and body traits that materially affect the rendered subject.
-- [ ] Select one or two distinctive beauty details when available.
-- [ ] Add more compatible beauty marks and facial accents.
-- [ ] Keep the concise `solo adult woman` and `single subject` constraints at the prompt start.
-- [ ] Avoid temporal or cross-frame identity language that the backend cannot understand.
+- [x] Preserve the complete deterministic `model_signature` for reproducibility.
+- [x] Provide a concise model description for Studio and Director diagnostics.
+- [x] Keep Director-selected traits available even when a concise summary is displayed.
+- [x] Avoid prompts that claim cross-frame identity mechanisms the backend does not have.
+- [ ] Separate visually dominant traits from low-impact detail in compiler ordering.
+- [ ] Select one or two compatible distinctive facial accents when available.
+- [ ] Expand compatible beauty marks and facial accents without creating mechanical variants.
+- [ ] Add regression coverage proving each human trait is emitted once and visibility-gated anatomy is emitted only when visible.
 
 Ready when:
 
-- The selected trait subset is fixed within a photoshoot.
-- Human traits appear only once in the compiled prompt.
-- The full model signature remains available in console output.
+- The complete selected trait set remains fixed within a photoshoot.
+- Important face, hair, skin, and body traits appear before minor styling details.
+- The concise UI summary never changes or discards the resolved model signature.
 
 ## P1 — Dynamic location surfaces
 
-- [ ] Fix interior, palette, mood, time of day, and lighting family per photoshoot.
+- [x] Fix interior, palette, mood, and photography treatment per photoshoot.
 - [x] Allow different compatible surfaces within the same interior.
-- [ ] Add zones such as bed, bed edge, wall, vanity, window, rug, sofa, chair, pool edge, and garden surface.
-- [ ] Match poses and shot sizes to surface capabilities.
-- [ ] Preserve recognizable room identity while changing surfaces.
+- [x] Preserve recognizable room identity while surface, pose, and camera direction vary.
+- [ ] Model zones explicitly: bed, bed edge, wall, vanity, window, rug, sofa, chair, pool edge, and garden surface.
+- [ ] Add zone capabilities for standing, seated, reclining, kneeling, supported, and close-up compositions.
+- [ ] Match pose, action, shot size, and camera angle to zone capabilities.
+- [ ] Validate that bathroom, pool, bedroom, and outdoor zone families cannot mix incorrectly.
 
 Ready when:
 
-- A photoshoot retains one recognizable location.
-- Surfaces vary without logical conflicts.
-- Bathroom, pool, bedroom, and outdoor surface families do not mix incorrectly.
+- Surface variation never changes the photoshoot’s location identity.
+- Every selected pose is physically compatible with its zone.
+- Location-family conflicts are rejected with an exact diagnostic.
 
 ## P1 — Exact garment transitions
 
 - [x] Compare visible garment slots with the previous stage.
-- [x] Calculate exactly which slots were removed or revealed.
-- [ ] Select an undressing action matching the actual garment type.
+- [x] Calculate which slots disappeared and never describe removal of an absent garment.
+- [ ] Track removed slots explicitly across the whole photoshoot and reject restoration in progressive mode.
+- [ ] Select an undressing action matching the exact removed garment type and closure.
 - [ ] Add actions for zippers, buttons, straps, bra hooks, skirts, dresses, panties, stockings, and footwear.
-- [ ] Support intentionally retained stockings, heels, garters, and accessories.
-- [x] Never describe removing a garment that is absent or already removed.
-- [ ] Never restore removed clothing during progressive photoshoots.
+- [ ] Support intentionally retained stockings, heels, garters, and accessories as planned terminal state.
+- [ ] Add regression and stress tests proving a garment is never removed twice or restored unintentionally.
 
 Ready when:
 
-- Every undressing action matches the garment state difference.
-- Dry-runs contain no impossible removal actions.
-- Anatomy becomes visible only after the corresponding transition.
+- Every transition action matches the actual garment-state difference.
+- Anatomy becomes visible only after the corresponding garment transition.
+- Dry-runs contain no impossible, repeated, or reversed removal actions.
 
-## P1 — Explicit plateau recipes
+## P1 — Intensity system
 
-- [ ] Replace the three broad plateau kinds with a catalog of concrete recipes.
-- [x] Add rear standing, rear all-fours, bent-over, legs-up, legs-wide, intimate macro, breast-focus, hands-only stimulation, and climax recipes.
-- [x] Define pose tags, action tags, camera grammar, visibility, furniture, and expression intensity for every recipe.
-- [x] Add configurable recipe weights to `database.json`.
-- [x] Allow individual recipe families to be disabled.
-- [ ] Distribute active recipe families across the plateau before repeating them.
-- [ ] Use weighted shuffle bags in `random --xxx-only`.
+- [x] Add the shared `fashion`, `sensual`, `erotic`, `nude`, `explicit`, and `peak` labels.
+- [ ] Assign allowed intensity ranges to poses, actions, expressions, recipes, camera framing, and lighting.
+- [ ] Reject incompatible intensity combinations and unexplained jumps.
+- [ ] Increase intensity monotonically in progressive photoshoots.
+- [ ] Integrate intensity into Full-XXX editorial planning and shuffle-bag selection.
 
 Ready when:
 
-- Every active recipe is reachable.
-- Recipes never combine incompatible pose, action, camera, or surface components.
-- Hands-only actions never add external objects.
-- Expression intensity matches the action.
-
-## P1 — Intensity scale
-
-- [x] Add a shared `fashion`, `sensual`, `erotic`, `nude`, `explicit`, and `peak` scale.
-- [ ] Assign intensity to poses, actions, expressions, camera framing, and lighting.
-- [ ] Reject incompatible intensity jumps.
-- [ ] Increase intensity smoothly in progressive photoshoots.
-- [ ] Start `xxx-only` at explicit and finish at peak.
-
-Ready when:
-
-- Expression intensity matches action intensity.
+- Expression and camera treatment match action and recipe intensity.
 - Progressive intensity never moves backward.
-- Peak shots receive suitable framing, action, and expression.
+- Peak shots receive suitable role, framing, action, and expression.
 
-## P2 — `plan` command
+## P2 — Review artifacts and reporting
 
-- [ ] Add `python app.py plan` with the normal mode, seed, and count options.
-- [ ] Print a compact storyboard without full prompts.
-- [ ] Include stage, shot size, angle, pose, action, expression, and surface.
-- [ ] Add `--verbose` for the complete resolved prompt.
-- [ ] Add `plan` to the launcher.
+- [x] Review a resolved storyboard without GPU work in Studio.
+- [x] Inspect the full resolved prompt and key shot metadata in Studio and Director.
+- [ ] Add a printable/exportable local HTML contact sheet only if the persistent Output Gallery does not cover the review need.
+- [ ] If implemented, show thumbnails, shot index, stage, pose/action, seeds, model signature, and collapsible prompts.
+- [ ] Include sufficient metadata to reproduce a frame manually without JSONL output.
+- [ ] Reuse the existing thumbnail endpoint/cache rather than generating a second thumbnail system.
 
-Ready when:
-
-- A storyboard can be reviewed without GPU work.
-- `plan` and `generate` produce identical scenes from identical seeds.
-
-## P2 — `validate` and `stats` commands
-
-- [ ] Add a standalone `validate` command.
-- [ ] Stress-test every outfit template through the resolver.
-- [ ] Validate camera combinations and plateau recipes.
-- [ ] Find unreachable IDs.
-- [ ] Find records unused by every recipe and template.
-- [ ] Add a `stats` command for counts, tags, coverage, and candidate-pool sizes.
-- [ ] Add both commands to the launcher.
-
-Ready when:
-
-- Production validation does not require redirecting a large dry-run.
-- Structural or reachability conflicts produce a non-zero exit code.
-
-## P2 — HTML contact sheet
-
-- [ ] Create a directory for each photoshoot.
-- [ ] Generate a local dependency-free `index.html`.
-- [ ] Show thumbnails, shot index, stage, pose/action, and seeds.
-- [ ] Put the model signature and resolved prompt in collapsible details.
-- [ ] Include a ready-to-run reproduction command.
-- [ ] Do not create JSONL output.
-- [ ] Make contact-sheet generation configurable.
-
-Ready when:
-
-- A complete series can be reviewed from one local HTML page.
-- Metadata is sufficient to reproduce a frame manually.
-
-## P2 — Failure handling and frame regeneration
-
-- [x] Fail the batch immediately and visibly when a frame cannot be generated.
-- [x] Add regeneration of one frame from printed metadata.
-- [ ] Do not add an image-quality detector or external vision model in this phase.
-
-Ready when:
-
-- A generation failure is visible and explainable in Logger.
-
-## Recommended implementation order
-
-1. Camera grammar and database records.
-2. Storyboard editorial arc.
-3. Shuffle bags and diversity scoring.
-4. Deterministic inference-seed sequence.
-5. Dynamic location surfaces.
-6. Prompt Compiler v2 and non-destructive prompt diagnostics.
-7. Visual trait prioritization.
-8. Exact garment transitions.
-9. Plateau recipes and intensity scale.
-10. `plan`, `validate`, and `stats`.
-11. HTML contact sheet.
-12. Retry policy and frame regeneration.
+The old `python app.py plan` proposal is removed from the active roadmap because Studio already provides a richer GPU-free plan. CLI work is reserved for `validate` and `stats`.
 
 ## Regression checklist
 
-- [x] The same prompt seed reproduces the model signature, context, and prompt sequence.
-- [x] Photoshoot mode keeps one model, outfit, location, and palette per set.
+- [x] The same Storyboard seed reproduces model signature, context, and prompts; the same base Image Variation seed also reproduces deterministic frame seeds.
+- [x] Photoshoot mode keeps one model, outfit, location, palette, mood, and treatment per set.
 - [x] Random mode rebuilds context for every frame.
 - [x] Progressive stages never move backward.
 - [x] Full-XXX mode contains no covered or lingerie stages.
 - [x] Positive prompts describe one solo adult woman only.
 - [x] No sexual toy is selectable or emitted in a positive prompt.
 - [x] Outdoor locations are private rather than public.
-- [x] Python compilation, JSON validation, shell syntax, and `git diff --check` pass.
-- [ ] Deterministic inference strategy reproduces all frame seeds.
-- [ ] No garment is removed twice or after it disappears.
+- [x] Python compilation, JSON validation, shell syntax, unit tests, and `git diff --check` pass.
+- [ ] No garment is removed twice or restored after removal.
 - [ ] Camera-aware stress test of 10,000 planned scenes passes.
+- [ ] A 2,000-output gallery remains responsive with bounded DOM and thumbnail memory.
+
+## Planned implementation order
+
+1. Harden thumbnail concurrency, failure handling, cache tests, and original-file streaming.
+2. Add large-gallery virtualization and measure the 2,000-output acceptance case.
+3. Implement explicit camera tuple validation and the 10,000-scene stress test.
+4. Add standalone `validate`, then `stats`, using the same resolver and validation rules as the Web UI.
+5. Replace broad Full-XXX kinds with deterministic recipe planning and weighted shuffle bags.
+6. Integrate the intensity system with progressive and Full-XXX planning.
+7. Implement explicit garment-state tracking and matching transition actions.
+8. Refactor Prompt Compiler v2 and visual-trait ordering.
+9. Add location zones and physical surface capabilities.
+10. Reassess whether an HTML contact sheet adds value beyond the optimized Output Gallery.
