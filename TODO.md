@@ -212,15 +212,15 @@ Ready when:
 
 ## P1 — Output Gallery photoshoot grouping
 
-- [ ] Add a frontend-only toggle between the current flat Outputs grid and a grouped Photoshoots view.
-- [ ] Derive photoshoot groups entirely from existing output metadata and filenames without moving, copying, or rewriting output files.
-- [ ] Represent each photoshoot as one thumbnail card using a representative frame and show its frame count.
-- [ ] Open a photoshoot card into a focused grid containing only that photoshoot’s outputs.
-- [ ] Provide an immediate, obvious way to return from an opened photoshoot to the photoshoot-thumbnail list.
-- [ ] Allow switching back to the current flat representation at any time.
-- [ ] Keep lightbox navigation, downloads, deletion, live render additions, and virtualized rendering correct in flat and grouped views.
-- [ ] Remember the user’s scroll position and last focused output in flat view while they inspect grouped photoshoots, and restore both when returning.
-- [ ] Persist the selected gallery representation for the browser session.
+- [x] Add a frontend-only toggle between the current flat Outputs grid and a grouped Photoshoots view.
+- [x] Derive photoshoot groups entirely from existing output metadata and filenames without moving, copying, or rewriting output files.
+- [x] Represent each photoshoot as one thumbnail card using a representative frame and show its frame count.
+- [x] Open a photoshoot card into a focused grid containing only that photoshoot’s outputs.
+- [x] Provide an immediate, obvious way to return from an opened photoshoot to the photoshoot-thumbnail list.
+- [x] Allow switching back to the current flat representation at any time.
+- [x] Keep lightbox navigation, downloads, deletion, live render additions, and virtualized rendering correct in flat and grouped views.
+- [x] Remember the user’s scroll position and last focused output in flat view while they inspect grouped photoshoots, and restore both when returning.
+- [x] Persist the selected gallery representation for the browser session.
 
 Ready when:
 
@@ -273,12 +273,11 @@ The old `python app.py plan` proposal is removed from the active roadmap because
 ## Planned implementation order
 
 1. Measure and document the 2,000-output gallery acceptance case.
-2. Add frontend-only photoshoot grouping while preserving the flat gallery workflow and position.
-3. Add standalone `validate`, then `stats`, using the same resolver and validation rules as the Web UI.
-4. Replace the single captured workflow with named, selectable workflow profiles.
-5. Replace broad Full-XXX kinds with deterministic recipe planning and weighted shuffle bags.
-6. Integrate the intensity system with progressive and Full-XXX planning.
-7. Implement explicit garment-state tracking and matching transition actions.
-8. Refactor Prompt Compiler v2 and visual-trait ordering.
-9. Add location zones and physical surface capabilities.
-10. Reassess whether an HTML contact sheet adds value beyond the optimized Output Gallery.
+2. Add standalone `validate`, then `stats`, using the same resolver and validation rules as the Web UI.
+3. Replace the single captured workflow with named, selectable workflow profiles.
+4. Replace broad Full-XXX kinds with deterministic recipe planning and weighted shuffle bags.
+5. Integrate the intensity system with progressive and Full-XXX planning.
+6. Implement explicit garment-state tracking and matching transition actions.
+7. Refactor Prompt Compiler v2 and visual-trait ordering.
+8. Add location zones and physical surface capabilities.
+9. Reassess whether an HTML contact sheet adds value beyond the optimized Output Gallery.

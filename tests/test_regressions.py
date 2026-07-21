@@ -1392,13 +1392,17 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("item.thumbnail_url || item.url", js)
         self.assertIn('loading="lazy" decoding="async"', js)
 
+    def test_lightbox_fit_is_enabled_by_default_for_new_sessions(self):
+        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("sessionStorage.getItem('valhalla-preview-fit') !== 'false'", js)
+
     def test_output_gallery_virtualizes_rows_with_bounded_overscan(self):
         root = Path(app.__file__).parent
         js = (root / "web" / "app.js").read_text(encoding="utf-8")
         css = (root / "web" / "styles.css").read_text(encoding="utf-8")
         self.assertIn("const OUTPUT_OVERSCAN_ROWS = 3", js)
         self.assertIn("const OUTPUT_VIRTUALIZATION_THRESHOLD = 100", js)
-        self.assertIn("state.outputs.length <= OUTPUT_VIRTUALIZATION_THRESHOLD", js)
+        self.assertIn("entryCount <= OUTPUT_VIRTUALIZATION_THRESHOLD", js)
         self.assertIn(".slice(start, end)", js)
         self.assertIn("renderVirtualOutputs", js)
         self.assertIn("outputGrid.classList.add('virtualized')", js)
@@ -1407,6 +1411,32 @@ class FrontendContractTests(unittest.TestCase):
         self.assertNotIn("position: absolute; inset: 0 auto auto 0", css)
         self.assertIn(".output-grid:not(.virtualized)", css)
         self.assertNotIn("state.outputs.map((item, index)", js)
+
+    def test_output_gallery_groups_photoshoots_by_run_and_set_filename(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('data-gallery-view="flat"', html)
+        self.assertIn('data-gallery-view="photoshoots"', html)
+        self.assertIn("const PHOTOSHOOT_FILENAME", js)
+        self.assertIn("const RANDOM_FILENAME", js)
+        self.assertIn("const LEGACY_RUN_FILENAME", js)
+        self.assertIn("`${photoshoot[1]}:photoshoot_${photoshoot[2]}`", js)
+        self.assertIn("`${random[1]}:random`", js)
+        self.assertIn("kind: 'random'", js)
+        self.assertIn("kind: 'legacy'", js)
+        self.assertIn("group.displayNumber = ++randomNumber", js)
+        self.assertIn("`Random ${group.displayNumber}`", js)
+        self.assertIn("'Render run'", js)
+        self.assertIn("sessionStorage.getItem('valhalla-gallery-view') === 'flat' ? 'flat' : 'photoshoots'", js)
+        self.assertIn("function formatOutputRun(run)", js)
+        self.assertIn("Render ID: ${group.identity.run}", js)
+        self.assertIn("function photoshootGroups()", js)
+        self.assertIn("function openPhotoshoot(key)", js)
+        self.assertIn("sessionStorage.setItem('valhalla-gallery-view', next)", js)
+        self.assertIn("state.flatScrollY = window.scrollY", js)
+        self.assertIn("activePhotoshootGroup()?.items", js)
 
     def test_virtual_output_navigation_uses_stable_absolute_indexes(self):
         js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")

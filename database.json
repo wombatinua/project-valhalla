@@ -18049,17 +18049,6 @@
       ]
     },
     {
-      "id": "prop_camera",
-      "prompt": "holding a compact vintage camera",
-      "tags": [
-        "fashion_prop",
-        "casual_prop"
-      ],
-      "excludes_tags": [
-        "explicit"
-      ]
-    },
-    {
       "id": "prop_coffee_cup",
       "prompt": "holding a warm ceramic coffee cup",
       "tags": [

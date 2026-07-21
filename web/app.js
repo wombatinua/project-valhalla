@@ -16,13 +16,17 @@ const state = {
   jobTimer: null,
   outputs: [],
   galleryBenchmark: false,
+  galleryView: sessionStorage.getItem('valhalla-gallery-view') === 'flat' ? 'flat' : 'photoshoots',
+  galleryGroup: null,
+  flatScrollY: 0,
+  flatFocusName: null,
   deletedOutputs: new Set(),
   renderMode: sessionStorage.getItem('valhalla-render-mode') === 'preview'
     ? 'preview'
     : 'production',
   previewIndex: 0,
   previewZoom: Number(sessionStorage.getItem('valhalla-preview-zoom')) || 100,
-  previewFit: sessionStorage.getItem('valhalla-preview-fit') === 'true',
+  previewFit: sessionStorage.getItem('valhalla-preview-fit') !== 'false',
   previewPanX: 0,
   previewPanY: 0,
   slideshowTimer: null,
@@ -59,6 +63,79 @@ const OUTPUT_VIRTUALIZATION_THRESHOLD = 100;
 let outputLayout = null;
 let outputRenderFrame = null;
 let outputRenderSignature = '';
+
+const PHOTOSHOOT_FILENAME = /^(\d{8}_\d{6}_\d{6})_(?:fast_)?photoshoot_(\d+)_shot_(\d+)_/;
+const RANDOM_FILENAME = /^(\d{8}_\d{6}_\d{6})_(?:fast_)?random_shot_(\d+)_/;
+const LEGACY_RUN_FILENAME = /^(\d{8}_\d{6}_\d{6})_/;
+
+function outputGroupIdentity(item) {
+  const photoshoot = item.name.match(PHOTOSHOOT_FILENAME);
+  if (photoshoot) {
+    return {
+      key: `${photoshoot[1]}:photoshoot_${photoshoot[2]}`,
+      run: photoshoot[1],
+      kind: 'photoshoot',
+      number: Number(photoshoot[2]),
+    };
+  }
+  const random = item.name.match(RANDOM_FILENAME);
+  if (random) {
+    return {
+      key: `${random[1]}:random`,
+      run: random[1],
+      kind: 'random',
+      number: null,
+    };
+  }
+  const legacy = item.name.match(LEGACY_RUN_FILENAME);
+  if (legacy) {
+    return {
+      key: `${legacy[1]}:legacy`,
+      run: legacy[1],
+      kind: 'legacy',
+      number: null,
+    };
+  }
+  return null;
+}
+
+function photoshootGroups() {
+  const groups = new Map();
+  state.outputs.forEach((item, outputIndex) => {
+    const identity = outputGroupIdentity(item);
+    const key = identity?.key || 'ungrouped';
+    if (!groups.has(key)) groups.set(key, { key, identity, items: [], firstIndex: outputIndex });
+    groups.get(key).items.push({ item, outputIndex });
+  });
+  const ordered = [...groups.values()].sort((a, b) => a.firstIndex - b.firstIndex);
+  let randomNumber = 0;
+  ordered.forEach((group) => {
+    if (group.identity?.kind === 'random') group.displayNumber = ++randomNumber;
+  });
+  return ordered;
+}
+
+function activePhotoshootGroup() {
+  return state.galleryGroup
+    ? photoshootGroups().find((group) => group.key === state.galleryGroup) || null
+    : null;
+}
+
+function displayedOutputs() {
+  const group = activePhotoshootGroup();
+  return group ? group.items : state.outputs.map((item, outputIndex) => ({ item, outputIndex }));
+}
+
+function previewOutputs() {
+  return activePhotoshootGroup()?.items || state.outputs.map((item, outputIndex) => ({ item, outputIndex }));
+}
+
+function formatOutputRun(run) {
+  const match = run?.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})_\d{6}$/);
+  if (!match) return run || '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${Number(match[3])} ${months[Number(match[2]) - 1]} ${match[1]} · ${match[4]}:${match[5]}:${match[6]}`;
+}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -849,6 +926,8 @@ function resolveDeletion(value) {
 async function deleteOutput(index) {
   const item = state.outputs[index];
   if (!item) return;
+  const previewScope = imageDialog.open ? previewOutputs() : [];
+  const previewPosition = previewScope.findIndex((entry) => entry.outputIndex === index);
   const confirmed = await confirmDeletion(
     'Delete this image?',
     `${item.name} will be permanently removed from the output folder.`,
@@ -861,8 +940,13 @@ async function deleteOutput(index) {
     state.outputs = state.outputs.filter((output) => output.name !== item.name);
     renderOutputs();
     if (imageDialog.open) {
-      if (!state.outputs.length) imageDialog.close();
-      else showPreview(Math.min(index, state.outputs.length - 1));
+      const remainingScope = previewOutputs();
+      if (!remainingScope.length || (state.galleryView === 'photoshoots' && !state.galleryGroup)) {
+        imageDialog.close();
+      } else {
+        const next = remainingScope[Math.min(Math.max(0, previewPosition), remainingScope.length - 1)];
+        showPreview(next.outputIndex);
+      }
     }
     toast('Image deleted', item.name, 'success');
   } catch (error) {
@@ -943,12 +1027,29 @@ async function restoreApplication() {
 
 function renderOutputs() {
   const count = state.outputs.length;
+  if (state.galleryGroup && !activePhotoshootGroup()) state.galleryGroup = null;
   $('#output-count').textContent = count;
   $('#outputs-empty').classList.toggle('hidden', count > 0);
+  const group = activePhotoshootGroup();
+  const groups = photoshootGroups();
+  $('#outputs-title').textContent = group
+    ? (group.identity?.kind === 'photoshoot'
+      ? `Photoshoot ${group.identity.number}`
+      : (group.identity?.kind === 'random'
+        ? `Random ${group.displayNumber}`
+        : (group.identity?.kind === 'legacy' ? 'Render run' : 'Ungrouped outputs')))
+    : 'Latest outputs';
+  $$('#gallery-view-toggle button').forEach((button) => {
+    button.classList.toggle('active', button.dataset.galleryView === state.galleryView);
+  });
   $('#outputs-summary').textContent = count
     ? (state.galleryBenchmark
       ? `Benchmark: ${count.toLocaleString()} synthetic records.`
-      : `${count} generated image${count === 1 ? '' : 's'}.`)
+      : (group
+        ? `${group.items.length} image${group.items.length === 1 ? '' : 's'} in this group.`
+        : (state.galleryView === 'photoshoots'
+          ? `${groups.length} photoshoot${groups.length === 1 ? '' : 's'} · ${count} images.`
+          : `${count} generated image${count === 1 ? '' : 's'}.`)))
     : 'No generated images.';
   outputRenderSignature = '';
   renderVirtualOutputs(true);
@@ -966,8 +1067,16 @@ function measureOutputGrid() {
     : Math.min(230, (width - gap * (columns - 1)) / columns);
   const cardHeight = cardWidth * 1.25;
   const rowStride = cardHeight + gap;
-  const rows = Math.ceil(state.outputs.length / columns);
+  const rows = Math.ceil(outputEntryCount() / columns);
   return { width, gap, columns, cardWidth, cardHeight, rowStride, rows };
+}
+
+function showingPhotoshootList() {
+  return state.galleryView === 'photoshoots' && !state.galleryGroup;
+}
+
+function outputEntryCount() {
+  return showingPhotoshootList() ? photoshootGroups().length : displayedOutputs().length;
 }
 
 function outputCardHtml(item, index, layout) {
@@ -979,6 +1088,33 @@ function outputCardHtml(item, index, layout) {
   </article>`;
 }
 
+function photoshootCardHtml(group, index) {
+  const representative = group.items[0].item;
+  const title = group.identity?.kind === 'photoshoot'
+    ? `Photoshoot ${group.identity.number}`
+    : (group.identity?.kind === 'random'
+      ? `Random ${group.displayNumber}`
+      : (group.identity?.kind === 'legacy' ? 'Render run' : 'Ungrouped'));
+  const run = group.identity ? formatOutputRun(group.identity.run) : 'Files without photoshoot naming';
+  const runTitle = group.identity ? `Render ID: ${group.identity.run}` : '';
+  return `<article class="output-card photoshoot-card" data-group-key="${escapeHtml(group.key)}" data-group-index="${index}" tabindex="0" role="button"
+    aria-label="Open ${escapeHtml(title)}, ${group.items.length} images">
+    <img src="${encodeURI(representative.thumbnail_url || representative.url)}" alt="${escapeHtml(title)} representative frame" loading="lazy" decoding="async">
+    <footer><span title="${escapeHtml(runTitle)}"><strong>${escapeHtml(title)}</strong><br>${escapeHtml(run)}</span><span class="photoshoot-count">${group.items.length}</span></footer>
+  </article>`;
+}
+
+function outputEntriesHtml(start, end, layout) {
+  if (showingPhotoshootList()) {
+    return photoshootGroups().slice(start, end)
+      .map((group, offset) => photoshootCardHtml(group, start + offset))
+      .join('');
+  }
+  return displayedOutputs().slice(start, end)
+    .map(({ item, outputIndex }) => outputCardHtml(item, outputIndex, layout))
+    .join('');
+}
+
 function updateGalleryBenchmarkSummary() {
   if (!state.galleryBenchmark) return;
   $('#outputs-summary').textContent = `Benchmark: ${state.outputs.length.toLocaleString()} records · ${outputGrid.childElementCount} cards in DOM.`;
@@ -986,23 +1122,22 @@ function updateGalleryBenchmarkSummary() {
 
 function renderVirtualOutputs(force = false) {
   outputLayout = measureOutputGrid();
-  if (!outputLayout || !state.outputs.length) {
+  const entryCount = outputEntryCount();
+  if (!outputLayout || !entryCount) {
     outputGrid.classList.remove('virtualized');
     outputGrid.style.paddingTop = '';
     outputGrid.style.paddingBottom = '';
     outputGrid.innerHTML = '';
     return;
   }
-  if (state.outputs.length <= OUTPUT_VIRTUALIZATION_THRESHOLD) {
+  if (entryCount <= OUTPUT_VIRTUALIZATION_THRESHOLD) {
     outputGrid.classList.remove('virtualized');
     outputGrid.style.paddingTop = '';
     outputGrid.style.paddingBottom = '';
-    const signature = `native:${outputLayout.width}:${state.outputs.length}`;
+    const signature = `native:${state.galleryView}:${state.galleryGroup}:${outputLayout.width}:${entryCount}:${state.outputs.length}`;
     if (!force && signature === outputRenderSignature) return;
     outputRenderSignature = signature;
-    outputGrid.innerHTML = state.outputs
-      .map((item, index) => outputCardHtml(item, index, outputLayout))
-      .join('');
+    outputGrid.innerHTML = outputEntriesHtml(0, entryCount, outputLayout);
     syncDeleteControls();
     updateGalleryBenchmarkSummary();
     return;
@@ -1021,19 +1156,16 @@ function renderVirtualOutputs(force = false) {
     Math.max(firstRow, lastVisibleRow) + OUTPUT_OVERSCAN_ROWS,
   );
   const start = firstRow * columns;
-  const end = Math.min(state.outputs.length, (lastRow + 1) * columns);
+  const end = Math.min(entryCount, (lastRow + 1) * columns);
   outputGrid.style.setProperty('--output-columns', String(columns));
   outputGrid.style.setProperty('--output-card-width', `${outputLayout.cardWidth}px`);
   outputGrid.style.setProperty('--output-gap', `${outputLayout.gap}px`);
   outputGrid.style.paddingTop = `${firstRow * rowStride}px`;
   outputGrid.style.paddingBottom = `${Math.max(0, rows - lastRow - 1) * rowStride}px`;
-  const signature = `${start}:${end}:${columns}:${outputLayout.width}:${state.outputs.length}`;
+  const signature = `${state.galleryView}:${state.galleryGroup}:${start}:${end}:${columns}:${outputLayout.width}:${entryCount}:${state.outputs.length}`;
   if (!force && signature === outputRenderSignature) return;
   outputRenderSignature = signature;
-  outputGrid.innerHTML = state.outputs
-    .slice(start, end)
-    .map((item, offset) => outputCardHtml(item, start + offset, outputLayout))
-    .join('');
+  outputGrid.innerHTML = outputEntriesHtml(start, end, outputLayout);
   syncDeleteControls();
   updateGalleryBenchmarkSummary();
 }
@@ -1051,7 +1183,9 @@ function focusOutputCard(index, { alignTop = false } = {}) {
   if (!state.outputs[index]) return;
   outputLayout = measureOutputGrid();
   if (!outputLayout) return;
-  const row = Math.floor(index / outputLayout.columns);
+  const displayIndex = displayedOutputs().findIndex((entry) => entry.outputIndex === index);
+  if (displayIndex < 0) return;
+  const row = Math.floor(displayIndex / outputLayout.columns);
   const gridTop = window.scrollY + outputGrid.getBoundingClientRect().top;
   const cardTop = gridTop + row * outputLayout.rowStride;
   const cardBottom = cardTop + outputLayout.cardHeight;
@@ -1136,18 +1270,21 @@ function setPreviewFit(value) {
 
 function showPreview(index) {
   if (!state.outputs.length) return;
-  state.previewIndex = (index + state.outputs.length) % state.outputs.length;
+  const scope = previewOutputs();
+  let position = scope.findIndex((entry) => entry.outputIndex === index);
+  if (position < 0) position = 0;
+  state.previewIndex = scope[position].outputIndex;
   const item = state.outputs[state.previewIndex];
   resetPreviewPan();
   const image = $('#image-viewer-image');
   image.src = item.url;
   image.alt = `Maximized generated output from shot ${item.shot}`;
   $('#image-viewer-title').textContent = item.name;
-  $('#image-viewer-count').textContent = `${state.previewIndex + 1} of ${state.outputs.length}`;
+  $('#image-viewer-count').textContent = `${position + 1} of ${scope.length}`;
   const download = $('#image-viewer-download');
   download.href = item.url;
   download.download = item.name;
-  const single = state.outputs.length < 2;
+  const single = scope.length < 2;
   $('#image-previous').disabled = single;
   $('#image-next').disabled = single;
   if (single && state.slideshowActive) stopSlideshow();
@@ -1161,15 +1298,18 @@ function openPreview(index) {
 }
 
 function movePreview(direction) {
-  showPreview(state.previewIndex + direction);
+  const scope = previewOutputs();
+  const position = scope.findIndex((entry) => entry.outputIndex === state.previewIndex);
+  const next = scope[(position + direction + scope.length) % scope.length];
+  if (next) showPreview(next.outputIndex);
   if (state.slideshowActive) scheduleSlideshow();
 }
 
 function syncSlideshowControls() {
   const button = $('#image-slideshow-toggle');
-  const active = state.slideshowActive && state.outputs.length > 1;
+  const active = state.slideshowActive && previewOutputs().length > 1;
   button.classList.toggle('active', active);
-  button.disabled = state.outputs.length < 2;
+  button.disabled = previewOutputs().length < 2;
   button.querySelector('span').textContent = active ? '■' : '▶';
   button.querySelector('strong').textContent = active ? 'Stop' : 'Play';
   button.setAttribute('aria-label', active ? 'Stop slideshow' : 'Start slideshow');
@@ -1178,10 +1318,9 @@ function syncSlideshowControls() {
 function scheduleSlideshow() {
   clearTimeout(state.slideshowTimer);
   state.slideshowTimer = null;
-  if (!state.slideshowActive || !imageDialog.open || state.outputs.length < 2) return;
+  if (!state.slideshowActive || !imageDialog.open || previewOutputs().length < 2) return;
   state.slideshowTimer = setTimeout(() => {
-    showPreview(state.previewIndex + 1);
-    scheduleSlideshow();
+    movePreview(1);
   }, state.slideshowDelay * 1000);
 }
 
@@ -1197,7 +1336,7 @@ function toggleSlideshow() {
     stopSlideshow();
     return;
   }
-  if (state.outputs.length < 2) return;
+  if (previewOutputs().length < 2) return;
   state.slideshowActive = true;
   syncSlideshowControls();
   scheduleSlideshow();
@@ -1246,9 +1385,52 @@ function syncOutputGridToPreview() {
   requestAnimationFrame(() => focusOutputCard(state.previewIndex, { alignTop: true }));
 }
 
+function rememberFlatGalleryPosition() {
+  if (state.galleryView !== 'flat') return;
+  state.flatScrollY = window.scrollY;
+  const focused = document.activeElement?.closest?.('.output-card[data-output-index]');
+  const firstVisible = $$('.output-card[data-output-index]', outputGrid)
+    .find((card) => card.getBoundingClientRect().bottom > 0);
+  const anchor = focused || firstVisible;
+  state.flatFocusName = anchor ? state.outputs[Number(anchor.dataset.outputIndex)]?.name || null : null;
+}
+
+function setGalleryView(view) {
+  const next = view === 'photoshoots' ? 'photoshoots' : 'flat';
+  if (next === state.galleryView && !state.galleryGroup) return;
+  rememberFlatGalleryPosition();
+  state.galleryView = next;
+  state.galleryGroup = null;
+  sessionStorage.setItem('valhalla-gallery-view', next);
+  renderOutputs();
+  if (next === 'flat') {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: state.flatScrollY, behavior: 'auto' });
+      renderVirtualOutputs(true);
+      if (state.flatFocusName) {
+        const index = state.outputs.findIndex((item) => item.name === state.flatFocusName);
+        const card = $(`.output-card[data-output-index="${index}"]`, outputGrid);
+        if (card) card.focus({ preventScroll: true });
+      }
+    });
+  } else {
+    window.scrollTo({ top: Math.max(0, window.scrollY + outputGrid.getBoundingClientRect().top - 16), behavior: 'auto' });
+  }
+}
+
+function openPhotoshoot(key) {
+  state.galleryGroup = key;
+  renderOutputs();
+  window.scrollTo({ top: Math.max(0, window.scrollY + outputGrid.getBoundingClientRect().top - 16), behavior: 'auto' });
+}
+
 outputGrid.addEventListener('click', (event) => {
   const card = event.target.closest('.output-card');
   if (!card) return;
+  if (card.dataset.groupKey) {
+    openPhotoshoot(card.dataset.groupKey);
+    return;
+  }
   if (event.target.closest('[data-action="delete-output"]')) {
     deleteOutput(Number(card.dataset.outputIndex));
     return;
@@ -1288,6 +1470,13 @@ outputGrid.addEventListener('keydown', (event) => {
   if (event.target.closest('a, button')) return;
   const card = event.target.closest('.output-card');
   if (!card) return;
+  if (card.dataset.groupKey) {
+    if (['Enter', ' '].includes(event.key)) {
+      event.preventDefault();
+      openPhotoshoot(card.dataset.groupKey);
+    }
+    return;
+  }
   const index = Number(card.dataset.outputIndex);
   if (['Enter', ' '].includes(event.key)) {
     event.preventDefault();
@@ -1301,6 +1490,10 @@ outputGrid.addEventListener('keydown', (event) => {
   if (movement == null) return;
   event.preventDefault();
   focusOutputCard(Math.max(0, Math.min(state.outputs.length - 1, index + movement)));
+});
+
+$$('#gallery-view-toggle button').forEach((button) => {
+  button.addEventListener('click', () => setGalleryView(button.dataset.galleryView));
 });
 
 window.addEventListener('scroll', () => scheduleVirtualOutputRender(), { passive: true });
