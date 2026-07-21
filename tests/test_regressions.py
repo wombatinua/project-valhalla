@@ -55,6 +55,22 @@ class StudioGenerationLimitTests(unittest.TestCase):
 
 
 class CatalogQualityTests(unittest.TestCase):
+    def test_classical_ballet_is_a_reachable_complete_luxury_outfit(self):
+        database, _ = app.load_database()
+        template = next(
+            item for item in database["outfit_templates"]
+            if item["id"] == "template_classical_ballet"
+        )
+        self.assertEqual(template["catalog_category"], "luxury")
+        outfit = app.Composer(database, app.random.Random(20260721)).choose_outfit(template)
+        self.assertEqual(outfit["garments"]["full_body"]["id"], "dress_ballet_tutu")
+        self.assertEqual(outfit["garments"]["legwear"]["id"], "legwear_ballet_tights")
+        self.assertEqual(outfit["garments"]["footwear"]["id"], "shoes_ballet_pointe")
+        self.assertEqual(
+            [stage["id"] for stage in template["stages"]],
+            ["ballet_dressed", "ballet_lingerie", "ballet_topless"],
+        )
+
     def test_custom_mast_actions_are_wired_as_hands_only_actions(self):
         database, _ = app.load_database()
         actions = {item["id"]: item for item in database["actions"]}
@@ -1379,6 +1395,33 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_primary_workspace_names_and_headers_use_photography_terms(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn('<span>Proofs</span>', html)
+        self.assertIn('<span>Logbook</span>', html)
+        self.assertIn('<title>Valhalla Photo Studio</title>', html)
+        self.assertIn("studio: 'Photo Studio'", js)
+        self.assertIn("outputs: 'Proof Gallery'", js)
+        self.assertIn("logger: 'Production Logbook'", js)
+        self.assertIn('id="view-eyebrow"', html)
+        self.assertNotIn('>Render logger</h2>', html)
+
+    def test_workflow_capture_and_storyboard_transfer_are_studio_only(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="studio-topbar-actions"', html)
+        self.assertIn('id="studio-files-menu"', html)
+        self.assertIn("name !== 'studio'", js)
+        menu = html.split('id="studio-files-menu"', 1)[1].split('</details>', 1)[0]
+        self.assertIn('id="import-storyboard"', menu)
+        self.assertIn('id="export-storyboard" disabled', menu)
+        self.assertIn('id="capture-button"', menu)
+        self.assertNotIn('id="export-storyboard"', html.split('id="director-view"', 1)[1])
+        self.assertIn("studioFilesMenu.open = false", js)
+
     def test_active_render_accepts_additional_fifo_jobs(self):
         js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("button.textContent = idleLabel", js)
@@ -1513,6 +1556,29 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn(": 'normal'", js)
         self.assertIn("valhalla-type-size", js)
         self.assertIn("font-size: 0.75rem", css)
+
+    def test_accent_switcher_offers_three_session_scoped_palettes(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        for accent in ("lavender", "azure", "rose"):
+            self.assertIn(f'data-accent="{accent}"', html)
+        self.assertEqual(html.count('system-choice-control'), 3)
+        for theme in ("system", "light", "dark"):
+            self.assertIn(f'data-theme-choice="{theme}"', html)
+        self.assertIn("sessionStorage.setItem('valhalla-accent', accent)", js)
+        self.assertIn("sessionStorage.setItem('valhalla-theme', state.theme)", js)
+        self.assertIn("function applyAccent()", js)
+        self.assertIn(".system-choice-control button.active", css)
+        self.assertIn(':root[data-accent="azure"]', css)
+        self.assertIn(':root[data-accent="rose"]', css)
+        for semantic in ("success", "warning", "danger"):
+            self.assertIn(
+                f"--{semantic}: color-mix(in oklab, var(--{semantic}-base) 90%, var(--brand))",
+                css,
+            )
+        self.assertIn("accent-color: var(--brand)", css)
 
     def test_entity_values_are_capitalized_without_bold_emphasis(self):
         root = Path(__file__).resolve().parents[1]

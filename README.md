@@ -1,6 +1,6 @@
-# Project Valhalla Production Studio
+# Valhalla Photo Studio
 
-Project Valhalla is a local, browser-based production interface for composing rule-compatible image prompts and rendering them through a captured Stability Matrix / ComfyUI workflow.
+Valhalla Photo Studio is a local, browser-based production interface for composing rule-compatible image prompts and rendering them through a captured Stability Matrix / ComfyUI workflow.
 
 The project intentionally does not preserve backward compatibility for internal configuration or storyboard formats. When a format changes, keep the current implementation direct and reject obsolete files instead of adding legacy fields, aliases, or migration paths.
 
@@ -17,7 +17,7 @@ There is no terminal wizard and no `fzf` dependency. The terminal is used only f
 
 ## Interface
 
-The Production Studio is designed around a review-before-render workflow:
+The Photo Studio is designed around a review-before-render workflow:
 
 1. Configure the production mode, content direction, batch size, progression, render mode, and seed strategy.
 2. Select **Resolve storyboard** to assemble every compatible shot without using the GPU.
@@ -41,7 +41,7 @@ The UI includes:
 - editorially planned storyboard cards with camera grammar, roles, diversity scoring, one-shot reroll/render, prompt inspection, temporary Fast Preview, and compact JSON export/import tied to the exact semantic database version;
 - a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render style, stage, pose/action, surface, editorial role, shot size, angle, framing, focus, and explicit-recipe controls;
 - cancellable FIFO background render jobs that accept additional work while rendering and fail each job clearly on its first generation error;
-- a reload-safe Render Logger with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves outputs and the displayed preview intact;
+- a reload-safe Production Logbook with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves proofs and the displayed preview intact;
 - shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
 - a persistent, virtualized output gallery with bounded DOM size, a browser-fullscreen lightbox, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
 - safe or forced workflow capture from the latest successful ComfyUI run.
@@ -91,7 +91,7 @@ Test large-gallery behavior without rendering or copying thousands of images:
 python3 app.py gallery-benchmark --count 2000
 ```
 
-The read-only benchmark requires at least one existing image in `outputs/`. It exposes 2,000 unique synthetic gallery records that cycle through at most ten real images, gives every thumbnail a unique browser URL to exercise network transfer and decoding, opens directly on Outputs, disables deletion, and reports both the record count and current `.output-card` DOM count. The server still reuses its RAM thumbnail cache, so no image copies are created. Stop it with `Ctrl+C`, then start the normal production server again.
+The read-only benchmark requires at least one existing image in `outputs/`. It exposes 2,000 unique synthetic gallery records that cycle through at most ten real images, gives every thumbnail a unique browser URL to exercise network transfer and decoding, opens directly on Proofs, disables deletion, and reports both the record count and current `.output-card` DOM count. The server still reuses its RAM thumbnail cache, so no image copies are created. Stop it with `Ctrl+C`, then start the normal production server again.
 
 In browser developer tools, record initial network transfer and browser memory, scroll from the first record to the last, open and navigate the lightbox, and confirm that the displayed DOM-card count remains bounded rather than approaching 2,000.
 
@@ -187,7 +187,7 @@ Safe capture refuses to overwrite an existing `workflow.json`. Enable **Replace 
 
 ## Preview render
 
-Preview render patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. The synchronized Studio and Director split-buttons switch between **Preview storyboard** and **Render storyboard**, and their primary action runs the selected workflow. Individual **Preview** buttons always use the preview workflow. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logger. Closing the draggable preview window discards its temporary image without adding anything to Outputs.
+Preview render patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. The synchronized Studio and Director split-buttons switch between **Preview storyboard** and **Render storyboard**, and their primary action runs the selected workflow. Individual **Preview** buttons always use the preview workflow. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logbook. Closing the draggable preview window discards its temporary image without adding anything to Proofs.
 
 While production is active, using **Preview storyboard** or **Render storyboard** again appends another immutable storyboard snapshot to the FIFO render queue. The current image is never interrupted, queued jobs start automatically in submission order, and cancelling the active job advances to the next queued job after the current image finishes.
 

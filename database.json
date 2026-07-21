@@ -7883,6 +7883,27 @@
         ]
       },
       {
+        "id": "dress_ballet_tutu",
+        "catalog_category": "luxury",
+        "prompt": "luxury classical ballet dress with a fitted satin bodice and layered tulle tutu",
+        "tags": [
+          "ballet",
+          "elegant",
+          "formal",
+          "luxury"
+        ],
+        "occupies_slots": [
+          "upperwear",
+          "lowerwear"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_ivory",
+          "color_pink",
+          "color_black"
+        ]
+      },
+      {
         "id": "dress_slip",
         "catalog_category": "normal",
         "prompt": "silk slip dress",
@@ -10964,6 +10985,22 @@
         ]
       },
       {
+        "id": "legwear_ballet_tights",
+        "catalog_category": "luxury",
+        "prompt": "smooth opaque ballet tights",
+        "tags": [
+          "ballet",
+          "pantyhose",
+          "elegant",
+          "luxury"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_ivory",
+          "color_pink"
+        ]
+      },
+      {
         "id": "legwear_lace_stockings",
         "catalog_category": "normal",
         "prompt": "lace-top thigh-high stockings",
@@ -11856,6 +11893,22 @@
           "color_black",
           "color_beige",
           "color_pink"
+        ]
+      },
+      {
+        "id": "shoes_ballet_pointe",
+        "catalog_category": "luxury",
+        "prompt": "satin ballet pointe shoes with neatly wrapped ankle ribbons",
+        "tags": [
+          "ballet",
+          "elegant",
+          "luxury"
+        ],
+        "allowed_colors": [
+          "color_white",
+          "color_ivory",
+          "color_pink",
+          "color_black"
         ]
       },
       {
@@ -13088,6 +13141,89 @@
             "nipples",
             "pubic_area",
             "genitals"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template_classical_ballet",
+      "catalog_category": "luxury",
+      "weight": 2,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_tags": [
+            "ballet"
+          ],
+          "color_group": "main"
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "elegant"
+          ],
+          "color_group": "lingerie",
+          "match_group": "lingerie"
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "elegant"
+          ],
+          "color_group": "lingerie",
+          "match_group": "lingerie"
+        },
+        "legwear": {
+          "catalog": "legwear",
+          "required": true,
+          "required_tags": [
+            "ballet"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": true,
+          "required_tags": [
+            "ballet"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "ballet_dressed",
+          "level": "covered",
+          "visible_slots": [
+            "full_body",
+            "legwear",
+            "footwear"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "ballet_lingerie",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "legwear",
+            "footwear"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "ballet_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "legwear",
+            "footwear"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
           ]
         }
       ]

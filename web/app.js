@@ -43,6 +43,8 @@ const state = {
   pendingStructural: false,
   updateResolver: null,
   theme: sessionStorage.getItem('valhalla-theme') || 'system',
+  accent: ['lavender', 'azure', 'rose'].includes(sessionStorage.getItem('valhalla-accent'))
+    ? sessionStorage.getItem('valhalla-accent') : 'lavender',
   typeSize: ['small', 'normal', 'large'].includes(sessionStorage.getItem('valhalla-type-size'))
     ? sessionStorage.getItem('valhalla-type-size') : 'normal',
 };
@@ -191,14 +193,16 @@ function setBusy(button, busy, label) {
 function applyTheme() {
   if (state.theme === 'system') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.dataset.theme = state.theme;
-  const icon = { system: '◐', light: '☀', dark: '☾' }[state.theme];
-  $('#theme-icon').textContent = icon;
-  $('#theme-label').textContent = `${state.theme[0].toUpperCase()}${state.theme.slice(1)}`;
-  $('#theme-button').title = `Theme: ${state.theme}`;
+  $$('[data-theme-choice]').forEach((button) => {
+    const active = button.dataset.themeChoice === state.theme;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
 }
 
-function cycleTheme() {
-  state.theme = { system: 'light', light: 'dark', dark: 'system' }[state.theme];
+function setTheme(theme) {
+  if (!['system', 'light', 'dark'].includes(theme)) return;
+  state.theme = theme;
   sessionStorage.setItem('valhalla-theme', state.theme);
   applyTheme();
   toast('Theme updated', `${state.theme[0].toUpperCase()}${state.theme.slice(1)} appearance`);
@@ -219,6 +223,23 @@ function setTypeSize(size) {
   sessionStorage.setItem('valhalla-type-size', size);
   applyTypeSize();
   toast('Text size updated', `${size[0].toUpperCase()}${size.slice(1)}`);
+}
+
+function applyAccent() {
+  document.documentElement.dataset.accent = state.accent;
+  $$('[data-accent]').forEach((button) => {
+    const active = button.dataset.accent === state.accent;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function setAccent(accent) {
+  if (!['lavender', 'azure', 'rose'].includes(accent)) return;
+  state.accent = accent;
+  sessionStorage.setItem('valhalla-accent', accent);
+  applyAccent();
+  toast('Accent updated', `${accent[0].toUpperCase()}${accent.slice(1)} palette`);
 }
 
 async function refreshStatus(showToast = false) {
@@ -573,12 +594,12 @@ function shotCard(shot) {
         <div class="shot-detail"><span>Variation</span><strong title="Inference seed ${shot.inference_seed}">${shot.seed_manual ? 'Custom · ' : ''}${escapeHtml(shot.inference_seed)}</strong></div>
       </div>
       <div class="shot-footer">
-        <button class="direct" data-action="director">⌘ Director</button>
-        <button class="reroll" data-action="reroll">↻ Reroll</button>
-        <button data-action="inspect">≡ Prompt</button>
-        <button class="variation" data-action="variation">⤨ Variation</button>
-        <button class="preview" data-action="preview">◉ Preview</button>
-        <button class="render-one" data-action="render">▶ Render</button>
+        <button class="direct" data-action="director">Director</button>
+        <button class="reroll" data-action="reroll">Reroll</button>
+        <button data-action="inspect">Prompt</button>
+        <button class="variation" data-action="variation">Variation</button>
+        <button class="preview" data-action="preview">Preview</button>
+        <button class="render-one" data-action="render">Render</button>
       </div>
     </article>`;
 }
@@ -586,6 +607,7 @@ function shotCard(shot) {
 function renderStoryboard() {
   const board = state.storyboard;
   if (!board) return;
+  $('#export-storyboard').disabled = false;
   if (state.director?.storyboard_id !== board.id) {
     state.director = null;
     state.directorOpenGroup = null;
@@ -784,9 +806,6 @@ function renderLogger() {
   if (usePreview) {
     $('#clear-logger').disabled = ['queued', 'running'].includes(preview.status);
     $('#log-count').textContent = '1';
-    const status = $('#logger-status');
-    status.textContent = `Preview · ${preview.status}`;
-    status.className = `logger-status ${preview.status}`;
     $('#logger-progress').textContent = 'Preview';
     $('#logger-percent').textContent = preview.status === 'completed' ? 'Ready' : 'Rendering one shot';
     $('#logger-elapsed').textContent = formatDuration(preview.elapsed_seconds);
@@ -798,15 +817,12 @@ function renderLogger() {
     $('#logger-negative').textContent = formatLoggedPrompt(preview.negative);
     $('#logger-job-id').textContent = `Preview ${preview.id.slice(0, 10)}`;
     const time = new Date(preview.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    $('#logger-event-list').innerHTML = `<div class="logger-event ${escapeHtml(preview.status)}"><time>${escapeHtml(time)}</time><i>preview</i><span>${escapeHtml(`Shot ${preview.shot} preview ${preview.status}`)}</span><em>1/1</em></div>`;
+    $('#logger-event-list').innerHTML = `<div class="logger-event ${escapeHtml(preview.status)}"><time>${escapeHtml(time)}</time><i>Preview</i><span>${escapeHtml(`Shot ${preview.shot} preview ${preview.status}`)}</span><em>1/1</em></div>`;
     return;
   }
   const logs = job.logs || [];
   $('#clear-logger').disabled = ['queued', 'running'].includes(job.status);
   $('#log-count').textContent = logs.length;
-  const status = $('#logger-status');
-  status.textContent = job.cancel_requested ? 'Cancelling' : job.status;
-  status.className = `logger-status ${job.status}`;
   const visiblePosition = job.current_prompt?.position || job.completed || 0;
   $('#logger-progress').textContent = `${visiblePosition} / ${job.total}`;
   $('#logger-percent').textContent = `${job.progress || 0}% complete`;
@@ -824,17 +840,24 @@ function renderLogger() {
   $('#logger-event-list').innerHTML = logs.map((entry, logIndex) => ({ entry, logIndex })).reverse().map(({ entry, logIndex }) => {
     const time = new Date(entry.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const count = entry.position ? `${entry.position}/${entry.total}` : `0/${entry.total}`;
-    const detail = entry.duration_seconds != null ? `${entry.message} · ${formatDuration(entry.duration_seconds)}` : entry.message;
+    const liveDuration = Math.max(0, (Date.now() - new Date(entry.time).getTime()) / 1000);
+    const detail = entry.type === 'shot_started'
+      ? `Rendering · ${formatDuration(liveDuration)}`
+      : (entry.type === 'shot_completed'
+        ? `Rendered in ${formatDuration(entry.duration_seconds)}`
+        : entry.message);
     const inspectable = entry.positive != null && entry.negative != null;
+    const eventLabel = entry.shot != null ? `Shot ${entry.shot}` : 'Production';
     const selected = state.loggerInspection?.jobId === job.id
       && state.loggerInspection.logIndex === logIndex;
-    return `<div class="logger-event ${escapeHtml(entry.type)}${inspectable ? ' inspectable' : ''}${selected ? ' selected' : ''}"${inspectable ? ` data-log-index="${logIndex}" role="button" tabindex="0" aria-label="Inspect prompts for shot ${entry.shot}"` : ''}><time>${escapeHtml(time)}</time><i>${escapeHtml(entry.type.replaceAll('_', ' '))}</i><span>${escapeHtml(detail)}</span><em>${escapeHtml(count)}</em></div>`;
+    return `<div class="logger-event ${escapeHtml(entry.type)}${inspectable ? ' inspectable' : ''}${selected ? ' selected' : ''}"${inspectable ? ` data-log-index="${logIndex}" role="button" tabindex="0" aria-label="Inspect prompts for shot ${entry.shot}"` : ''}><time>${escapeHtml(time)}</time><i>${escapeHtml(eventLabel)}</i><span>${escapeHtml(detail)}</span><em>${escapeHtml(count)}</em></div>`;
   }).join('');
 }
 
 function showJob() {
   const job = state.job;
   if (!job) return;
+  const allImagesRendered = job.total > 0 && job.completed >= job.total;
   const queueSuffix = job.queued_after
     ? ` · ${job.queued_after} job${job.queued_after === 1 ? '' : 's'} queued`
     : '';
@@ -846,8 +869,11 @@ function showJob() {
     ? 'Cancelling… current image will finish'
     : (job.status === 'queued'
       ? `Waiting to start${queueSuffix}`
-      : `Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}${queueSuffix}`);
-  $('#cancel-job').disabled = Boolean(job.cancel_requested);
+      : (allImagesRendered
+        ? `Finalizing production…${queueSuffix}`
+        : `Image ${job.completed} of ${job.total} · ${formatTime(job.eta_seconds)}${queueSuffix}`));
+  $('#cancel-job').classList.toggle('hidden', allImagesRendered);
+  $('#cancel-job').disabled = Boolean(job.cancel_requested) || allImagesRendered;
   renderLogger();
 }
 
@@ -1024,9 +1050,9 @@ async function deleteAllOutputs() {
     state.outputs = [];
     if (imageDialog.open) imageDialog.close();
     renderOutputs();
-    toast('Outputs deleted', `${result.deleted} image${result.deleted === 1 ? '' : 's'} permanently removed.`, 'success');
+    toast('Proofs deleted', `${result.deleted} image${result.deleted === 1 ? '' : 's'} permanently removed.`, 'success');
   } catch (error) {
-    toast('Could not delete outputs', error.message, 'error');
+    toast('Could not delete proofs', error.message, 'error');
   }
 }
 
@@ -1036,7 +1062,7 @@ async function loadOutputs() {
     state.outputs = result.outputs || [];
     state.galleryBenchmark = Boolean(result.benchmark);
   } catch (error) {
-    toast('Could not load outputs', error.message, 'error');
+    toast('Could not load proofs', error.message, 'error');
   }
   renderOutputs();
 }
@@ -1084,13 +1110,6 @@ function renderOutputs() {
   $('#outputs-empty').classList.toggle('hidden', count > 0);
   const group = activePhotoshootGroup();
   const groups = photoshootGroups();
-  $('#outputs-title').textContent = group
-    ? (group.identity?.kind === 'photoshoot'
-      ? `Photoshoot ${group.displayNumber}`
-      : (group.identity?.kind === 'random'
-        ? `Random ${group.displayNumber}`
-        : (group.identity?.kind === 'legacy' ? 'Render run' : 'Ungrouped outputs')))
-    : 'Latest outputs';
   $$('#gallery-view-toggle button').forEach((button) => {
     button.classList.toggle('active', button.dataset.galleryView === state.galleryView);
   });
@@ -1867,6 +1886,26 @@ async function openShotPreview(preview) {
   }
 }
 
+function fitShotPreviewWindowToImage() {
+  const windowElement = $('#shot-preview-window');
+  const image = $('#shot-preview-image');
+  if (windowElement.classList.contains('hidden') || !image.naturalWidth || !image.naturalHeight) return;
+  const headerHeight = windowElement.querySelector('header').offsetHeight;
+  const footerHeight = windowElement.querySelector('footer').offsetHeight;
+  const frameHeight = headerHeight + footerHeight + 2;
+  const maxContentWidth = Math.max(1, window.innerWidth - 34);
+  const maxContentHeight = Math.max(1, window.innerHeight - frameHeight - 18);
+  const scale = Math.min(
+    430 / image.naturalWidth,
+    maxContentWidth / image.naturalWidth,
+    maxContentHeight / image.naturalHeight,
+    1,
+  );
+  windowElement.style.width = `${Math.round(image.naturalWidth * scale + 2)}px`;
+  windowElement.style.height = `${Math.round(image.naturalHeight * scale + frameHeight)}px`;
+  clampShotPreviewWindow();
+}
+
 function setPreviewBusy(button, busy) {
   if (button?.id === 'shot-preview-refresh') {
     button.disabled = busy;
@@ -1888,7 +1927,7 @@ async function pollShotPreview(button) {
     setPreviewBusy(button, false);
     if (state.previewJob.status === 'completed') {
       await openShotPreview(state.previewJob);
-      toast('Shot preview ready', 'Temporary preview rendered without adding it to Outputs.', 'success');
+      toast('Shot preview ready', 'Temporary preview rendered without adding it to Proofs.', 'success');
     } else {
       const message = state.previewJob.error || 'Preview rendering failed';
       const failedId = state.previewJob.id;
@@ -1946,9 +1985,17 @@ function clampShotPreviewWindow() {
 function switchView(name) {
   $$('.view').forEach((view) => view.classList.toggle('active', view.id === `${name}-view`));
   $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.view === name));
+  $('#studio-topbar-actions').classList.toggle('hidden', name !== 'studio');
+  $('#outputs-topbar-center').classList.toggle('hidden', name !== 'outputs');
+  $('#outputs-topbar-actions').classList.toggle('hidden', name !== 'outputs');
+  $('#logbook-topbar-actions').classList.toggle('hidden', name !== 'logger');
   $('#view-title').textContent = {
-    studio: 'Production Studio', director: 'Director’s Desk', outputs: 'Output Gallery', logger: 'Render Logger',
-  }[name] || 'Project Valhalla';
+    studio: 'Photo Studio', director: 'Director’s Desk', outputs: 'Proof Gallery', logger: 'Production Logbook',
+  }[name] || 'Valhalla Photo Studio';
+  $('#view-eyebrow').textContent = {
+    studio: 'Creative workspace', director: 'Direction workspace',
+    outputs: 'Review workspace', logger: 'Production telemetry',
+  }[name] || 'Creative workspace';
   if (name === 'director') loadDirector();
   if (name === 'logger') renderLogger();
   if (name === 'outputs') scheduleVirtualOutputRender(true);
@@ -1981,8 +2028,9 @@ form.addEventListener('input', (event) => {
   syncPendingState();
 });
 form.addEventListener('input', scheduleSeedResolve);
-$('#theme-button').addEventListener('click', cycleTheme);
+$$('[data-theme-choice]').forEach((button) => button.addEventListener('click', () => setTheme(button.dataset.themeChoice)));
 $$('[data-type-size]').forEach((button) => button.addEventListener('click', () => setTypeSize(button.dataset.typeSize)));
+$$('[data-accent]').forEach((button) => button.addEventListener('click', () => setAccent(button.dataset.accent)));
 $('#refresh-status').addEventListener('click', () => refreshStatus(true));
 $('#reset-config').addEventListener('click', () => {
   form.reset();
@@ -1997,6 +2045,18 @@ $('#reroll-all').addEventListener('click', () => requestStoryboardUpdate());
 $('#export-storyboard').addEventListener('click', exportStoryboard);
 $('#import-storyboard').addEventListener('click', () => $('#storyboard-file').click());
 $('#storyboard-file').addEventListener('change', importStoryboard);
+const studioFilesMenu = $('#studio-files-menu');
+$$('#studio-files-menu button').forEach((button) => {
+  button.addEventListener('click', () => { studioFilesMenu.open = false; });
+});
+document.addEventListener('click', (event) => {
+  if (studioFilesMenu.open && !event.target.closest('#studio-files-menu')) {
+    studioFilesMenu.open = false;
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') studioFilesMenu.open = false;
+});
 $$('[data-render-mode]').forEach((select) => select.addEventListener('change', (event) => {
   setRenderMode(event.target.value);
 }));
@@ -2080,6 +2140,7 @@ $('#shot-preview-refresh').addEventListener('click', (event) => {
 $('#shot-preview-image').addEventListener('error', () => {
   toast('Could not display preview', 'The temporary preview image is no longer available.', 'error');
 });
+$('#shot-preview-image').addEventListener('load', fitShotPreviewWindowToImage);
 let previewDrag = null;
 $('#shot-preview-drag-handle').addEventListener('pointerdown', (event) => {
   if (event.target.closest('button')) return;
@@ -2194,9 +2255,9 @@ $('#clear-logger').addEventListener('click', async () => {
     state.previewJob = null;
     state.loggerInspection = null;
     renderLogger();
-    toast('Logger cleared', `${result.cleared} log source${result.cleared === 1 ? '' : 's'} removed.`, 'success');
+    toast('Logbook cleared', `${result.cleared} log source${result.cleared === 1 ? '' : 's'} removed.`, 'success');
   } catch (error) {
-    toast('Could not clear logger', error.message, 'error');
+    toast('Could not clear logbook', error.message, 'error');
   } finally {
     setBusy(button, false);
   }
@@ -2204,6 +2265,7 @@ $('#clear-logger').addEventListener('click', async () => {
 
 applyTheme();
 applyTypeSize();
+applyAccent();
 syncForm();
 syncPendingState();
 syncRenderControls();

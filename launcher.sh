@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Project Valhalla Web UI bootstrap.
+# Valhalla Photo Studio Web UI bootstrap.
 set -u
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -32,5 +32,5 @@ command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python not found: $PYTHON_BIN"
 
 ensure_dependency requests requests
 ensure_dependency PIL Pillow
-printf 'Starting Project Valhalla at http://%s:%s/\n' "$VALHALLA_HOST" "$VALHALLA_PORT"
+printf 'Starting Valhalla Photo Studio at http://%s:%s/\n' "$VALHALLA_HOST" "$VALHALLA_PORT"
 exec "$PYTHON_BIN" "$APP" --host "$VALHALLA_HOST" --port "$VALHALLA_PORT"

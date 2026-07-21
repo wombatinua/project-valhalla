@@ -1,4 +1,4 @@
-# Project Valhalla — Roadmap
+# Valhalla Photo Studio — Roadmap
 
 This file describes the verified implementation state and the agreed next work.
 Checked items are implemented and covered by the current application or regression suite.

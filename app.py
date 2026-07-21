@@ -3984,7 +3984,7 @@ class WebState:
                     "This file is a UI storyboard snapshot, not an export file. "
                     "Export the storyboard again with the updated server."
                 )
-            raise AppError("This is not a Project Valhalla storyboard export file")
+            raise AppError("This is not a Valhalla Photo Studio storyboard export file")
         if payload.get("version") != STORYBOARD_FORMAT_VERSION:
             raise AppError("Unsupported storyboard format version")
         db, _ = load_database()
@@ -4427,7 +4427,12 @@ class WebState:
                     "position": 0, "total": job["total"],
                 })
             elif job["status"] == "running":
-                if not job["cancel_requested"]:
+                if job["completed"] >= job["total"]:
+                    job["status"] = "completed"
+                    job["progress"] = 100
+                    job["eta_seconds"] = 0
+                    job["finished_at"] = job["finished_at"] or _iso_now()
+                elif not job["cancel_requested"]:
                     job["cancel_requested"] = True
                     job["logs"].append({
                         "time": _iso_now(), "type": "cancel_requested",
@@ -4488,13 +4493,14 @@ class WebState:
                         "positive": positive, "negative": negative,
                         "seed": shot["inference_seed"],
                     }
-                    job["logs"].append({
+                    shot_log = {
                         "time": _iso_now(), "type": "shot_started",
                         "message": f"Rendering shot {shot['number']}",
                         "shot": shot["number"], "position": completed_index,
                         "total": len(selected_shots), "seed": shot["inference_seed"],
                         "positive": positive, "negative": negative,
-                    })
+                    }
+                    job["logs"].append(shot_log)
                 prompt_id, paths = generate_one(
                     db, db_path, positive, negative, shot["inference_seed"],
                     job["_mode"], shot["shot_index"], shot["photoshoot_index"],
@@ -4515,21 +4521,19 @@ class WebState:
                             "prompt_id": prompt_id,
                             "shot": shot["number"],
                         })
-                    job["logs"].append({
-                        "time": _iso_now(), "type": "shot_completed",
-                        "message": f"Shot {shot['number']} completed",
-                        "shot": shot["number"], "position": completed,
-                        "total": len(selected_shots),
+                    shot_log.update({
+                        "type": "shot_completed",
+                        "position": completed,
                         "elapsed_seconds": round(elapsed, 1),
                         "duration_seconds": round(time.monotonic() - shot_started, 1),
                     })
+                    if completed == len(selected_shots):
+                        job["status"] = "completed"
+                        job["progress"] = 100
+                        job["eta_seconds"] = 0
             with self.lock:
                 if job["status"] == "running":
                     job["status"] = "completed"
-                    job["logs"].append({
-                        "time": _iso_now(), "type": "completed", "message": "Render job completed",
-                        "shot": None, "position": job["completed"], "total": job["total"],
-                    })
         except Exception as exc:
             with self.lock:
                 job["status"] = "failed"
@@ -4756,7 +4760,7 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
             comfy["message"] = str(exc)
     progression = settings.get("photoshoot_progression", {})
     return {
-        "app": "Project Valhalla",
+        "app": "Valhalla Photo Studio",
         "version": "2.0-web",
         "comfy": comfy,
         "workflow": {"ready": workflow_path.is_file(), "name": workflow_path.name},
@@ -4984,20 +4988,20 @@ def serve(host: str, port: int, open_browser: bool) -> None:
     server = ThreadingHTTPServer((host, port), ValhallaHandler)
     browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
     url = f"http://{browser_host}:{server.server_port}/"
-    label = "Gallery benchmark" if GALLERY_BENCHMARK_COUNT else "Project Valhalla Web UI"
+    label = "Gallery benchmark" if GALLERY_BENCHMARK_COUNT else "Valhalla Photo Studio Web UI"
     print(f"{label}: {url}")
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping Project Valhalla…")
+        print("\nStopping Valhalla Photo Studio…")
     finally:
         server.server_close()
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Project Valhalla local Web UI server")
+    parser = argparse.ArgumentParser(description="Valhalla Photo Studio local Web UI server")
     parser.add_argument(
         "command", nargs="?", choices=("serve", "gallery-benchmark"), default="serve",
         help="Start the production server or an isolated synthetic gallery benchmark",
