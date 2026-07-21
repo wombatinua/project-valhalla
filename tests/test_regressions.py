@@ -1,4 +1,6 @@
 import copy
+import concurrent.futures
+import threading
 import time
 import tempfile
 import unittest
@@ -1056,6 +1058,128 @@ class OutputDeletionRegressionTests(unittest.TestCase):
                 self.assertEqual(app.output_thumbnail(target.name), b"thumbnail")
             app._thumbnail_cache_remove()
 
+    def test_concurrent_thumbnail_misses_share_one_generation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "result.png"
+            target.write_bytes(b"image")
+            app._thumbnail_cache_remove()
+            workers = 8
+            ready = threading.Barrier(workers)
+            calls = 0
+            calls_lock = threading.Lock()
+
+            def generate(_target):
+                nonlocal calls
+                with calls_lock:
+                    calls += 1
+                time.sleep(0.05)
+                return b"thumbnail"
+
+            def request_thumbnail():
+                ready.wait()
+                return app.output_thumbnail(target.name)
+
+            with (
+                patch.object(app, "output_directory", return_value=Path(directory)),
+                patch.object(app, "_generate_thumbnail", side_effect=generate),
+                concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor,
+            ):
+                results = list(executor.map(lambda _: request_thumbnail(), range(workers)))
+            self.assertEqual(results, [b"thumbnail"] * workers)
+            self.assertEqual(calls, 1)
+            app._thumbnail_cache_remove()
+
+    def test_thumbnail_generation_failure_is_shared_and_can_be_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "result.png"
+            target.write_bytes(b"image")
+            app._thumbnail_cache_remove()
+            workers = 4
+            ready = threading.Barrier(workers)
+
+            def fail(_target):
+                time.sleep(0.05)
+                raise app.AppError("thumbnail failed")
+
+            def request_thumbnail():
+                ready.wait()
+                return app.output_thumbnail(target.name)
+
+            with (
+                patch.object(app, "output_directory", return_value=Path(directory)),
+                patch.object(app, "_generate_thumbnail", side_effect=fail) as generate,
+                concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor,
+            ):
+                futures = [executor.submit(request_thumbnail) for _ in range(workers)]
+                for future in futures:
+                    with self.assertRaisesRegex(app.AppError, "thumbnail failed"):
+                        future.result()
+                self.assertEqual(generate.call_count, 1)
+
+            with (
+                patch.object(app, "output_directory", return_value=Path(directory)),
+                patch.object(app, "_generate_thumbnail", return_value=b"retry") as generate,
+            ):
+                self.assertEqual(app.output_thumbnail(target.name), b"retry")
+                generate.assert_called_once_with(target)
+            app._thumbnail_cache_remove()
+
+    def test_thumbnail_cache_evicts_least_recently_used_entries_by_byte_size(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            first = output_dir / "first.png"
+            second = output_dir / "second.png"
+            first.write_bytes(b"first")
+            second.write_bytes(b"second")
+            generated = []
+
+            def generate(target):
+                generated.append(target.name)
+                return target.stem.encode()[:6]
+
+            app._thumbnail_cache_remove()
+            with (
+                patch.object(app, "output_directory", return_value=output_dir),
+                patch.object(app, "_generate_thumbnail", side_effect=generate),
+                patch.object(app, "THUMBNAIL_CACHE_MAX_BYTES", 10),
+            ):
+                self.assertEqual(app.output_thumbnail(first.name), b"first")
+                self.assertEqual(app.output_thumbnail(second.name), b"second")
+                self.assertEqual(app.output_thumbnail(second.name), b"second")
+                self.assertEqual(app.output_thumbnail(first.name), b"first")
+                self.assertEqual(generated, ["first.png", "second.png", "first.png"])
+                self.assertLessEqual(app.THUMBNAIL_CACHE_BYTES, 10)
+            app._thumbnail_cache_remove()
+
+    def test_deleting_output_invalidates_all_cached_versions_of_its_thumbnail(self):
+        state = app.WebState()
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            target = output_dir / "result.png"
+            target.write_bytes(b"image")
+            removed_keys = [
+                (target.name, 1, 5),
+                (target.name, 2, 5),
+            ]
+            retained_key = ("other.png", 1, 5)
+            app._thumbnail_cache_remove()
+            with app.THUMBNAIL_CACHE_LOCK:
+                app.THUMBNAIL_CACHE[removed_keys[0]] = b"old"
+                app.THUMBNAIL_CACHE[retained_key] = b"other"
+                app.THUMBNAIL_CACHE[removed_keys[1]] = b"new"
+                app.THUMBNAIL_CACHE_BYTES = 11
+
+            with (
+                patch.object(app, "WEB_STATE", state),
+                patch.object(app, "output_directory", return_value=output_dir),
+            ):
+                app.delete_output_image(target.name)
+
+            with app.THUMBNAIL_CACHE_LOCK:
+                self.assertEqual(list(app.THUMBNAIL_CACHE), [retained_key])
+                self.assertEqual(app.THUMBNAIL_CACHE_BYTES, len(b"other"))
+            app._thumbnail_cache_remove()
+
     def test_completed_frame_can_be_deleted_while_batch_is_rendering(self):
         state = app.WebState()
         name = "run_photoshoot_001_shot_001_1_image_01.png"
@@ -1098,7 +1222,8 @@ class FrontendContractTests(unittest.TestCase):
     def test_lightbox_close_aligns_grid_to_last_viewed_output(self):
         js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("function syncOutputGridToPreview()", js)
-        self.assertIn("card.scrollIntoView({ block: 'start', inline: 'nearest' })", js)
+        self.assertIn("focusOutputCard(state.previewIndex, { alignTop: true })", js)
+        self.assertIn("window.scrollTo({ top: cardTop, behavior: 'auto' })", js)
         self.assertIn("syncOutputGridToPreview();", js)
 
     def test_lightbox_has_fullscreen_and_non_interrupting_slideshow_controls(self):
@@ -1125,6 +1250,19 @@ class FrontendContractTests(unittest.TestCase):
         js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("item.thumbnail_url || item.url", js)
         self.assertIn('loading="lazy" decoding="async"', js)
+
+    def test_output_gallery_virtualizes_rows_with_bounded_overscan(self):
+        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("const OUTPUT_OVERSCAN_ROWS = 3", js)
+        self.assertIn(".slice(start, end)", js)
+        self.assertIn("renderVirtualOutputs", js)
+        self.assertNotIn("state.outputs.map((item, index)", js)
+
+    def test_virtual_output_navigation_uses_stable_absolute_indexes(self):
+        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn('data-output-index="${index}"', js)
+        self.assertIn("focusOutputCard(state.previewIndex, { alignTop: true })", js)
+        self.assertIn("ArrowUp: -columns, ArrowDown: columns", js)
 
     def test_typography_presets_use_relative_scale_with_normal_default(self):
         root = Path(__file__).resolve().parents[1]

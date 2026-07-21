@@ -14,6 +14,7 @@ import secrets
 import sys
 import time
 import uuid
+from concurrent.futures import Future
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -2412,6 +2413,7 @@ THUMBNAIL_CACHE_MAX_BYTES = 128 * 1024 * 1024
 THUMBNAIL_CACHE: OrderedDict[tuple[str, int, int], bytes] = OrderedDict()
 THUMBNAIL_CACHE_BYTES = 0
 THUMBNAIL_CACHE_LOCK = threading.Lock()
+THUMBNAIL_IN_FLIGHT: dict[tuple[str, int, int], Future[bytes]] = {}
 
 
 def _iso_now() -> str:
@@ -4268,22 +4270,7 @@ def _thumbnail_cache_remove(name: str | None = None) -> None:
             THUMBNAIL_CACHE_BYTES -= len(THUMBNAIL_CACHE.pop(key))
 
 
-def output_thumbnail(name: str) -> bytes:
-    global THUMBNAIL_CACHE_BYTES
-    if not name or Path(name).name != name:
-        raise AppError("Invalid output filename")
-    target = output_directory() / name
-    if target.suffix.lower() not in IMAGE_SUFFIXES:
-        raise AppError("Only generated image files can be viewed")
-    if not target.is_file():
-        raise AppError("Output not found")
-    stat = target.stat()
-    key = (name, stat.st_mtime_ns, stat.st_size)
-    with THUMBNAIL_CACHE_LOCK:
-        cached = THUMBNAIL_CACHE.get(key)
-        if cached is not None:
-            THUMBNAIL_CACHE.move_to_end(key)
-            return cached
+def _generate_thumbnail(target: Path) -> bytes:
     if Image is None or ImageOps is None:
         raise AppError("Thumbnail support requires Pillow; restart with launcher.sh to install it")
     try:
@@ -4303,16 +4290,51 @@ def output_thumbnail(name: str) -> bytes:
             body = buffer.getvalue()
     except (OSError, ValueError) as exc:
         raise AppError(f"Could not create thumbnail: {exc}") from exc
-    with THUMBNAIL_CACHE_LOCK:
-        previous = THUMBNAIL_CACHE.pop(key, None)
-        if previous is not None:
-            THUMBNAIL_CACHE_BYTES -= len(previous)
-        THUMBNAIL_CACHE[key] = body
-        THUMBNAIL_CACHE_BYTES += len(body)
-        while THUMBNAIL_CACHE_BYTES > THUMBNAIL_CACHE_MAX_BYTES and len(THUMBNAIL_CACHE) > 1:
-            _, evicted = THUMBNAIL_CACHE.popitem(last=False)
-            THUMBNAIL_CACHE_BYTES -= len(evicted)
     return body
+
+
+def output_thumbnail(name: str) -> bytes:
+    global THUMBNAIL_CACHE_BYTES
+    if not name or Path(name).name != name:
+        raise AppError("Invalid output filename")
+    target = output_directory() / name
+    if target.suffix.lower() not in IMAGE_SUFFIXES:
+        raise AppError("Only generated image files can be viewed")
+    if not target.is_file():
+        raise AppError("Output not found")
+    stat = target.stat()
+    key = (name, stat.st_mtime_ns, stat.st_size)
+    with THUMBNAIL_CACHE_LOCK:
+        cached = THUMBNAIL_CACHE.get(key)
+        if cached is not None:
+            THUMBNAIL_CACHE.move_to_end(key)
+            return cached
+        future = THUMBNAIL_IN_FLIGHT.get(key)
+        owns_generation = future is None
+        if future is None:
+            future = Future()
+            THUMBNAIL_IN_FLIGHT[key] = future
+    if not owns_generation:
+        return future.result()
+    try:
+        body = _generate_thumbnail(target)
+        with THUMBNAIL_CACHE_LOCK:
+            previous = THUMBNAIL_CACHE.pop(key, None)
+            if previous is not None:
+                THUMBNAIL_CACHE_BYTES -= len(previous)
+            THUMBNAIL_CACHE[key] = body
+            THUMBNAIL_CACHE_BYTES += len(body)
+            while THUMBNAIL_CACHE_BYTES > THUMBNAIL_CACHE_MAX_BYTES and len(THUMBNAIL_CACHE) > 1:
+                _, evicted = THUMBNAIL_CACHE.popitem(last=False)
+                THUMBNAIL_CACHE_BYTES -= len(evicted)
+        future.set_result(body)
+        return body
+    except BaseException as exc:
+        future.set_exception(exc)
+        raise
+    finally:
+        with THUMBNAIL_CACHE_LOCK:
+            THUMBNAIL_IN_FLIGHT.pop(key, None)
 
 
 def list_output_images() -> list[dict[str, Any]]:

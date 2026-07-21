@@ -52,6 +52,11 @@ const deleteDialog = $('#delete-dialog');
 const promptDialog = $("#prompt-dialog");
 const directorCustomDialog = $("#director-custom-dialog");
 const updateStoryboardDialog = $('#update-storyboard-dialog');
+const outputGrid = $('#output-grid');
+const OUTPUT_OVERSCAN_ROWS = 3;
+let outputLayout = null;
+let outputRenderFrame = null;
+let outputRenderSignature = '';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -928,15 +933,99 @@ function renderOutputs() {
   $('#outputs-summary').textContent = count
     ? `${count} generated image${count === 1 ? '' : 's'}.`
     : 'No generated images.';
-  $('#output-grid').innerHTML = state.outputs.map((item, index) => {
-    const shotLabel = item.shot == null ? 'Output' : `Shot ${item.shot}`;
-    return `
-    <article class="output-card" data-output-index="${index}" tabindex="0" role="button" aria-label="Maximize ${escapeHtml(shotLabel)}">
-      <img src="${encodeURI(item.thumbnail_url || item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy" decoding="async">
-      <footer><span>${escapeHtml(shotLabel)}</span><span class="output-actions"><button class="output-delete" data-action="delete-output" aria-label="Delete ${escapeHtml(item.name)}">Delete</button><a href="${encodeURI(item.url)}" download="${escapeHtml(item.name)}">Download</a></span></footer>
-    </article>`;
-  }).join('');
+  outputRenderSignature = '';
+  renderVirtualOutputs(true);
   syncDeleteControls();
+}
+
+function measureOutputGrid() {
+  const width = outputGrid.clientWidth;
+  if (!width) return null;
+  const mobile = window.matchMedia('(max-width: 560px)').matches;
+  const gap = mobile ? 8 : 14;
+  const columns = mobile ? 2 : Math.max(1, Math.floor((width + gap) / (180 + gap)));
+  const cardWidth = mobile
+    ? (width - gap) / columns
+    : Math.min(230, (width - gap * (columns - 1)) / columns);
+  const cardHeight = cardWidth * 1.25;
+  const rowStride = cardHeight + gap;
+  const rows = Math.ceil(state.outputs.length / columns);
+  return { width, gap, columns, cardWidth, cardHeight, rowStride, rows };
+}
+
+function outputCardHtml(item, index, layout) {
+  const shotLabel = item.shot == null ? 'Output' : `Shot ${item.shot}`;
+  const row = Math.floor(index / layout.columns);
+  const column = index % layout.columns;
+  return `<article class="output-card" data-output-index="${index}" tabindex="0" role="button"
+    aria-label="Maximize ${escapeHtml(shotLabel)}" aria-posinset="${index + 1}" aria-setsize="${state.outputs.length}"
+    style="width:${layout.cardWidth}px;height:${layout.cardHeight}px;transform:translate(${column * (layout.cardWidth + layout.gap)}px,${row * layout.rowStride}px)">
+    <img src="${encodeURI(item.thumbnail_url || item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy" decoding="async">
+    <footer><span>${escapeHtml(shotLabel)}</span><span class="output-actions"><button class="output-delete" data-action="delete-output" aria-label="Delete ${escapeHtml(item.name)}">Delete</button><a href="${encodeURI(item.url)}" download="${escapeHtml(item.name)}">Download</a></span></footer>
+  </article>`;
+}
+
+function renderVirtualOutputs(force = false) {
+  outputLayout = measureOutputGrid();
+  if (!outputLayout || !state.outputs.length) {
+    outputGrid.style.height = '';
+    outputGrid.innerHTML = '';
+    return;
+  }
+  const { rows, rowStride, cardHeight, columns } = outputLayout;
+  const totalHeight = Math.max(0, rows * rowStride - outputLayout.gap);
+  outputGrid.style.height = `${totalHeight}px`;
+  const rect = outputGrid.getBoundingClientRect();
+  const firstVisibleRow = Math.max(0, Math.floor(-rect.top / rowStride));
+  const lastVisibleRow = Math.min(
+    rows - 1,
+    Math.floor((window.innerHeight - rect.top) / rowStride),
+  );
+  const firstRow = Math.max(0, firstVisibleRow - OUTPUT_OVERSCAN_ROWS);
+  const lastRow = Math.min(
+    rows - 1,
+    Math.max(firstRow, lastVisibleRow) + OUTPUT_OVERSCAN_ROWS,
+  );
+  const start = firstRow * columns;
+  const end = Math.min(state.outputs.length, (lastRow + 1) * columns);
+  const signature = `${start}:${end}:${columns}:${outputLayout.width}:${state.outputs.length}`;
+  if (!force && signature === outputRenderSignature) return;
+  outputRenderSignature = signature;
+  outputGrid.innerHTML = state.outputs
+    .slice(start, end)
+    .map((item, offset) => outputCardHtml(item, start + offset, outputLayout))
+    .join('');
+  syncDeleteControls();
+}
+
+function scheduleVirtualOutputRender(force = false) {
+  if (force) outputRenderSignature = '';
+  if (outputRenderFrame != null) return;
+  outputRenderFrame = requestAnimationFrame(() => {
+    outputRenderFrame = null;
+    if ($('#outputs-view').classList.contains('active')) renderVirtualOutputs(force);
+  });
+}
+
+function focusOutputCard(index, { alignTop = false } = {}) {
+  if (!state.outputs[index]) return;
+  outputLayout = measureOutputGrid();
+  if (!outputLayout) return;
+  const row = Math.floor(index / outputLayout.columns);
+  const gridTop = window.scrollY + outputGrid.getBoundingClientRect().top;
+  const cardTop = gridTop + row * outputLayout.rowStride;
+  const cardBottom = cardTop + outputLayout.cardHeight;
+  if (alignTop || cardTop < window.scrollY || cardBottom > window.scrollY + window.innerHeight) {
+    window.scrollTo({ top: cardTop, behavior: 'auto' });
+  }
+  outputRenderSignature = '';
+  requestAnimationFrame(() => {
+    renderVirtualOutputs(true);
+    requestAnimationFrame(() => {
+      const card = $(`.output-card[data-output-index="${index}"]`, outputGrid);
+      if (card) card.focus({ preventScroll: true });
+    });
+  });
 }
 
 function persistPreviewScale() {
@@ -1114,15 +1203,10 @@ async function toggleTrueFullscreen() {
 
 function syncOutputGridToPreview() {
   if (!state.outputs.length || !$('#outputs-view').classList.contains('active')) return;
-  const card = $(`.output-card[data-output-index="${state.previewIndex}"]`, $('#output-grid'));
-  if (!card) return;
-  requestAnimationFrame(() => {
-    card.scrollIntoView({ block: 'start', inline: 'nearest' });
-    card.focus({ preventScroll: true });
-  });
+  requestAnimationFrame(() => focusOutputCard(state.previewIndex, { alignTop: true }));
 }
 
-$('#output-grid').addEventListener('click', (event) => {
+outputGrid.addEventListener('click', (event) => {
   const card = event.target.closest('.output-card');
   if (!card) return;
   if (event.target.closest('[data-action="delete-output"]')) {
@@ -1160,13 +1244,29 @@ $('.image-viewer-bar').addEventListener('pointermove', () => {
 $('#image-viewer-image').addEventListener('load', fitPreviewImage);
 window.addEventListener('resize', () => { if (imageDialog.open) fitPreviewImage(); });
 
-$('#output-grid').addEventListener('keydown', (event) => {
+outputGrid.addEventListener('keydown', (event) => {
   if (event.target.closest('a, button')) return;
-  if (!['Enter', ' '].includes(event.key)) return;
-  event.preventDefault();
   const card = event.target.closest('.output-card');
-  if (card) openPreview(Number(card.dataset.outputIndex));
+  if (!card) return;
+  const index = Number(card.dataset.outputIndex);
+  if (['Enter', ' '].includes(event.key)) {
+    event.preventDefault();
+    openPreview(index);
+    return;
+  }
+  const columns = outputLayout?.columns || 1;
+  const movement = {
+    ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columns, ArrowDown: columns,
+  }[event.key];
+  if (movement == null) return;
+  event.preventDefault();
+  focusOutputCard(Math.max(0, Math.min(state.outputs.length - 1, index + movement)));
 });
+
+window.addEventListener('scroll', () => scheduleVirtualOutputRender(), { passive: true });
+if ('ResizeObserver' in window) {
+  new ResizeObserver(() => scheduleVirtualOutputRender(true)).observe(outputGrid);
+}
 
 $('#image-viewer-delete').addEventListener('click', () => deleteOutput(state.previewIndex));
 $('#image-previous').addEventListener('click', () => movePreview(-1));
@@ -1566,6 +1666,7 @@ function switchView(name) {
   }[name] || 'Project Valhalla';
   if (name === 'director') loadDirector();
   if (name === 'logger') renderLogger();
+  if (name === 'outputs') scheduleVirtualOutputRender(true);
 }
 
 async function captureWorkflow() {

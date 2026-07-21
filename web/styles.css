@@ -302,8 +302,8 @@ input[type="range"]:disabled { cursor: not-allowed; opacity: .42; }
 .outputs-header { display: flex; align-items: end; justify-content: space-between; margin-bottom: 18px; }
 .outputs-tools { min-width: 0; display: flex; align-items: center; gap: 12px; }
 .outputs-tools p { min-width: 0; margin: 0; color: var(--muted); overflow-wrap: anywhere; font-size: 0.6875rem; }
-.output-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 230px)); justify-content: start; gap: 14px; }
-.output-card { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); cursor: zoom-in; }
+.output-grid { position: relative; contain: layout style; }
+.output-card { position: absolute; inset: 0 auto auto 0; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); cursor: zoom-in; }
 .output-card img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
 .output-card:hover img { transform: scale(1.015); }
 .output-actions { display: flex; align-items: center; gap: 9px; }
@@ -548,7 +548,6 @@ pre { min-height: 280px; max-height: 50vh; margin: 0; padding: 15px; overflow-x:
   .image-viewer-actions .button { padding: 0 9px; }
   .storyboard-actions .button { flex: 1; }
   .shot-grid { padding: 9px; }
-  .output-grid { grid-template-columns: repeat(2, minmax(135px, 1fr)); gap: 8px; }
   .outputs-header { align-items: flex-start; flex-direction: column; }
   .job-dock { right: 10px; bottom: 73px; width: calc(100vw - 20px); grid-template-columns: 32px 1fr; }
   .shot-preview-window { right: 10px; bottom: 73px; width: calc(100vw - 20px); height: min(520px, calc(100vh - 93px)); min-width: 280px; min-height: 300px; }

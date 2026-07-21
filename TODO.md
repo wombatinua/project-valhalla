@@ -52,12 +52,10 @@ The next work is deliberately split into independently testable increments.
 - [x] Stop gallery cards from loading and decoding full-resolution originals.
 - [x] Add versioned thumbnail URLs and long-lived browser caching.
 - [x] Bound the server-side thumbnail cache by encoded byte size.
-- [ ] Coalesce simultaneous requests for the same uncached thumbnail so it is generated only once.
-- [ ] Stream original output files instead of reading each complete 5–10 MB file into server memory.
-- [ ] Add HTTP range support for large original-image viewing and downloads where the browser requests it.
-- [ ] Virtualize gallery cards when the collection is large, keeping the viewport plus a small overscan window in the DOM.
-- [ ] Keep keyboard navigation, deletion indexes, lightbox navigation, and scroll position correct with virtualization.
-- [ ] Add regression coverage for cache eviction, invalidation, concurrent cache misses, and thumbnail-generation failures.
+- [x] Coalesce simultaneous requests for the same uncached thumbnail so it is generated only once.
+- [x] Virtualize gallery cards when the collection is large, keeping the viewport plus a small overscan window in the DOM.
+- [x] Keep keyboard navigation, deletion indexes, lightbox navigation, and scroll position correct with virtualization.
+- [x] Add regression coverage for cache eviction, invalidation, concurrent cache misses, and thumbnail-generation failures.
 - [ ] Measure a gallery containing at least 2,000 outputs and record network transfer, decoded browser memory, and scroll responsiveness.
 
 Ready when:
@@ -229,13 +227,12 @@ The old `python app.py plan` proposal is removed from the active roadmap because
 
 ## Planned implementation order
 
-1. Harden thumbnail concurrency, failure handling, cache tests, and original-file streaming.
-2. Add large-gallery virtualization and measure the 2,000-output acceptance case.
-3. Implement explicit camera tuple validation and the 10,000-scene stress test.
-4. Add standalone `validate`, then `stats`, using the same resolver and validation rules as the Web UI.
-5. Replace broad Full-XXX kinds with deterministic recipe planning and weighted shuffle bags.
-6. Integrate the intensity system with progressive and Full-XXX planning.
-7. Implement explicit garment-state tracking and matching transition actions.
-8. Refactor Prompt Compiler v2 and visual-trait ordering.
-9. Add location zones and physical surface capabilities.
+1. Measure and document the 2,000-output gallery acceptance case.
+2. Implement explicit camera tuple validation and the 10,000-scene stress test.
+3. Add standalone `validate`, then `stats`, using the same resolver and validation rules as the Web UI.
+4. Replace broad Full-XXX kinds with deterministic recipe planning and weighted shuffle bags.
+5. Integrate the intensity system with progressive and Full-XXX planning.
+6. Implement explicit garment-state tracking and matching transition actions.
+7. Refactor Prompt Compiler v2 and visual-trait ordering.
+8. Add location zones and physical surface capabilities.
 10. Reassess whether an HTML contact sheet adds value beyond the optimized Output Gallery.

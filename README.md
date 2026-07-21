@@ -41,7 +41,7 @@ The UI includes:
 - cancellable background render jobs that fail clearly on the first generation error;
 - a reload-safe Render Logger with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves outputs and the displayed preview intact;
 - shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
-- a persistent output gallery with a browser-fullscreen lightbox, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
+- a persistent, virtualized output gallery with bounded DOM size, a browser-fullscreen lightbox, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
 - safe or forced workflow capture from the latest successful ComfyUI run.
 
 ## Requirements
