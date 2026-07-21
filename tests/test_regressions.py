@@ -1963,6 +1963,23 @@ class VisualCompatibilityRegressionTests(unittest.TestCase):
 
 
 class WorkflowProfileTests(unittest.TestCase):
+    def test_zeroed_negative_conditioning_needs_only_one_text_prompt(self):
+        workflow = {
+            "text": {"class_type": "CLIPTextEncode", "inputs": {"text": "prompt", "clip": ["clip", 0]}},
+            "zero": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["text", 0]}},
+            "latent": {"class_type": "EmptyLatentImage", "inputs": {}},
+            "sampler": {"class_type": "KSampler", "inputs": {
+                "positive": ["text", 0], "negative": ["zero", 0],
+                "latent_image": ["latent", 0], "seed": 1,
+            }},
+        }
+        mapping = app.detect_node_mapping(workflow)
+        self.assertEqual(mapping["positive_prompt"]["node"], "text")
+        self.assertIsNone(mapping["negative_prompt"])
+        app.patch_workflow(workflow, mapping, "new positive", "ignored negative", 99)
+        self.assertEqual(workflow["text"]["inputs"]["text"], "new positive")
+        self.assertEqual(workflow["sampler"]["inputs"]["seed"], 99)
+
     def test_model_name_becomes_a_readable_safe_profile_filename(self):
         workflow = {
             "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "models/Lumina_2-F16.safetensors"}},

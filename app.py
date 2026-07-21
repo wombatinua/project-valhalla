@@ -580,13 +580,47 @@ def detect_node_mapping(
     workflow: dict[str, Any], include_fast: bool = False
 ) -> dict[str, Any]:
     """Discover workflow-specific prompt and seed targets for this process only."""
+    def upstream_nodes(source: Any) -> set[str]:
+        found: set[str] = set()
+        pending = [source]
+        while pending:
+            link = pending.pop()
+            if not (isinstance(link, list) and len(link) == 2):
+                continue
+            node_id = str(link[0])
+            if node_id in found or node_id not in workflow:
+                continue
+            found.add(node_id)
+            pending.extend(workflow[node_id].get("inputs", {}).values())
+        return found
+
     text_candidates = [
         (node_id, node) for node_id, node in workflow.items()
         if isinstance(node.get("inputs", {}).get("text"), str)
     ]
-    positives = [entry for entry in text_candidates if "positive" in entry[0].lower()]
-    negatives = [entry for entry in text_candidates if "negative" in entry[0].lower()]
-    if len(positives) != 1 or len(negatives) != 1:
+    text_ids = {node_id for node_id, _ in text_candidates}
+    positive_ids: set[str] = set()
+    negative_ids: set[str] = set()
+    negative_is_zeroed = False
+    for node in workflow.values():
+        class_type = str(node.get("class_type", "")).lower()
+        if "sampler" not in class_type or "detailer" in class_type:
+            continue
+        inputs = node.get("inputs", {})
+        positive_upstream = upstream_nodes(inputs.get("positive"))
+        negative_upstream = upstream_nodes(inputs.get("negative"))
+        sampler_negative_zeroed = any(
+            "conditioningzeroout" in str(workflow[node_id].get("class_type", "")).lower()
+            for node_id in negative_upstream
+        )
+        positive_ids.update(positive_upstream & text_ids)
+        if not sampler_negative_zeroed:
+            negative_ids.update(negative_upstream & text_ids)
+        negative_is_zeroed = negative_is_zeroed or sampler_negative_zeroed
+    if not positive_ids and not negative_ids:
+        positive_ids = {node_id for node_id, _ in text_candidates if "positive" in node_id.lower()}
+        negative_ids = {node_id for node_id, _ in text_candidates if "negative" in node_id.lower()}
+    if len(positive_ids) != 1 or (len(negative_ids) != 1 and not (negative_is_zeroed and not negative_ids)):
         candidates = ", ".join(
             f"{node_id}:{node.get('class_type')}" for node_id, node in text_candidates
         )
@@ -602,8 +636,11 @@ def detect_node_mapping(
     if not seed_targets:
         raise AppError("Could not find a scalar seed input in sampler/detailer nodes")
     mapping = {
-        "positive_prompt": {"node": positives[0][0], "input": "text"},
-        "negative_prompt": {"node": negatives[0][0], "input": "text"},
+        "positive_prompt": {"node": next(iter(positive_ids)), "input": "text"},
+        "negative_prompt": (
+            {"node": next(iter(negative_ids)), "input": "text"}
+            if negative_ids else None
+        ),
         "inference_seed": seed_targets,
     }
     if include_fast:
@@ -2336,6 +2373,8 @@ def delete_workflow_profile(db: dict[str, Any], db_path: Path, profile_id: str) 
 def patch_workflow(workflow: dict[str, Any], mapping: dict[str, Any], positive: str, negative: str, seed: int) -> None:
     for map_key, value in (("positive_prompt", positive), ("negative_prompt", negative)):
         target = mapping[map_key]
+        if target is None:
+            continue
         try:
             workflow[target["node"]]["inputs"][target["input"]] = value
         except KeyError as exc:
