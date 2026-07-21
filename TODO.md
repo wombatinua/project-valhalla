@@ -142,6 +142,8 @@ Ready when:
 - [x] Provide a concise model description for Studio and Director diagnostics.
 - [x] Keep Director-selected traits available even when a concise summary is displayed.
 - [x] Avoid prompts that claim cross-frame identity mechanisms the backend does not have.
+- [x] Apply seeded arousal-moisture appearance only to explicit recipes with a visible intimate focus.
+- [x] Add reachable asymmetric Full-XXX poses and non-penetrative intimate hand-direction actions.
 - [ ] Separate visually dominant traits from low-impact detail in compiler ordering.
 - [ ] Select one or two compatible distinctive facial accents when available.
 - [ ] Expand compatible beauty marks and facial accents without creating mechanical variants.

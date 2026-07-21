@@ -38,6 +38,69 @@ class StudioGenerationLimitTests(unittest.TestCase):
 
 
 class CatalogQualityTests(unittest.TestCase):
+    def test_custom_mast_actions_are_wired_as_hands_only_actions(self):
+        database, _ = app.load_database()
+        actions = {item["id"]: item for item in database["actions"]}
+        expected_hands = {
+            "action_inserting_vagina": 1,
+            "action_inserting_anus": 1,
+            "action_inserting_both": 2,
+        }
+        for action_id, hands in expected_hands.items():
+            item = actions[action_id]
+            self.assertTrue(item["prompt"].strip())
+            self.assertTrue(item["menu_label"].strip())
+            self.assertTrue(
+                {"explicit_action", "masturbation_action", "explicit"}.issubset(
+                    app.tags(item)
+                )
+            )
+            self.assertEqual(set(item["requires_tags"]), {"genitals", "open_legs"})
+            self.assertEqual(item["hands_required"], hands)
+            self.assertEqual(item["allowed_levels"], ["explicit"])
+
+    def test_database_rejects_duplicate_json_keys(self):
+        with self.assertRaisesRegex(app.AppError, "Duplicate JSON key: catalog_category"):
+            app.json.loads(
+                '{"catalog_category":"normal","catalog_category":"luxury"}',
+                object_pairs_hook=app.unique_json_object,
+            )
+
+    def test_database_source_contains_no_duplicate_json_keys(self):
+        source = Path(app.__file__).with_name("database.json").read_text(encoding="utf-8")
+        app.json.loads(source, object_pairs_hook=app.unique_json_object)
+
+    def test_intimate_arousal_modifiers_are_visibility_gated_and_seeded(self):
+        database, _ = app.load_database()
+        composer = app.Composer(database, app.random.Random(20260721))
+        context = composer.fixed_context()
+        explicit = next(
+            stage
+            for stage in app.effective_photoshoot_stages(context["outfit"]["template"])
+            if stage["level"] == "explicit"
+        )
+        intimate = composer.resolve_scene(
+            context, explicit, {"explicit_recipe": "recipe_intimate_macro"}
+        )
+        masturbation = composer.resolve_scene(
+            context, explicit, {"explicit_recipe": "recipe_hands_only"}
+        )
+        rear = composer.resolve_scene(
+            context, explicit, {"explicit_recipe": "recipe_rear_standing"}
+        )
+        breast = composer.resolve_scene(
+            context, explicit, {"explicit_recipe": "recipe_breast_focus"}
+        )
+        modifier = intimate["intimate_arousal_modifier"]
+        self.assertIn(
+            modifier["id"],
+            {item["id"] for item in database["intimate_arousal_modifiers"]},
+        )
+        self.assertIn(modifier["prompt"], app.compile_scene(database, intimate)[0])
+        self.assertIsNotNone(masturbation["intimate_arousal_modifier"])
+        self.assertIsNone(rear["intimate_arousal_modifier"])
+        self.assertIsNone(breast["intimate_arousal_modifier"])
+
     def test_wardrobe_environment_and_surface_catalogs_use_one_explicit_category(self):
         database, _ = app.load_database()
         items = list(database["outfit_templates"])
@@ -365,6 +428,10 @@ class DirectorRegressionTests(unittest.TestCase):
         self.assertGreaterEqual(len(poses), 35)
         self.assertGreaterEqual(len(actions), 30)
         self.assertGreaterEqual(len(recipes), 8)
+        self.assertTrue({
+            "pose_explicit_side_scissor", "pose_explicit_half_roll_open",
+            "pose_explicit_overhead_asymmetric", "pose_explicit_edge_side_open",
+        }.issubset(poses))
         self.assertEqual(
             plateau_kinds,
             {"provocative_rear", "intimate_closeup", "panties_aside", "masturbation"},

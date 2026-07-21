@@ -12736,7 +12736,6 @@
     {
       "id": "template_everyday_casual",
       "catalog_category": "normal",
-      "catalog_category": "normal",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -12831,7 +12830,6 @@
     },
     {
       "id": "template_office_elegant",
-      "catalog_category": "luxury",
       "catalog_category": "luxury",
       "weight": 2,
       "slots": {
@@ -12932,7 +12930,6 @@
     {
       "id": "template_cocktail_dress",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -13016,7 +13013,6 @@
     {
       "id": "template_evening_gown",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -13099,7 +13095,6 @@
     {
       "id": "template_romantic_bedroom",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -13173,7 +13168,6 @@
     },
     {
       "id": "template_classic_boudoir",
-      "catalog_category": "luxury",
       "catalog_category": "luxury",
       "weight": 2,
       "slots": {
@@ -13267,7 +13261,6 @@
     {
       "id": "template_stockings_garter",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "slots": {
         "bra": {
           "catalog": "bra",
@@ -13357,7 +13350,6 @@
     },
     {
       "id": "template_progressive_undressing",
-      "catalog_category": "luxury",
       "catalog_category": "luxury",
       "weight": 2,
       "slots": {
@@ -13474,7 +13466,6 @@
     {
       "id": "template_nude_studio",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "slots": {
         "full_body": {
           "catalog": "full_body",
@@ -13528,7 +13519,6 @@
     },
     {
       "id": "template_explicit_solo",
-      "catalog_category": "luxury",
       "catalog_category": "luxury",
       "slots": {
         "full_body": {
@@ -13629,7 +13619,6 @@
     {
       "id": "template_cozy_home",
       "catalog_category": "normal",
-      "catalog_category": "normal",
       "weight": 2,
       "slots": {
         "upperwear": {
@@ -13715,7 +13704,6 @@
     },
     {
       "id": "template_sexy_casual_dress",
-      "catalog_category": "normal",
       "catalog_category": "normal",
       "weight": 2,
       "slots": {
@@ -13808,7 +13796,6 @@
     {
       "id": "template_bathrobe_private",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -13878,7 +13865,6 @@
     {
       "id": "template_private_garden",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -13945,7 +13931,6 @@
     {
       "id": "template_poolside_swimwear",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -14006,7 +13991,6 @@
     },
     {
       "id": "template_luxury_lingerie",
-      "catalog_category": "luxury",
       "catalog_category": "luxury",
       "weight": 2,
       "slots": {
@@ -14095,7 +14079,6 @@
     {
       "id": "template_fishnet_fetish",
       "catalog_category": "luxury",
-      "catalog_category": "luxury",
       "weight": 2,
       "slots": {
         "full_body": {
@@ -14171,7 +14154,6 @@
     },
     {
       "id": "template_leather_editorial",
-      "catalog_category": "luxury",
       "catalog_category": "luxury",
       "slots": {
         "upperwear": {
@@ -14258,7 +14240,6 @@
     },
     {
       "id": "template_playful_socks",
-      "catalog_category": "luxury",
       "catalog_category": "luxury",
       "weight": 2,
       "slots": {
@@ -14729,6 +14710,26 @@
       "tags": [
         "macro_view"
       ]
+    }
+  ],
+  "intimate_arousal_modifiers": [
+    {
+      "id": "arousal_moisture_subtle",
+      "prompt": "subtle natural arousal moisture with a delicate realistic sheen on the visible external vulva",
+      "menu_label": "Subtle moisture",
+      "weight": 1.2
+    },
+    {
+      "id": "arousal_moisture_clear",
+      "prompt": "clear natural arousal moisture with a realistic wet gloss around the visible vulva and vaginal opening",
+      "menu_label": "Clear moisture",
+      "weight": 1.0
+    },
+    {
+      "id": "arousal_moisture_glossy",
+      "prompt": "pronounced natural arousal moisture creating a glossy wet sheen on the visible inner vulva",
+      "menu_label": "Glossy moisture",
+      "weight": 0.75
     }
   ],
   "explicit_recipes": [
@@ -16449,6 +16450,78 @@
       "allowed_levels": [
         "explicit"
       ]
+    },
+    {
+      "id": "pose_explicit_side_scissor",
+      "prompt": "lying on her side with the lower leg extended and the upper knee drawn high and opened outward",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "lying",
+        "side_pose"
+      ],
+      "requires_tags": [
+        "lying_surface",
+        "genitals"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_half_roll_open",
+      "prompt": "half-rolled from her back onto one hip with one straight leg low and the other knee opened toward camera",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "lying",
+        "side_pose"
+      ],
+      "requires_tags": [
+        "lying_surface",
+        "genitals"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_overhead_asymmetric",
+      "prompt": "lying diagonally beneath an overhead camera with one knee near her chest and the opposite leg extended outward",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "lying"
+      ],
+      "requires_tags": [
+        "lying_surface",
+        "genitals"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
+    },
+    {
+      "id": "pose_explicit_edge_side_open",
+      "prompt": "sitting sideways at the edge with one foot grounded and the opposite knee lifted and opened wide",
+      "tags": [
+        "explicit_pose",
+        "masturbation_pose",
+        "open_legs",
+        "sitting",
+        "sitting_surface",
+        "side_pose"
+      ],
+      "requires_tags": [
+        "sitting_surface",
+        "genitals"
+      ],
+      "allowed_levels": [
+        "explicit"
+      ]
     }
   ],
   "actions": [
@@ -17696,6 +17769,174 @@
       ],
       "requires_expression_tags": [
         "intense_pleasure_expression"
+      ]
+    },
+    {
+      "id": "action_hold_thighs_open",
+      "prompt": "holding both inner thighs apart with her hands while keeping the intimate view unobstructed",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit",
+        "nonpenetrative"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "hands_required": 2,
+      "allowed_levels": [
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ]
+    },
+    {
+      "id": "action_frame_intimate_area",
+      "prompt": "framing the exposed intimate area with both hands placed along her thighs without obscuring it",
+      "tags": [
+        "explicit_action",
+        "closeup_action",
+        "explicit",
+        "nonpenetrative"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "hands_required": 2,
+      "allowed_levels": [
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ]
+    },
+    {
+      "id": "action_trace_inner_thigh",
+      "prompt": "slowly tracing one fingertip along her inner thigh toward the exposed intimate area without penetration",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit",
+        "nonpenetrative"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "hands_required": 1,
+      "allowed_levels": [
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ]
+    },
+    {
+      "id": "action_cup_mons_visible",
+      "prompt": "resting one cupped palm above her exposed vulva while leaving the intimate anatomy clearly visible",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit",
+        "nonpenetrative"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "hands_required": 1,
+      "allowed_levels": [
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ]
+    },
+    {
+      "id": "action_pull_knee_open",
+      "prompt": "drawing one raised knee farther outward with her hand to deepen the asymmetric open-leg pose",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit",
+        "nonpenetrative"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "hands_required": 1,
+      "allowed_levels": [
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "aroused_expression"
+      ]
+    },
+    {
+      "id": "action_inserting_vagina",
+      "prompt": "using one hand inserting her fingers deep in vagina",
+      "menu_label": "fingers in vagina",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "hands_required": 1,
+      "allowed_levels": [
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
+      ]
+    },
+    {
+     "id": "action_inserting_anus",
+      "prompt": "using one hand inserting her fingers deep in her anus",
+      "menu_label": "fingers in anus",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "hands_required": 1,
+      "allowed_levels": [
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
+      ]
+    },
+    {
+      "id": "action_inserting_both",
+      "prompt": "using both hands inserting her fingers deep in vagina and anus",
+      "menu_label": "fingers in both",
+      "tags": [
+        "explicit_action",
+        "masturbation_action",
+        "explicit"
+      ],
+      "requires_tags": [
+        "genitals",
+        "open_legs"
+      ],
+      "hands_required": 2,
+      "allowed_levels": [
+        "explicit"
+      ],
+      "requires_expression_tags": [
+        "pleasure_expression"
       ]
     }
   ],

@@ -63,6 +63,15 @@ def database_path() -> Path:
     return Path(__file__).resolve().with_name("database.json")
 
 
+def unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise AppError(f"Duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
 def resolve_path(base: Path, value: str) -> Path:
     path = Path(value).expanduser()
     return path if path.is_absolute() else (base / path).resolve()
@@ -71,7 +80,10 @@ def resolve_path(base: Path, value: str) -> Path:
 def load_database() -> tuple[dict[str, Any], Path]:
     path = database_path()
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=unique_json_object,
+        )
     except FileNotFoundError as exc:
         raise AppError(f"Database not found: {path}") from exc
     except json.JSONDecodeError as exc:
@@ -93,7 +105,7 @@ def iter_content_items(db: dict[str, Any]) -> Iterable[dict[str, Any]]:
         "outfit_templates", "interiors", "furniture", "poses", "actions",
         "props", "expressions", "moods", "photography_styles", "shot_sizes",
         "camera_angles", "framings", "focus_targets", "editorial_roles",
-        "explicit_recipes",
+        "explicit_recipes", "intimate_arousal_modifiers",
     ):
         yield from db.get(section, [])
 
@@ -143,7 +155,7 @@ def validate_database(db: dict[str, Any]) -> None:
         "outfit_templates", "interiors", "furniture", "poses", "actions", "props",
         "expressions", "moods", "photography_styles", "shot_sizes",
         "camera_angles", "framings", "focus_targets", "editorial_roles",
-        "explicit_recipes",
+        "explicit_recipes", "intimate_arousal_modifiers",
     )
     for section in required_sections:
         if section not in db:
@@ -207,7 +219,7 @@ def validate_database(db: dict[str, Any]) -> None:
         "colors", "patterns", "fabric_textures", "outfit_templates", "interiors", "furniture", "poses", "actions",
         "props", "expressions", "moods", "photography_styles", "shot_sizes",
         "camera_angles", "framings", "focus_targets", "editorial_roles",
-        "explicit_recipes",
+        "explicit_recipes", "intimate_arousal_modifiers",
     ):
         values = db[section]
         if not isinstance(values, list) or not values:
@@ -1356,6 +1368,15 @@ class Composer:
         intensity = overrides.get("intensity") or (recipe.get("intensity", "explicit") if recipe else {
             "covered": "fashion", "lingerie": "sensual", "topless": "erotic", "nude": "nude"
         }.get(stage["level"], "fashion"))
+        intimate_arousal_modifier = None
+        if recipe and recipe.get("focus_target") == "focus_intimate":
+            candidates = [
+                item for item in self.db["intimate_arousal_modifiers"]
+                if not item.get("disabled", False)
+            ]
+            intimate_arousal_modifier = choose(
+                "intimate_arousal_modifier", candidates
+            )
         return {
             "furniture": furniture,
             **surface_style,
@@ -1365,6 +1386,7 @@ class Composer:
             "expression": choose("expression", expression_candidates),
             "editorial_role": editorial_role,
             "explicit_recipe": recipe,
+            "intimate_arousal_modifier": intimate_arousal_modifier,
             "intensity": intensity,
             **camera,
         }
@@ -1426,6 +1448,8 @@ class Composer:
         )
         if scene.get("explicit_recipe"):
             flattened.append(scene["explicit_recipe"])
+        if scene.get("intimate_arousal_modifier"):
+            flattened.append(scene["intimate_arousal_modifier"])
         if scene.get("prop"):
             flattened.append(scene["prop"])
         flattened.extend(scene.get("dependencies", []))
@@ -1662,6 +1686,8 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     fragments.extend(
         human_fragments(scene["human"], visibility, covered_chest, custom)
     )
+    if scene.get("intimate_arousal_modifier"):
+        fragments.append(scene["intimate_arousal_modifier"]["prompt"])
     if custom.get("outfit.template"):
         fragments.append(custom["outfit.template"])
     reveals_cameltoe = False
@@ -2335,7 +2361,7 @@ def build_storyboard(
                         "prompt": "fully removed and no longer wearing " + " and ".join(names),
                         "slots": sorted(removed),
                     }
-            for key in ("furniture", "pose", "action", "expression", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe"):
+            for key in ("furniture", "pose", "action", "expression", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe", "intimate_arousal_modifier"):
                 item = scene.get(key)
                 if item:
                     avoid.setdefault(key, set()).add(item["id"])
@@ -2526,6 +2552,13 @@ def serialize_shot(db: dict[str, Any], shot: dict[str, Any]) -> dict[str, Any]:
         "framing": {"id": scene["framing"]["id"], "prompt": scene["framing"]["prompt"]},
         "focus_target": {"id": scene["focus_target"]["id"], "prompt": scene["focus_target"]["prompt"]},
         "explicit_recipe": ({"id": scene["explicit_recipe"]["id"], "prompt": scene["explicit_recipe"]["prompt"]} if scene.get("explicit_recipe") else None),
+        "intimate_arousal_modifier": (
+            {
+                "id": scene["intimate_arousal_modifier"]["id"],
+                "prompt": scene["intimate_arousal_modifier"]["prompt"],
+            }
+            if scene.get("intimate_arousal_modifier") else None
+        ),
         "intensity": scene["intensity"],
         "garment_transition": scene.get("garment_transition", {}).get("prompt"),
         "positive_prompt": positive,
