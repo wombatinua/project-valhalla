@@ -1126,15 +1126,19 @@ async function finishJob() {
 
 function addOutputs(outputs) {
   const keys = new Set(state.outputs.map(outputIdentity));
+  let added = false;
   outputs.forEach((item) => {
     const key = outputIdentity(item);
     if (!keys.has(key) && !state.deletedOutputs.has(key)) {
       state.outputs.push(item);
       keys.add(key);
+      added = true;
     }
   });
+  if (!added) return false;
   sortOutputsByFilename();
   renderOutputs();
+  return true;
 }
 
 function outputIdentity(item) {
@@ -1648,18 +1652,32 @@ function toggleSlideshow() {
 function syncTrueFullscreenControl() {
   const button = $('#image-true-fullscreen');
   const target = $('#image-viewer-shell');
-  const active = document.fullscreenElement === target;
+  const active = isViewerFullscreen();
   button.textContent = active ? '⤡' : '⤢';
-  button.disabled = !target.requestFullscreen && !active;
+  button.disabled = false;
   button.setAttribute('aria-label', active ? 'Exit browser fullscreen' : 'Enter browser fullscreen');
   button.title = active ? 'Exit browser fullscreen' : 'Enter browser fullscreen';
   button.classList.toggle('active', active);
 }
 
+function isViewerFullscreen() {
+  const target = $('#image-viewer-shell');
+  return document.fullscreenElement === target || target.classList.contains('fallback-fullscreen');
+}
+
+function setFallbackFullscreen(active) {
+  const target = $('#image-viewer-shell');
+  target.classList.toggle('fallback-fullscreen', active);
+  syncTrueFullscreenControl();
+  if (active) showFullscreenControls();
+  else showFullscreenControls({ autoHide: false });
+  requestAnimationFrame(fitPreviewImage);
+}
+
 function hideFullscreenControls() {
   state.fullscreenControlsTimer = null;
   const shell = $('#image-viewer-shell');
-  if (document.fullscreenElement === shell) shell.classList.add('controls-hidden');
+  if (isViewerFullscreen()) shell.classList.add('controls-hidden');
 }
 
 function showFullscreenControls({ autoHide = true } = {}) {
@@ -1667,20 +1685,28 @@ function showFullscreenControls({ autoHide = true } = {}) {
   shell.classList.remove('controls-hidden');
   clearTimeout(state.fullscreenControlsTimer);
   state.fullscreenControlsTimer = null;
-  if (autoHide && document.fullscreenElement === shell) {
+  if (autoHide && isViewerFullscreen()) {
     state.fullscreenControlsTimer = setTimeout(hideFullscreenControls, 2200);
   }
 }
 
 async function toggleTrueFullscreen() {
   const target = $('#image-viewer-shell');
-  try {
-    if (document.fullscreenElement === target) await document.exitFullscreen();
-    else if (target.requestFullscreen) await target.requestFullscreen();
-    else toast('Fullscreen unavailable', 'This browser does not support the Fullscreen API.', 'error');
-  } catch (error) {
-    toast('Fullscreen unavailable', error.message, 'error');
+  if (document.fullscreenElement === target) {
+    await document.exitFullscreen().catch(() => setFallbackFullscreen(false));
+    return;
   }
+  if (target.classList.contains('fallback-fullscreen')) {
+    setFallbackFullscreen(false);
+    return;
+  }
+  if (target.requestFullscreen) {
+    try {
+      await target.requestFullscreen();
+      return;
+    } catch { /* Use the viewport fallback below. */ }
+  }
+  setFallbackFullscreen(true);
 }
 
 function syncOutputGridToPreview() {
@@ -1779,11 +1805,11 @@ document.addEventListener('fullscreenchange', () => {
 });
 syncTrueFullscreenControl();
 $('#image-viewer-shell').addEventListener('pointermove', (event) => {
-  if (document.fullscreenElement !== event.currentTarget || event.clientY > 90) return;
+  if (!isViewerFullscreen() || event.clientY > 90) return;
   showFullscreenControls();
 });
 $('.image-viewer-bar').addEventListener('pointermove', () => {
-  if (document.fullscreenElement === $('#image-viewer-shell')) showFullscreenControls();
+  if (isViewerFullscreen()) showFullscreenControls();
 });
 $('#image-viewer-image').addEventListener('load', fitPreviewImage);
 window.addEventListener('resize', () => { if (imageDialog.open) fitPreviewImage(); });
@@ -1832,6 +1858,7 @@ imageDialog.addEventListener('close', () => {
   stopSlideshow();
   showFullscreenControls({ autoHide: false });
   if (document.fullscreenElement === $('#image-viewer-shell')) document.exitFullscreen().catch(() => {});
+  setFallbackFullscreen(false);
   syncOutputGridToPreview();
 });
 let suppressPreviewStageClick = false;
@@ -1852,9 +1879,10 @@ imageDialog.addEventListener('keydown', (event) => {
 });
 
 let previewPointer = null;
+let previewPinch = null;
 const imageStage = $('.image-stage');
 imageStage.addEventListener('pointerdown', (event) => {
-  if (event.button !== 0 || event.target.closest('button')) return;
+  if (previewPinch || event.button !== 0 || event.target.closest('button')) return;
   const bounds = previewPanBounds();
   previewPointer = {
     id: event.pointerId,
@@ -1893,6 +1921,47 @@ function finishPreviewPointer(event) {
 }
 imageStage.addEventListener('pointerup', finishPreviewPointer);
 imageStage.addEventListener('pointercancel', finishPreviewPointer);
+
+function touchDistance(touches) {
+  return Math.hypot(
+    touches[0].clientX - touches[1].clientX,
+    touches[0].clientY - touches[1].clientY,
+  );
+}
+
+imageStage.addEventListener('touchstart', (event) => {
+  if (event.touches.length !== 2) return;
+  event.preventDefault();
+  previewPointer = null;
+  imageStage.classList.remove('panning');
+  const image = $('#image-viewer-image');
+  const renderedZoom = image.naturalWidth
+    ? image.offsetWidth / image.naturalWidth * 100
+    : state.previewZoom;
+  previewPinch = {
+    distance: Math.max(1, touchDistance(event.touches)),
+    zoom: state.previewFit ? renderedZoom : state.previewZoom,
+  };
+  state.previewFit = false;
+  syncPreviewScaleControls();
+}, { passive: false });
+
+imageStage.addEventListener('touchmove', (event) => {
+  if (!previewPinch || event.touches.length !== 2) return;
+  event.preventDefault();
+  const scale = touchDistance(event.touches) / previewPinch.distance;
+  setPreviewZoom(previewPinch.zoom * scale);
+}, { passive: false });
+
+function finishPreviewPinch(event) {
+  if (!previewPinch || event.touches.length >= 2) return;
+  previewPinch = null;
+  suppressPreviewStageClick = true;
+  persistPreviewScale();
+}
+
+imageStage.addEventListener('touchend', finishPreviewPinch, { passive: true });
+imageStage.addEventListener('touchcancel', finishPreviewPinch, { passive: true });
 
 function directorShotButton(shot) {
   const active = shot.number === state.directorShot ? 'active' : '';

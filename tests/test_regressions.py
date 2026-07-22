@@ -1621,6 +1621,16 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('id="view-eyebrow"', html)
         self.assertNotIn('>Render logger</h2>', html)
 
+    def test_launcher_confirms_before_stopping_only_this_project_server(self):
+        launcher = (Path(app.__file__).parent / "launcher.sh").read_text(encoding="utf-8")
+        self.assertIn("is_project_server()", launcher)
+        self.assertIn('grep -Fqx "$SERVER"', launcher)
+        self.assertIn('[ "$process_cwd" = "$SCRIPT_DIR" ]', launcher)
+        self.assertIn("Stop these processes before starting a new server? [y/N]", launcher)
+        self.assertIn('kill -TERM "$process_id"', launcher)
+        self.assertIn('kill -KILL "$process_id"', launcher)
+        self.assertIn("if [ ! -t 0 ]", launcher)
+
     def test_workflow_capture_and_storyboard_transfer_are_studio_only(self):
         root = Path(app.__file__).parent
         html = (root / "client" / "client.html").read_text(encoding="utf-8")
@@ -1706,11 +1716,37 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("function hideFullscreenControls()", js)
         self.assertIn("setTimeout(hideFullscreenControls, 2200)", js)
         self.assertIn("event.clientY > 90", js)
+        self.assertIn("function isViewerFullscreen()", js)
+        self.assertIn("function setFallbackFullscreen(active)", js)
+        self.assertIn("target.classList.contains('fallback-fullscreen')", js)
+        self.assertIn("setFallbackFullscreen(true)", js)
+
+    def test_lightbox_supports_touch_pinch_zoom(self):
+        root = Path(app.__file__).parent
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
+        self.assertIn("function touchDistance(touches)", js)
+        self.assertIn("imageStage.addEventListener('touchstart'", js)
+        self.assertIn("imageStage.addEventListener('touchmove'", js)
+        self.assertIn("setPreviewZoom(previewPinch.zoom * scale)", js)
+        self.assertIn("{ passive: false }", js)
+        self.assertIn(".image-viewer-shell.fallback-fullscreen", css)
+        self.assertIn("env(safe-area-inset-top)", css)
 
     def test_output_cards_use_lazy_async_thumbnails(self):
         js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("item.thumbnail_url || item.url", js)
         self.assertIn('loading="lazy" decoding="async"', js)
+
+    def test_job_polling_does_not_rebuild_unchanged_proofs(self):
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
+        add_outputs = js.split("function addOutputs(outputs)", 1)[1].split(
+            "function outputIdentity", 1
+        )[0]
+        self.assertIn("let added = false", add_outputs)
+        self.assertIn("added = true", add_outputs)
+        self.assertIn("if (!added) return false", add_outputs)
+        self.assertIn("renderOutputs();", add_outputs)
 
     def test_privacy_cover_is_persistent_high_priority_and_releases_image_sources(self):
         root = Path(app.__file__).parent
@@ -1826,6 +1862,24 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn(".system-card.mobile-open { display: block; }", css)
         self.assertIn("const isOpen = systemCard.classList.toggle('mobile-open')", js)
         self.assertIn("if (event.key === 'Escape') closeMobileSystem()", js)
+
+    def test_iphone_layout_has_native_touch_targets_and_stable_action_rows(self):
+        root = Path(app.__file__).parent
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
+
+        self.assertIn("viewport-fit=cover", html)
+        self.assertIn("/* iPhone/mobile refinement", css)
+        self.assertIn("min-height: 44px", css)
+        self.assertIn("font-size: 16px", css)
+        self.assertIn("grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr)", css)
+        self.assertIn(".director-quick-actions::-webkit-scrollbar", css)
+        self.assertIn("grid-template-rows: auto auto auto", css)
+        self.assertIn("grid-template-columns: 30px minmax(0, 1fr) auto", css)
+        self.assertIn("env(safe-area-inset-bottom)", css)
+        self.assertIn("@media (hover: none) and (pointer: coarse)", css)
+        self.assertIn("width: min(288px, calc(100vw - 16px))", css)
+        self.assertIn(".system-card .system-settings > summary { justify-content: space-between; }", css)
 
 
     def test_typography_presets_use_relative_scale_with_normal_default(self):

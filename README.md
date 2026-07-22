@@ -44,7 +44,7 @@ The UI includes:
 - cancellable FIFO background render jobs that accept additional work while rendering and fail each job clearly on its first generation error;
 - a reload-safe Production Logbook with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves proofs and the displayed preview intact;
 - shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
-- a persistent, virtualized output gallery with bounded DOM size, a browser-fullscreen lightbox, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
+- a persistent, virtualized output gallery with bounded DOM size, a browser-fullscreen lightbox with a safe-area-aware viewport fallback for iPhone browsers, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling with touch pinch zoom, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
 - a persistent Privacy Cover that immediately replaces gallery thumbnails, the lightbox image, temporary previews, and Logbook prompts with neutral placeholders, closes Prompt Inspector, and masks the open lightbox filename. Its shortcut is configured in System as middle mouse button (default), `Shift+X`, or both. One middle click covers images and a double middle click within 500 ms reveals them; `Shift+X` remains a direct toggle. Optional Auto cover activates after 1, 5, or 15 minutes without mouse, pointer/touch, or keyboard activity; the browser-local preference defaults to Off. Covering clears image `src`/`srcset` attributes and rebuilds the visible gallery without image URLs so decoded resources become eligible for browser memory reclamation; exact release timing remains browser-controlled. It does not cancel renders or delete files;
 - safe or forced workflow capture from the latest successful ComfyUI run.
 
@@ -69,7 +69,7 @@ Run:
 ./launcher.sh
 ```
 
-The launcher installs required Python packages if they are missing, reads `server.host` and `server.port` from `config.json`, starts the server, and asks Python to open that address in the default browser.
+The launcher installs required Python packages if they are missing, reads `server.host` and `server.port` from `config.json`, starts the server, and asks Python to open that address in the default browser. Before startup it detects Python processes running this project's exact `server.py`, displays them, and asks for confirmation before stopping them. Confirmed processes receive `SIGTERM` and a five-second grace period before a revalidated `SIGKILL`. In a non-interactive session the launcher refuses to kill anything and exits instead.
 
 Environment overrides:
 
