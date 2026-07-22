@@ -2776,7 +2776,6 @@ function renderWorkflowProfiles(profiles) {
     select.value = profiles[mode] || '';
     select.disabled = live || !profiles.profiles.some((profile) => profile.valid);
   }
-  $('#save-profile-selection').disabled = !live && !profiles.profiles.some((profile) => profile.valid);
   $('#workflow-profile-list').innerHTML = profiles.profiles.length
     ? profiles.profiles.map((profile) => `
       <div class="workflow-profile-item${profile.valid ? '' : ' invalid'}" data-profile-id="${escapeHtml(profile.id)}">
@@ -2814,7 +2813,8 @@ async function manageWorkflowProfile(button) {
 }
 
 async function openWorkflowProfiles() {
-  $('#studio-files-menu').open = false;
+  $('#system-settings').open = false;
+  closeMobileSystem();
   $('#capture-dialog').showModal();
   $('#capture-candidate-status').textContent = 'Inspecting the latest successful ComfyUI run…';
   try {
@@ -2830,9 +2830,13 @@ async function openWorkflowProfiles() {
   }
 }
 
+let workflowSettingsSaving = false;
+
 async function saveWorkflowProfileSelection() {
-  const button = $('#save-profile-selection');
-  setBusy(button, true, 'Saving…');
+  if (workflowSettingsSaving) return;
+  workflowSettingsSaving = true;
+  const controls = $$('#live-workflow-source, #workflow-profile-selectors select');
+  controls.forEach((control) => { control.disabled = true; });
   try {
     const profiles = await api('/api/workflow/profiles/select', {
       method: 'POST',
@@ -2846,7 +2850,16 @@ async function saveWorkflowProfileSelection() {
     refreshStatus();
   } catch (error) {
     toast('Could not select profiles', error.message, 'error');
-  } finally { setBusy(button, false); }
+    try { renderWorkflowProfiles(await api('/api/workflow/profiles')); } catch { /* keep original error */ }
+  } finally {
+    workflowSettingsSaving = false;
+    $('#live-workflow-source').disabled = false;
+    const live = $('#live-workflow-source').checked;
+    const hasProfiles = state.workflowProfiles?.profiles.some((profile) => profile.valid);
+    $$('#workflow-profile-selectors select').forEach((select) => {
+      select.disabled = live || !hasProfiles;
+    });
+  }
 }
 
 $('#live-workflow-source').addEventListener('change', (event) => {
@@ -2854,8 +2867,11 @@ $('#live-workflow-source').addEventListener('change', (event) => {
   $('#workflow-profile-selectors').classList.toggle('disabled', live);
   $('#live-workflow-help').classList.toggle('hidden', !live);
   $$('#workflow-profile-selectors select').forEach((select) => { select.disabled = live; });
-  $('#save-profile-selection').disabled = !live
-    && !state.workflowProfiles?.profiles.some((profile) => profile.valid);
+  saveWorkflowProfileSelection();
+});
+
+$$('#workflow-profile-selectors select').forEach((select) => {
+  select.addEventListener('change', saveWorkflowProfileSelection);
 });
 
 async function captureWorkflow() {
@@ -3098,7 +3114,6 @@ $('#copy-prompt').addEventListener('click', async () => {
 $('#capture-button').addEventListener('click', openWorkflowProfiles);
 $$('.capture-close').forEach((button) => button.addEventListener('click', () => $('#capture-dialog').close()));
 $('#capture-confirm').addEventListener('click', captureWorkflow);
-$('#save-profile-selection').addEventListener('click', saveWorkflowProfileSelection);
 $('#workflow-profile-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-profile-action]');
   if (button) manageWorkflowProfile(button);

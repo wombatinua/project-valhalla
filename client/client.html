@@ -33,6 +33,7 @@
         <details class="system-settings" id="system-settings">
           <summary><span>Options</span><i aria-hidden="true">⌄</i></summary>
           <div class="system-settings-body">
+        <button type="button" class="system-workflow-button" id="capture-button"><span><strong>Rendering profiles</strong><small>Capture and select ComfyUI workflows</small></span><i aria-hidden="true">›</i></button>
         <div class="system-theme-row">
           <span>Appearance</span>
           <div class="system-choice-control theme-control" role="group" aria-label="Appearance theme">
@@ -93,9 +94,6 @@
               <p>Storyboard</p>
               <button type="button" id="import-storyboard"><span><strong>Import storyboard</strong><small>Open a compact JSON file</small></span></button>
               <button type="button" id="export-storyboard" disabled><span><strong>Export storyboard</strong><small>Save the current production</small></span></button>
-              <hr>
-              <p>Rendering</p>
-              <button type="button" id="capture-button"><span><strong>Rendering profiles</strong><small>Capture and select ComfyUI workflows</small></span></button>
             </div>
           </details>
           <input class="hidden" id="storyboard-file" type="file" accept="application/json,.json">
@@ -385,7 +383,6 @@
           <label class="field"><span>Preview rendering</span><select id="preview-profile"></select></label>
         </div>
         <p class="field-help hidden" id="live-workflow-help">Valhalla previews are excluded from live selection. Preview size and node bypass limits still apply.</p>
-        <button class="button ghost full" id="save-profile-selection">Save selection</button>
         <div class="workflow-profile-list" id="workflow-profile-list"></div>
       </section>
       <section class="profile-capture">

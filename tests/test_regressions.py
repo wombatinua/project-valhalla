@@ -1722,7 +1722,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('kill -KILL "$process_id"', launcher)
         self.assertIn("if [ ! -t 0 ]", launcher)
 
-    def test_workflow_capture_and_storyboard_transfer_are_studio_only(self):
+    def test_storyboard_transfer_is_studio_only_and_workflows_are_in_system(self):
         root = Path(app.__file__).parent
         html = (root / "client" / "client.html").read_text(encoding="utf-8")
         js = (root / "client" / "client.js").read_text(encoding="utf-8")
@@ -1732,9 +1732,12 @@ class FrontendContractTests(unittest.TestCase):
         menu = html.split('id="studio-files-menu"', 1)[1].split('</details>', 1)[0]
         self.assertIn('id="import-storyboard"', menu)
         self.assertIn('id="export-storyboard" disabled', menu)
-        self.assertIn('id="capture-button"', menu)
+        self.assertNotIn('id="capture-button"', menu)
+        system = html.split('id="system-card"', 1)[1].split('</section>', 1)[0]
+        self.assertIn('id="capture-button"', system)
         self.assertNotIn('id="export-storyboard"', html.split('id="director-view"', 1)[1])
         self.assertIn("studioFilesMenu.open = false", js)
+        self.assertIn("$('#system-settings').open = false", js)
 
     def test_active_render_accepts_additional_fifo_jobs(self):
         js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
@@ -2552,8 +2555,10 @@ class WorkflowProfileTests(unittest.TestCase):
         html = (root / "client" / "client.html").read_text(encoding="utf-8")
         javascript = (root / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn('id="live-workflow-source"', html)
+        self.assertNotIn('id="save-profile-selection"', html)
         self.assertIn("profiles.source === 'live'", javascript)
         self.assertIn("source: $('#live-workflow-source').checked ? 'live' : 'profiles'", javascript)
+        self.assertIn("select.addEventListener('change', saveWorkflowProfileSelection)", javascript)
 
     def test_operational_settings_live_only_in_root_config(self):
         config, _ = app.load_config()

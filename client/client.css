@@ -118,6 +118,12 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
     0 0 10px color-mix(in srgb, var(--brand) 25%, transparent);
 }
 .system-settings-body { padding-top: 3px; }
+.system-workflow-button { width: 100%; margin: 5px 0 9px; padding: 7px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; text-align: left; }
+.system-workflow-button:hover { background: var(--surface-3); }
+.system-workflow-button strong, .system-workflow-button small { display: block; }
+.system-workflow-button strong { font-size: 0.6875rem; }
+.system-workflow-button small { margin-top: 1px; color: var(--muted); font-size: 0.5625rem; }
+.system-workflow-button > i { color: var(--faint); font-size: 1rem; font-style: normal; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--faint) 14%, transparent); }
 .status-dot.online { background: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 14%, transparent); }
 .status-dot.error { background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 14%, transparent); }
