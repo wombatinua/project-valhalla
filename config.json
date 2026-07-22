@@ -12,7 +12,7 @@
     "poll_interval_seconds": 1,
     "generation_timeout_seconds": 600,
     "preview_max_edge": 512,
-    "workflow_source": "profiles",
+    "workflow_source": "live",
     "profiles": {
       "production": "ciel-bleu-zit-v2",
       "preview": "ciel-bleu-zit-v2"
@@ -31,7 +31,10 @@
   },
   "interface": {
     "privacy": {
-      "auto_cover_minutes": [5, 15]
+      "auto_cover_minutes": [
+        5,
+        15
+      ]
     }
   },
   "limits": {

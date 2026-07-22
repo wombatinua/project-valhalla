@@ -62,6 +62,7 @@ const state = {
   previewPanY: 0,
   slideshowTimer: null,
   slideshowActive: false,
+  slideshowRandom: sessionStorage.getItem('valhalla-slideshow-random') === 'true',
   slideshowDelay: Math.min(10, Math.max(1, Number(sessionStorage.getItem('valhalla-slideshow-delay')) || 3)),
   fullscreenControlsTimer: null,
   deleteResolver: null,
@@ -1796,6 +1797,16 @@ function movePreview(direction) {
   if (state.slideshowActive) scheduleSlideshow();
 }
 
+function movePreviewRandom() {
+  const scope = previewOutputs();
+  if (scope.length < 2) return;
+  const position = scope.findIndex((entry) => entry.outputIndex === state.previewIndex);
+  const offset = 1 + Math.floor(Math.random() * (scope.length - 1));
+  const next = scope[(position + offset) % scope.length];
+  if (next) showPreview(next.outputIndex);
+  if (state.slideshowActive) scheduleSlideshow();
+}
+
 function syncSlideshowControls() {
   const button = $('#image-slideshow-toggle');
   const active = state.slideshowActive && previewOutputs().length > 1;
@@ -1809,6 +1820,7 @@ function syncSlideshowControls() {
     choice.classList.toggle('active', selected);
     choice.setAttribute('aria-pressed', String(selected));
   });
+  $('#slideshow-random').checked = state.slideshowRandom;
 }
 
 function scheduleSlideshow() {
@@ -1816,7 +1828,8 @@ function scheduleSlideshow() {
   state.slideshowTimer = null;
   if (!state.slideshowActive || !imageDialog.open || previewOutputs().length < 2) return;
   state.slideshowTimer = setTimeout(() => {
-    movePreview(1);
+    if (state.slideshowRandom) movePreviewRandom();
+    else movePreview(1);
   }, state.slideshowDelay * 1000);
 }
 
@@ -1974,6 +1987,11 @@ $$('[data-slideshow-delay]').forEach((button) => button.addEventListener('click'
   $('#image-slideshow-delay').open = false;
   if (state.slideshowActive) scheduleSlideshow();
 }));
+$('#slideshow-random').addEventListener('change', (event) => {
+  state.slideshowRandom = event.currentTarget.checked;
+  sessionStorage.setItem('valhalla-slideshow-random', String(state.slideshowRandom));
+  if (state.slideshowActive) scheduleSlideshow();
+});
 document.addEventListener('click', (event) => {
   const menu = $('#image-slideshow-delay');
   if (menu.open && !event.target.closest('#image-slideshow-delay')) menu.open = false;

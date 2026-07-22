@@ -494,6 +494,9 @@ dialog.image-viewer::backdrop { background: #050608; backdrop-filter: none; }
 .slideshow-delay-popover button { padding: 7px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--text); cursor: pointer; font-size: 0.6875rem; text-align: left; }
 .slideshow-delay-popover button:hover { background: var(--surface-2); }
 .slideshow-delay-popover button.active { background: var(--brand-soft); color: var(--brand); font-weight: 750; }
+.slideshow-random { margin: 7px 3px 1px; padding: 8px 5px 3px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); color: var(--muted); cursor: pointer; font-size: 0.6875rem; }
+.slideshow-random input { margin: 0; accent-color: var(--brand); }
+.slideshow-random:has(input:checked) { color: var(--text); }
 .viewer-fit { display: flex; align-items: center; gap: 6px; color: rgb(255 255 255 / 70%); cursor: pointer; font-size: 0.625rem; }
 .viewer-fit input { margin: 0; accent-color: var(--brand); }
 .viewer-zoom { min-width: 175px; display: flex; align-items: center; justify-content: center; gap: 9px; color: rgb(255 255 255 / 58%); font-size: 0.625rem; }

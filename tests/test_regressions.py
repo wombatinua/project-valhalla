@@ -1836,7 +1836,10 @@ class FrontendContractTests(unittest.TestCase):
         slideshow = html.split('id="image-slideshow-delay"', 1)[1].split("</details>", 1)[0]
         self.assertEqual(slideshow.count('data-slideshow-delay="'), 10)
         self.assertIn('class="slideshow-delay-popover"', slideshow)
+        self.assertIn('id="slideshow-random"', slideshow)
         self.assertIn("function scheduleSlideshow()", js)
+        self.assertIn("function movePreviewRandom()", js)
+        self.assertIn("valhalla-slideshow-random", js)
         self.assertIn("if (state.slideshowActive) scheduleSlideshow();", js)
         self.assertIn("document.fullscreenElement === target", js)
         self.assertIn("target.requestFullscreen()", js)
