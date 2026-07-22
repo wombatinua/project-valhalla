@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import app
+import server as app
 import qa_preview_audit as preview_qa
 
 
@@ -34,7 +34,7 @@ class StudioGenerationLimitTests(unittest.TestCase):
             app.parse_run_config({"count": 0}, database)
 
     def test_studio_number_inputs_have_no_maximum(self):
-        html = (Path(app.__file__).parent / "web" / "index.html").read_text(encoding="utf-8")
+        html = (Path(app.__file__).parent / "client" / "client.html").read_text(encoding="utf-8")
         self.assertNotIn('name="photoshoots" min="1" max=', html)
         self.assertNotIn('name="count" min="1" max=', html)
 
@@ -1610,8 +1610,8 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 class FrontendContractTests(unittest.TestCase):
     def test_primary_workspace_names_and_headers_use_photography_terms(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn('<span>Proofs</span>', html)
         self.assertIn('<span>Logbook</span>', html)
         self.assertIn('<title>Valhalla Photo Studio</title>', html)
@@ -1623,8 +1623,8 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_workflow_capture_and_storyboard_transfer_are_studio_only(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn('id="studio-topbar-actions"', html)
         self.assertIn('id="studio-files-menu"', html)
         self.assertIn("name !== 'studio'", js)
@@ -1636,14 +1636,14 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("studioFilesMenu.open = false", js)
 
     def test_active_render_accepts_additional_fifo_jobs(self):
-        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("button.textContent = idleLabel", js)
         self.assertIn("alreadyActive ? 'Added to render queue'", js)
         self.assertIn("queuedJob.queue_position", js)
         self.assertIn("session.active_job.id !== job.id", js)
 
     def test_system_status_refreshes_while_the_browser_is_active(self):
-        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("function scheduleStatusRefresh()", js)
         self.assertIn("statusRefreshSeconds * 1000", js)
         self.assertIn("if (document.hidden) return", js)
@@ -1653,9 +1653,9 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_logger_timeline_can_inspect_historical_shot_prompts(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
         self.assertIn('id="logger-shot-label"', html)
         self.assertIn("function inspectedJobPrompt(job)", js)
         self.assertIn('data-log-index="${logIndex}"', js)
@@ -1664,7 +1664,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn(".logger-event.inspectable.selected", css)
 
     def test_gallery_benchmark_is_read_only_and_reports_bounded_dom_size(self):
-        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("state.galleryBenchmark = Boolean(result.benchmark)", js)
         self.assertIn("outputGrid.childElementCount", js)
         self.assertIn("state.outputs.length === 0 || state.galleryBenchmark", js)
@@ -1672,15 +1672,15 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_sfw_is_a_structural_content_mode(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn('name="content" value="sfw"', html)
         self.assertIn("content_mode: value('content')", js)
         self.assertIn("content !== 'progressive'", js)
         self.assertNotIn("xxx_only:", js)
 
     def test_lightbox_close_aligns_grid_to_last_viewed_output(self):
-        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("function syncOutputGridToPreview()", js)
         self.assertIn("focusOutputCard(state.previewIndex, { alignTop: true })", js)
         self.assertIn("window.scrollTo({ top: cardTop, behavior: 'auto' })", js)
@@ -1688,8 +1688,8 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_lightbox_has_fullscreen_and_non_interrupting_slideshow_controls(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn('id="image-true-fullscreen"', html)
         self.assertIn('id="image-viewer-shell"', html)
         self.assertIn('id="image-slideshow-toggle"', html)
@@ -1708,15 +1708,15 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("event.clientY > 90", js)
 
     def test_output_cards_use_lazy_async_thumbnails(self):
-        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("item.thumbnail_url || item.url", js)
         self.assertIn('loading="lazy" decoding="async"', js)
 
     def test_privacy_cover_is_persistent_high_priority_and_releases_image_sources(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
 
         self.assertIn('data-privacy-shortcut="middle"', html)
         self.assertIn('<summary><span>Options</span>', html)
@@ -1755,13 +1755,13 @@ class FrontendContractTests(unittest.TestCase):
         self.assertNotIn('content: "Image covered"', css)
 
     def test_lightbox_fit_is_enabled_by_default_for_new_sessions(self):
-        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("sessionStorage.getItem('valhalla-preview-fit') !== 'false'", js)
 
     def test_output_gallery_virtualizes_rows_with_bounded_overscan(self):
         root = Path(app.__file__).parent
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
         self.assertIn("const OUTPUT_OVERSCAN_ROWS = 3", js)
         self.assertIn("const OUTPUT_VIRTUALIZATION_THRESHOLD = 100", js)
         self.assertIn("entryCount <= OUTPUT_VIRTUALIZATION_THRESHOLD", js)
@@ -1776,8 +1776,8 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_output_gallery_groups_photoshoots_by_run_and_set_filename(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
 
         self.assertIn('data-gallery-view="flat"', html)
         self.assertIn('data-gallery-view="photoshoots"', html)
@@ -1807,16 +1807,16 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("activePhotoshootGroup()?.items", js)
 
     def test_virtual_output_navigation_uses_stable_absolute_indexes(self):
-        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn('data-output-index="${index}"', js)
         self.assertIn("focusOutputCard(state.previewIndex, { alignTop: true })", js)
         self.assertIn("ArrowUp: -columns, ArrowDown: columns", js)
 
     def test_narrow_layout_keeps_all_pages_and_system_controls_accessible(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
 
         for view in ("studio", "director", "outputs", "logger"):
             self.assertIn(f'data-view="{view}"', html)
@@ -1830,9 +1830,9 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_typography_presets_use_relative_scale_with_normal_default(self):
         root = Path(__file__).resolve().parents[1]
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
 
         for size in ("small", "normal", "large"):
             self.assertIn(f'data-type-size="{size}"', html)
@@ -1843,9 +1843,9 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_accent_switcher_offers_three_session_scoped_palettes(self):
         root = Path(app.__file__).parent
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
         for accent in ("lavender", "azure", "rose"):
             self.assertIn(f'data-accent="{accent}"', html)
         self.assertEqual(html.count('system-choice-control'), 5)
@@ -1867,8 +1867,8 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_entity_values_are_capitalized_without_bold_emphasis(self):
         root = Path(__file__).resolve().parents[1]
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
 
         self.assertIn("function displayValue(value)", js)
         self.assertIn("escapeHtml(displayValue(shot.pose.prompt))", js)
@@ -1879,7 +1879,7 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_clearing_director_search_collapses_all_groups(self):
         root = Path(__file__).resolve().parents[1]
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
 
         self.assertIn("filterDirector(query, { collapseEmpty = false } = {})", js)
         self.assertIn("if (!normalized && collapseEmpty)", js)
@@ -1888,7 +1888,7 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_director_marks_defaults_only_inside_dropdown(self):
         root = Path(__file__).resolve().parents[1]
-        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
 
         self.assertIn("option.default ? ' (default)' : ''", js)
         self.assertNotIn("Database default", js)
@@ -1896,7 +1896,7 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_dropdowns_and_render_split_share_unified_control_geometry(self):
         root = Path(__file__).resolve().parents[1]
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
 
         self.assertIn(".field input, .field select, .director-field select", css)
         self.assertIn(".render-choice { --render-color: var(--success);", css)
@@ -1908,7 +1908,7 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_studio_and_director_use_the_same_control_column_width(self):
         root = Path(__file__).resolve().parents[1]
-        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
 
         self.assertIn("--workspace-control-column: 328px", css)
         self.assertIn(
@@ -1924,8 +1924,8 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_storyboard_render_mode_uses_synchronized_split_buttons(self):
         root = Path(__file__).resolve().parents[1]
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        javascript = (root / "web" / "app.js").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        javascript = (root / "client" / "client.js").read_text(encoding="utf-8")
         self.assertNotIn('name="fast"', html)
         self.assertEqual(html.count('class="render-choice-menu" data-render-mode'), 2)
         self.assertEqual(html.count('data-render-mode-choice="preview"'), 2)
@@ -1936,7 +1936,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertNotIn("retry_count", javascript)
 
     def test_active_page_is_restored_after_browser_reload(self):
-        javascript = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        javascript = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("sessionStorage.getItem('valhalla-active-view')", javascript)
         self.assertIn("sessionStorage.setItem('valhalla-active-view', name)", javascript)
         self.assertIn("switchView(restoredView);", javascript)
@@ -1947,8 +1947,8 @@ class FrontendContractTests(unittest.TestCase):
 
     def test_global_settings_have_pending_update_and_slider_guardrails(self):
         root = Path(__file__).resolve().parents[1]
-        html = (root / "web" / "index.html").read_text(encoding="utf-8")
-        javascript = (root / "web" / "app.js").read_text(encoding="utf-8")
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        javascript = (root / "client" / "client.js").read_text(encoding="utf-8")
         for marker in (
             'id="config-notice"', 'id="active-config"',
             'id="nsfw-help"', 'id="plateau-help"',

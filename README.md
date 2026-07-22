@@ -6,8 +6,8 @@ The project intentionally does not preserve backward compatibility for internal 
 
 The application now uses a web-first architecture:
 
-- `app.py` contains the composition engine, ComfyUI client, HTTP API, background job runner, and static-file server.
-- `web/` contains the responsive production interface.
+- `server.py` contains the composition engine, ComfyUI client, HTTP API, background job runner, and static-file server.
+- `client/` contains the responsive production interface.
 - `launcher.sh` checks the Python dependency, starts the local server, and opens the browser.
 - `config.json` stores local runtime paths, the ComfyUI address, and active rendering profiles.
 - `database.json` is the manually editable production content catalog.
@@ -80,9 +80,9 @@ PYTHON_BIN=python3 ./launcher.sh
 You can also start the application directly:
 
 ```bash
-python3 app.py
-python3 app.py --host 127.0.0.1 --port 9000
-python3 app.py --no-browser
+python3 server.py
+python3 server.py --host 127.0.0.1 --port 9000
+python3 server.py --no-browser
 ```
 
 ### Runtime configuration
@@ -151,7 +151,7 @@ Every ComfyUI connection, workflow, and timing setting is grouped under the requ
 Test large-gallery behavior without rendering or copying thousands of images:
 
 ```bash
-python3 app.py gallery-benchmark --count 2000
+python3 server.py gallery-benchmark --count 2000
 ```
 
 The read-only benchmark requires at least one existing image in a configured Proofs source. It exposes 2,000 unique synthetic gallery records that cycle through at most ten real images, gives every thumbnail a unique browser URL to exercise network transfer and decoding, opens directly on Proofs, disables deletion, and reports both the record count and current `.output-card` DOM count. The server still reuses its RAM thumbnail cache, so no image copies are created. Stop it with `Ctrl+C`, then start the normal production server again.

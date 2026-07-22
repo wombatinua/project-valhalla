@@ -2915,7 +2915,7 @@ try:
 except ImportError:
     Image = ImageOps = None  # type: ignore[assignment]
 
-WEB_ROOT = Path(__file__).resolve().with_name("web")
+CLIENT_ROOT = Path(__file__).resolve().with_name("client")
 THUMBNAIL_CACHE: OrderedDict[tuple[str, str, int, int], bytes] = OrderedDict()
 THUMBNAIL_CACHE_BYTES = 0
 THUMBNAIL_CACHE_LOCK = threading.Lock()
@@ -5401,13 +5401,13 @@ class ValhallaHandler(BaseHTTPRequestHandler):
 
 
     def serve_static(self, path: str) -> None:
-        relative = "index.html" if path in {"", "/"} else unquote(path.lstrip("/"))
-        target = (WEB_ROOT / relative).resolve()
-        if WEB_ROOT.resolve() not in target.parents and target != WEB_ROOT.resolve():
+        relative = "client.html" if path in {"", "/"} else unquote(path.lstrip("/"))
+        target = (CLIENT_ROOT / relative).resolve()
+        if CLIENT_ROOT.resolve() not in target.parents and target != CLIENT_ROOT.resolve():
             self.send_error(HTTPStatus.FORBIDDEN)
             return
         if not target.is_file():
-            target = WEB_ROOT / "index.html"
+            target = CLIENT_ROOT / "client.html"
         body = target.read_bytes()
         content_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         self.send_response(HTTPStatus.OK)
@@ -5456,8 +5456,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
 
 
 def serve(host: str, port: int, open_browser: bool) -> None:
-    if not WEB_ROOT.joinpath("index.html").is_file():
-        raise AppError(f"Web UI assets not found: {WEB_ROOT}")
+    if not CLIENT_ROOT.joinpath("client.html").is_file():
+        raise AppError(f"Web UI assets not found: {CLIENT_ROOT}")
     load_config()
     load_database()
     server = ThreadingHTTPServer((host, port), ValhallaHandler)

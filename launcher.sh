@@ -4,7 +4,7 @@
 set -u
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-APP="$SCRIPT_DIR/app.py"
+SERVER="$SCRIPT_DIR/server.py"
 PYTHON_BIN=${PYTHON_BIN:-python3}
 
 die() {
@@ -26,8 +26,8 @@ ensure_dependency() {
 }
 
 command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python not found: $PYTHON_BIN"
-[ -f "$APP" ] || die "Application not found: $APP"
+[ -f "$SERVER" ] || die "Application not found: $SERVER"
 
 ensure_dependency requests requests
 ensure_dependency PIL Pillow
-exec "$PYTHON_BIN" "$APP"
+exec "$PYTHON_BIN" "$SERVER"

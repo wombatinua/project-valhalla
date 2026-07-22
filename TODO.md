@@ -6,7 +6,7 @@ Unchecked items are planned work, not claims about missing historical features.
 
 ## Project constraints
 
-- Keep one `app.py`, one local `config.json`, one manually editable `database.json`, a server-side `workflows/` library, one `launcher.sh`, and static assets under `web/`.
+- Keep one `server.py`, one local `config.json`, one manually editable `database.json`, a server-side `workflows/` library, one `launcher.sh`, and static assets under `client/`.
 - Preserve compatibility with different checkpoint families through the captured workflow.
 - Do not add FaceID, IPAdapter, PuLID, reference-image, or architecture-specific identity pipelines.
 - Do not add an image-quality detector or external vision model in the current roadmap.
@@ -104,12 +104,12 @@ Ready when:
 
 ### P0 — Standalone validation and statistics
 
-- [ ] Add `python app.py validate` without changing normal Web UI startup.
+- [ ] Add `python server.py validate` without changing normal Web UI startup.
 - [ ] Stress-test every enabled outfit template through the resolver.
 - [ ] Validate camera tuples, explicit recipes, garment transitions, and stage reachability.
 - [ ] Find unreachable IDs and records unused by every recipe, template, and configured pool.
 - [ ] Return a non-zero exit code for structural, reachability, or stress-test failures.
-- [ ] Add `python app.py stats` for record counts, tags, recipe coverage, and candidate-pool sizes.
+- [ ] Add `python server.py stats` for record counts, tags, recipe coverage, and candidate-pool sizes.
 - [ ] Document both commands and make them optionally accessible from `launcher.sh` without adding an interactive terminal wizard.
 
 Ready when:
@@ -254,7 +254,7 @@ Ready when:
 - Every render and preview records the exact selected profile.
 - Missing or invalid profiles fail before GPU work with an actionable diagnostic.
 
-The old `python app.py plan` proposal is removed from the active roadmap because Studio already provides a richer GPU-free plan. CLI work is reserved for `validate` and `stats`.
+The old `python server.py plan` proposal is removed from the active roadmap because Studio already provides a richer GPU-free plan. CLI work is reserved for `validate` and `stats`.
 
 ## Regression checklist
 
