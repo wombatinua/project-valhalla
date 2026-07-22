@@ -378,9 +378,13 @@
     <div class="dialog-header"><div><p class="eyebrow">ComfyUI</p><h2>Rendering profiles</h2></div><button class="icon-button capture-close" aria-label="Close">×</button></div>
     <div class="dialog-body">
       <section class="profile-selection">
-        <p>Select the captured workflow used by each rendering mode.</p>
-        <label class="field"><span>Production rendering</span><select id="production-profile"></select></label>
-        <label class="field"><span>Preview rendering</span><select id="preview-profile"></select></label>
+        <p>Choose captured profiles or use the latest workflow run directly in ComfyUI.</p>
+        <label class="switch-row"><span><strong>Live ComfyUI workflow</strong><small>Use the latest successful external ComfyUI job without saving it to disk</small></span><input type="checkbox" id="live-workflow-source"><i></i></label>
+        <div id="workflow-profile-selectors">
+          <label class="field"><span>Production rendering</span><select id="production-profile"></select></label>
+          <label class="field"><span>Preview rendering</span><select id="preview-profile"></select></label>
+        </div>
+        <p class="field-help hidden" id="live-workflow-help">Valhalla previews are excluded from live selection. Preview size and node bypass limits still apply.</p>
         <button class="button ghost full" id="save-profile-selection">Save selection</button>
         <div class="workflow-profile-list" id="workflow-profile-list"></div>
       </section>

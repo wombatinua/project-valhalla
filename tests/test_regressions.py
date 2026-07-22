@@ -2021,6 +2021,11 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("focusOutputCard(state.previewIndex, { alignTop: true })", js)
         self.assertIn("ArrowUp: -columns, ArrowDown: columns", js)
 
+    def test_image_preview_supports_horizontal_and_vertical_arrow_navigation(self):
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
+        self.assertIn("['ArrowLeft', 'ArrowUp'].includes(event.key)", js)
+        self.assertIn("['ArrowRight', 'ArrowDown'].includes(event.key)", js)
+
     def test_narrow_layout_keeps_all_pages_and_system_controls_accessible(self):
         root = Path(app.__file__).parent
         html = (root / "client" / "client.html").read_text(encoding="utf-8")
@@ -2487,6 +2492,69 @@ class VisualCompatibilityRegressionTests(unittest.TestCase):
 
 
 class WorkflowProfileTests(unittest.TestCase):
+    def test_latest_comfy_workflow_ignores_valhalla_preview_history(self):
+        external_workflow = {"external": {"class_type": "KSampler", "inputs": {}}}
+        preview_workflow = {"preview": {"class_type": "PreviewImage", "inputs": {}}}
+        history = {
+            "external-id": {
+                "status": {"completed": True, "status_str": "success", "messages": [["execution_success", {"timestamp": 10}]]},
+                "outputs": {"save": {}},
+                "prompt": [1, "external-id", external_workflow, {"client_id": "comfy-web"}],
+            },
+            "valhalla-id": {
+                "status": {"completed": True, "status_str": "success", "messages": [["execution_success", {"timestamp": 20}]]},
+                "outputs": {"preview": {}},
+                "prompt": [2, "valhalla-id", preview_workflow, {"valhalla_origin": True, "client_id": "valhalla-test"}],
+            },
+        }
+
+        class Response:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return history
+
+        class Session:
+            def get(self, *_args, **_kwargs):
+                return Response()
+
+        with patch.object(app, "comfy_session", return_value=(Session(), "http://comfy", 1)):
+            prompt_id, workflow = app.latest_comfy_workflow({"settings": {}})
+        self.assertEqual(prompt_id, "external-id")
+        self.assertEqual(workflow, external_workflow)
+
+    def test_valhalla_prompt_requests_are_persistently_identifiable(self):
+        request = app.valhalla_prompt_request({"node": {}})
+        self.assertTrue(request["client_id"].startswith("valhalla-"))
+        self.assertIs(request["extra_data"]["valhalla_origin"], True)
+
+    def test_live_preview_snapshot_still_requires_fast_mapping(self):
+        state = app.WebState()
+        board = state.create_storyboard(
+            {"count": 1, "prompt_seed": 81, "inference_seed": 82}
+        )
+        workflow = {"node": {"class_type": "Example", "inputs": {}}}
+        with (
+            patch.object(app, "workflow_source", return_value="live"),
+            patch.object(app, "latest_comfy_workflow", return_value=("external-id", workflow)),
+            patch.object(app, "detect_node_mapping", return_value={"fast_mode": {}}) as detect,
+            patch.object(app.threading, "Thread"),
+        ):
+            preview = state.create_preview(board["id"], 1, True)
+        detect.assert_called_once_with(workflow, include_fast=True)
+        self.assertEqual(preview["workflow_source"], "live")
+        self.assertEqual(preview["source_prompt_id"], "external-id")
+        self.assertEqual(state.previews[preview["id"]]["_workflow_template"], workflow)
+
+    def test_live_workflow_controls_disable_profile_selection(self):
+        root = Path(app.__file__).parent
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        javascript = (root / "client" / "client.js").read_text(encoding="utf-8")
+        self.assertIn('id="live-workflow-source"', html)
+        self.assertIn("profiles.source === 'live'", javascript)
+        self.assertIn("source: $('#live-workflow-source').checked ? 'live' : 'profiles'", javascript)
+
     def test_operational_settings_live_only_in_root_config(self):
         config, _ = app.load_config()
         database, _ = app.load_database()
@@ -2667,6 +2735,12 @@ class WorkflowProfileTests(unittest.TestCase):
                 selected = app.select_workflow_profiles(db, root / "database.json", "model-a", "model-b")
                 self.assertEqual(selected["production"], "model-a")
                 self.assertEqual(selected["preview"], "model-b")
+                live = app.select_workflow_profiles(
+                    db, root / "database.json", "", "", "live"
+                )
+                self.assertEqual(live["source"], "live")
+                self.assertEqual(live["production"], "model-a")
+                self.assertEqual(live["preview"], "model-b")
                 renamed = app.rename_workflow_profile(db, root / "database.json", "model-a", "Editorial Model")
                 self.assertEqual(renamed["production"], "editorial-model")
                 self.assertTrue((directory / "editorial-model.workflow.json").is_file())

@@ -217,6 +217,8 @@ def load_config() -> tuple[dict[str, Any], Path]:
         raise AppError(
             "config.comfy.preview_max_edge must be a multiple of 64 from 256 to 2048"
         )
+    if comfy.get("workflow_source", "profiles") not in {"profiles", "live"}:
+        raise AppError("config.comfy.workflow_source must be 'profiles' or 'live'")
     profiles = comfy.get("profiles")
     if not isinstance(profiles, dict):
         raise AppError("config.comfy.profiles must be an object")
@@ -2600,6 +2602,17 @@ def comfy_session(db: dict[str, Any]) -> tuple[Any, str, float]:
     return session, url, timeout
 
 
+def comfy_history_from_valhalla(item: dict[str, Any]) -> bool:
+    prompt_record = item.get("prompt", [])
+    if len(prompt_record) < 4 or not isinstance(prompt_record[3], dict):
+        return False
+    metadata = prompt_record[3]
+    return (
+        metadata.get("valhalla_origin") is True
+        or str(metadata.get("client_id", "")).startswith("valhalla-")
+    )
+
+
 def latest_comfy_workflow(db: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     session, url, timeout = comfy_session(db)
     try:
@@ -2611,14 +2624,20 @@ def latest_comfy_workflow(db: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     completed = []
     for prompt_id, item in history.items():
         status = item.get("status", {})
-        if status.get("completed") and status.get("status_str") == "success" and item.get("outputs"):
+        if (
+            status.get("completed") and status.get("status_str") == "success"
+            and item.get("outputs") and not comfy_history_from_valhalla(item)
+        ):
             timestamp = 0
             for message, payload in status.get("messages", []):
                 if message == "execution_success":
                     timestamp = payload.get("timestamp", timestamp)
             completed.append((timestamp, prompt_id, item))
     if not completed:
-        raise AppError("ComfyUI history contains no successful completed workflow with outputs")
+        raise AppError(
+            "ComfyUI history contains no successful external workflow with outputs. "
+            "Run the desired workflow directly in ComfyUI first"
+        )
     _, prompt_id, item = max(completed, key=lambda entry: entry[0])
     prompt_record = item.get("prompt", [])
     if len(prompt_record) < 3 or not isinstance(prompt_record[2], dict):
@@ -2654,12 +2673,23 @@ def load_workflow_profile_registry(db: dict[str, Any], db_path: Path) -> dict[st
     return dict(config["comfy"]["profiles"])
 
 
-def save_workflow_profile_registry(db: dict[str, Any], db_path: Path, registry: dict[str, Any]) -> None:
+def workflow_source() -> str:
+    config, _ = load_config()
+    return str(config["comfy"].get("workflow_source", "profiles"))
+
+
+def save_workflow_profile_registry(
+    db: dict[str, Any], db_path: Path, registry: dict[str, Any], source: str | None = None
+) -> None:
     config, _ = load_config()
     config["comfy"]["profiles"] = {
         "production": registry.get("production"),
         "preview": registry.get("preview"),
     }
+    if source is not None:
+        if source not in {"profiles", "live"}:
+            raise AppError("Workflow source must be profiles or live")
+        config["comfy"]["workflow_source"] = source
     save_config(config)
 
 
@@ -2690,7 +2720,12 @@ def list_workflow_profiles(db: dict[str, Any], db_path: Path) -> dict[str, Any]:
     for mode in ("production", "preview"):
         if registry.get(mode) not in ids:
             registry[mode] = None
-    return {"profiles": profiles, "production": registry.get("production"), "preview": registry.get("preview")}
+    return {
+        "profiles": profiles,
+        "production": registry.get("production"),
+        "preview": registry.get("preview"),
+        "source": workflow_source(),
+    }
 
 
 def workflow_capture_candidate(db: dict[str, Any]) -> dict[str, Any]:
@@ -2728,13 +2763,22 @@ def capture_workflow_profile(db: dict[str, Any], db_path: Path, name: str, repla
     }
 
 
-def select_workflow_profiles(db: dict[str, Any], db_path: Path, production: str, preview: str) -> dict[str, Any]:
+def select_workflow_profiles(
+    db: dict[str, Any], db_path: Path, production: str, preview: str,
+    source: str = "profiles",
+) -> dict[str, Any]:
     available = list_workflow_profiles(db, db_path)
     valid = {item["id"] for item in available["profiles"] if item["valid"]}
-    if production not in valid or preview not in valid:
+    if source not in {"profiles", "live"}:
+        raise AppError("Workflow source must be profiles or live")
+    if source == "profiles" and (production not in valid or preview not in valid):
         raise AppError("Production and Preview must each select a valid workflow profile")
-    registry = {"production": production, "preview": preview}
-    save_workflow_profile_registry(db, db_path, registry)
+    registry = (
+        load_workflow_profile_registry(db, db_path)
+        if source == "live"
+        else {"production": production, "preview": preview}
+    )
+    save_workflow_profile_registry(db, db_path, registry, source)
     return list_workflow_profiles(db, db_path)
 
 
@@ -2897,6 +2941,15 @@ def wait_for_outputs(session: Any, url: str, prompt_id: str) -> dict[str, Any]:
     raise AppError(f"Timed out waiting for prompt_id {prompt_id}")
 
 
+def valhalla_prompt_request(workflow: dict[str, Any]) -> dict[str, Any]:
+    """Mark submissions so live mode never reuses Valhalla's transformed graph."""
+    return {
+        "prompt": workflow,
+        "client_id": f"valhalla-{uuid.uuid4()}",
+        "extra_data": {"valhalla_origin": True},
+    }
+
+
 def load_workflow_runtime(
     db: dict[str, Any], db_path: Path, fast: bool, profile_id: str | None = None
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -2916,6 +2969,17 @@ def load_workflow_runtime(
     if not isinstance(workflow, dict) or not workflow:
         raise AppError(f"Workflow must be a non-empty JSON object: {workflow_path}")
     return workflow, detect_node_mapping(workflow, include_fast=fast)
+
+
+def snapshot_live_workflow(
+    db: dict[str, Any], fast: bool
+) -> tuple[str, str, dict[str, Any], dict[str, Any]]:
+    """Freeze the latest external ComfyUI workflow in memory for one queued task."""
+    prompt_id, workflow = latest_comfy_workflow(db)
+    mapping = detect_node_mapping(workflow, include_fast=fast)
+    model = workflow_model_name(workflow)
+    label = f"Live ComfyUI · {model} · {prompt_id[:10]}"
+    return label, prompt_id, copy.deepcopy(workflow), mapping
 
 
 def encode_output_image(content: bytes, storage: dict[str, Any]) -> tuple[bytes, str]:
@@ -2969,7 +3033,9 @@ def generate_one(
         workflow = prepare_fast_workflow(workflow, mapping)
     session, url, timeout = comfy_session(db)
     try:
-        response = session.post(f"{url}/prompt", json={"prompt": workflow, "client_id": str(uuid.uuid4())}, timeout=timeout)
+        response = session.post(
+            f"{url}/prompt", json=valhalla_prompt_request(workflow), timeout=timeout
+        )
         response.raise_for_status()
         payload = response.json()
     except Exception as exc:
@@ -3031,7 +3097,7 @@ def generate_preview_image(
     try:
         response = session.post(
             f"{url}/prompt",
-            json={"prompt": workflow, "client_id": str(uuid.uuid4())},
+            json=valhalla_prompt_request(workflow),
             timeout=timeout,
         )
         response.raise_for_status()
@@ -4835,9 +4901,17 @@ class WebState:
         record = self.get_storyboard(storyboard_id)
         _, db_path = load_database()
         profile_mode = "preview" if fast else "production"
-        workflow_profile = load_workflow_profile_registry(record["db"], db_path).get(profile_mode)
-        if not workflow_profile:
-            raise AppError(f"No {profile_mode} workflow profile is selected")
+        source = workflow_source()
+        live_workflow = live_mapping = None
+        source_prompt_id = None
+        if source == "live":
+            workflow_profile, source_prompt_id, live_workflow, live_mapping = (
+                snapshot_live_workflow(record["db"], bool(fast))
+            )
+        else:
+            workflow_profile = load_workflow_profile_registry(record["db"], db_path).get(profile_mode)
+            if not workflow_profile:
+                raise AppError(f"No {profile_mode} workflow profile is selected")
         shot_numbers = shot_numbers or [shot["number"] for shot in record["shots"]]
         if not shot_numbers or any(number < 1 or number > len(record["shots"]) for number in shot_numbers):
             raise AppError("Render selection contains an invalid shot")
@@ -4851,6 +4925,8 @@ class WebState:
             "status": "queued",
             "fast": bool(fast),
             "workflow_profile": workflow_profile,
+            "workflow_source": source,
+            "source_prompt_id": source_prompt_id,
             "created_at": _iso_now(),
             "started_at": None,
             "finished_at": None,
@@ -4873,6 +4949,8 @@ class WebState:
             "_db": record["db"],
             "_mode": record["args"].mode,
             "_shots": selected_shots,
+            "_workflow_template": live_workflow,
+            "_workflow_mapping": live_mapping,
         }
         start_worker = False
         with self.lock:
@@ -4905,9 +4983,17 @@ class WebState:
     ) -> dict[str, Any]:
         record = self.get_storyboard(storyboard_id)
         _, db_path = load_database()
-        workflow_profile = load_workflow_profile_registry(record["db"], db_path).get("preview")
-        if not workflow_profile:
-            raise AppError("No Preview workflow profile is selected")
+        source = workflow_source()
+        live_workflow = live_mapping = None
+        source_prompt_id = None
+        if source == "live":
+            workflow_profile, source_prompt_id, live_workflow, live_mapping = (
+                snapshot_live_workflow(record["db"], True)
+            )
+        else:
+            workflow_profile = load_workflow_profile_registry(record["db"], db_path).get("preview")
+            if not workflow_profile:
+                raise AppError("No Preview workflow profile is selected")
         if not 1 <= number <= len(record["shots"]):
             raise AppError("Shot number is out of range")
         shot = record["shots"][number - 1]
@@ -4931,6 +5017,10 @@ class WebState:
             "negative": negative,
             "seed": shot["inference_seed"],
             "workflow_profile": workflow_profile,
+            "workflow_source": source,
+            "source_prompt_id": source_prompt_id,
+            "_workflow_template": live_workflow,
+            "_workflow_mapping": live_mapping,
         }
         with self.lock:
             if any(job["status"] in {"queued", "running"} for job in self.jobs.values()):
@@ -4965,6 +5055,8 @@ class WebState:
             "started_at": preview["started_at"],
             "elapsed_seconds": preview["elapsed_seconds"],
             "workflow_profile": preview["workflow_profile"],
+            "workflow_source": preview["workflow_source"],
+            "source_prompt_id": preview["source_prompt_id"],
         }
         if preview["status"] == "running" and preview.get("_started_monotonic") is not None:
             payload["elapsed_seconds"] = round(
@@ -5007,7 +5099,9 @@ class WebState:
         try:
             db = preview["db"]
             _, db_path = load_database()
-            workflow, mapping = load_workflow_runtime(db, db_path, True, preview["workflow_profile"])
+            workflow, mapping = preview.get("_workflow_template"), preview.get("_workflow_mapping")
+            if workflow is None or mapping is None:
+                workflow, mapping = load_workflow_runtime(db, db_path, True, preview["workflow_profile"])
             prompt_id, image_bytes, mime_type = generate_preview_image(
                 db,
                 preview["positive"],
@@ -5175,7 +5269,11 @@ class WebState:
         try:
             db = job["_db"]
             _, db_path = load_database()
-            workflow, mapping = load_workflow_runtime(db, db_path, job["fast"], job["workflow_profile"])
+            workflow, mapping = job.get("_workflow_template"), job.get("_workflow_mapping")
+            if workflow is None or mapping is None:
+                workflow, mapping = load_workflow_runtime(
+                    db, db_path, job["fast"], job["workflow_profile"]
+                )
             run_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             with self.lock:
                 job["_run_id"] = run_id
@@ -5545,6 +5643,7 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
     settings = db["settings"]
     config, config_file = load_config()
     workflow_profiles = list_workflow_profiles(db, db_path)
+    live_workflow = workflow_profiles["source"] == "live"
     output_path = resolve_path(config_file.parent, config["storage"]["output_dir"])
     selectable = sum(1 for item in iter_content_items(db) if not item.get("disabled", False))
     comfy_config = config["comfy"]
@@ -5570,8 +5669,8 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
         "version": "2.1.0",
         "comfy": comfy,
         "workflow": {
-            "ready": bool(workflow_profiles["production"] and workflow_profiles["preview"]),
-            "name": f"{len(workflow_profiles['profiles'])} profiles",
+            "ready": live_workflow or bool(workflow_profiles["production"] and workflow_profiles["preview"]),
+            "name": "Live ComfyUI" if live_workflow else f"{len(workflow_profiles['profiles'])} profiles",
             **workflow_profiles,
         },
         "output": {"path": str(output_path), "exists": output_path.is_dir()},
@@ -5728,7 +5827,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
                 payload = self.read_json()
                 db, db_path = load_database()
                 self.send_json(select_workflow_profiles(
-                    db, db_path, str(payload.get("production", "")), str(payload.get("preview", ""))
+                    db, db_path, str(payload.get("production", "")),
+                    str(payload.get("preview", "")), str(payload.get("source", "profiles")),
                 ))
             elif path.endswith("/rename") and path.startswith("/api/workflow/profiles/"):
                 if WEB_STATE.has_active_render():

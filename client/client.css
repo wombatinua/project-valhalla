@@ -192,6 +192,8 @@ h3 { margin-bottom: 6px; font-size: 1rem; }
 .profile-capture { padding-top: 18px; border-top: 1px solid var(--line); }
 .profile-capture .setup-section-title, .profile-capture .field-help { margin: 0; }
 .workflow-profile-list { display: grid; gap: 6px; }
+#workflow-profile-selectors { display: grid; gap: 12px; }
+#workflow-profile-selectors.disabled { opacity: 0.5; }
 .workflow-profile-item { min-width: 0; padding: 9px 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); }
 .workflow-profile-item strong, .workflow-profile-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-profile-item strong { font-size: 0.75rem; text-transform: capitalize; }

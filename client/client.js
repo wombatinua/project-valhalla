@@ -483,10 +483,15 @@ async function refreshStatus(showToast = false) {
     const productionProfile = status.workflow.profiles.find(
       (profile) => profile.id === status.workflow.production,
     );
-    $('#workflow-status').textContent = status.workflow.ready
+    const liveWorkflow = status.workflow.source === 'live';
+    $('#workflow-status').textContent = liveWorkflow
+      ? 'Live ComfyUI'
+      : status.workflow.ready
       ? productionProfile.name
       : (status.workflow.profiles.length ? 'Select profiles' : 'Missing');
-    $('#workflow-status').title = productionProfile
+    $('#workflow-status').title = liveWorkflow
+      ? 'Latest successful workflow run directly in ComfyUI'
+      : productionProfile
       ? `Production: ${productionProfile.file}\nPreview: ${status.workflow.preview}`
       : '';
     $('#workflow-dot').className = `status-dot ${status.workflow.ready ? 'online' : 'error'}`;
@@ -2056,8 +2061,8 @@ $('.image-stage').addEventListener('click', (event) => {
   if (event.target.classList.contains('image-stage')) imageDialog.close();
 });
 imageDialog.addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowLeft') { event.preventDefault(); movePreview(-1); }
-  if (event.key === 'ArrowRight') { event.preventDefault(); movePreview(1); }
+  if (['ArrowLeft', 'ArrowUp'].includes(event.key)) { event.preventDefault(); movePreview(-1); }
+  if (['ArrowRight', 'ArrowDown'].includes(event.key)) { event.preventDefault(); movePreview(1); }
   if (['Delete', 'Backspace'].includes(event.key) && !event.repeat) {
     event.preventDefault();
     deleteOutput(state.previewIndex);
@@ -2758,6 +2763,10 @@ function switchView(name) {
 
 function renderWorkflowProfiles(profiles) {
   state.workflowProfiles = profiles;
+  const live = profiles.source === 'live';
+  $('#live-workflow-source').checked = live;
+  $('#workflow-profile-selectors').classList.toggle('disabled', live);
+  $('#live-workflow-help').classList.toggle('hidden', !live);
   const options = profiles.profiles
     .map((profile) => `<option value="${escapeHtml(profile.id)}"${profile.valid ? '' : ' disabled'}>${escapeHtml(profile.name)}${profile.valid ? '' : ' · invalid'}</option>`)
     .join('');
@@ -2765,9 +2774,9 @@ function renderWorkflowProfiles(profiles) {
     const select = $(selector);
     select.innerHTML = options || '<option value="">No captured profiles</option>';
     select.value = profiles[mode] || '';
-    select.disabled = !profiles.profiles.some((profile) => profile.valid);
+    select.disabled = live || !profiles.profiles.some((profile) => profile.valid);
   }
-  $('#save-profile-selection').disabled = !profiles.profiles.some((profile) => profile.valid);
+  $('#save-profile-selection').disabled = !live && !profiles.profiles.some((profile) => profile.valid);
   $('#workflow-profile-list').innerHTML = profiles.profiles.length
     ? profiles.profiles.map((profile) => `
       <div class="workflow-profile-item${profile.valid ? '' : ' invalid'}" data-profile-id="${escapeHtml(profile.id)}">
@@ -2830,6 +2839,7 @@ async function saveWorkflowProfileSelection() {
       body: JSON.stringify({
         production: $('#production-profile').value,
         preview: $('#preview-profile').value,
+        source: $('#live-workflow-source').checked ? 'live' : 'profiles',
       }),
     });
     renderWorkflowProfiles(profiles);
@@ -2838,6 +2848,15 @@ async function saveWorkflowProfileSelection() {
     toast('Could not select profiles', error.message, 'error');
   } finally { setBusy(button, false); }
 }
+
+$('#live-workflow-source').addEventListener('change', (event) => {
+  const live = event.currentTarget.checked;
+  $('#workflow-profile-selectors').classList.toggle('disabled', live);
+  $('#live-workflow-help').classList.toggle('hidden', !live);
+  $$('#workflow-profile-selectors select').forEach((select) => { select.disabled = live; });
+  $('#save-profile-selection').disabled = !live
+    && !state.workflowProfiles?.profiles.some((profile) => profile.valid);
+});
 
 async function captureWorkflow() {
   const button = $('#capture-confirm');
