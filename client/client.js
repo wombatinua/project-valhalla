@@ -1528,7 +1528,7 @@ function applyPreviewPan() {
   state.previewPanX = Math.max(-bounds.x, Math.min(bounds.x, state.previewPanX));
   state.previewPanY = Math.max(-bounds.y, Math.min(bounds.y, state.previewPanY));
   const image = $('#image-viewer-image');
-  image.style.transform = `translate(-50%, -50%) translate(${state.previewPanX}px, ${state.previewPanY}px)`;
+  image.style.transform = `translate(-50%, -50%) translate(${state.previewPanX}px, ${state.previewPanY}px) scale(var(--preview-pinch-scale, 1))`;
   $('.image-stage').classList.toggle('pannable', bounds.x > 0 || bounds.y > 0);
 }
 
@@ -1545,8 +1545,11 @@ function fitPreviewImage() {
   const stageWidth = stage.clientWidth;
   const stageHeight = stage.clientHeight;
   if (!image.naturalWidth || !image.naturalHeight || !stageWidth || !stageHeight) return;
+  const mobilePortrait = window.matchMedia('(max-width: 560px) and (orientation: portrait)').matches;
   const scale = state.previewFit
-    ? Math.min(stageWidth / image.naturalWidth, stageHeight / image.naturalHeight)
+    ? (mobilePortrait
+      ? stageHeight / image.naturalHeight
+      : Math.min(stageWidth / image.naturalWidth, stageHeight / image.naturalHeight))
     : state.previewZoom / 100;
   image.style.width = `${Math.round(image.naturalWidth * scale)}px`;
   image.style.height = `${Math.round(image.naturalHeight * scale)}px`;
@@ -1879,10 +1882,12 @@ imageDialog.addEventListener('keydown', (event) => {
 });
 
 let previewPointer = null;
+let previewTouch = null;
 let previewPinch = null;
+let previewPinchFrame = null;
 const imageStage = $('.image-stage');
 imageStage.addEventListener('pointerdown', (event) => {
-  if (previewPinch || event.button !== 0 || event.target.closest('button')) return;
+  if (event.pointerType === 'touch' || previewPinch || event.button !== 0 || event.target.closest('button')) return;
   const bounds = previewPanBounds();
   previewPointer = {
     id: event.pointerId,
@@ -1896,6 +1901,8 @@ imageStage.addEventListener('pointerdown', (event) => {
   if (previewPointer.pannable) {
     event.preventDefault();
     imageStage.setPointerCapture(event.pointerId);
+  }
+  if (previewPointer.pannable) {
     imageStage.classList.add('panning');
   }
 });
@@ -1913,10 +1920,15 @@ function finishPreviewPointer(event) {
   const pointer = previewPointer;
   previewPointer = null;
   imageStage.classList.remove('panning');
-  suppressPreviewStageClick = event.type === 'pointerup' && pointer.pannable && pointer.moved;
-  if (!pointer.pannable) {
-    const distance = event.clientX - pointer.x;
-    if (Math.abs(distance) > 55) movePreview(distance > 0 ? -1 : 1);
+  const dx = event.clientX - pointer.x;
+  const dy = event.clientY - pointer.y;
+  const swiped = !pointer.pannable
+    && event.type === 'pointerup'
+    && Math.abs(dx) > 55
+    && Math.abs(dx) > Math.abs(dy) * 1.2;
+  suppressPreviewStageClick = event.type === 'pointerup' && (pointer.moved || swiped);
+  if (swiped) {
+    movePreview(dx > 0 ? -1 : 1);
   }
 }
 imageStage.addEventListener('pointerup', finishPreviewPointer);
@@ -1930,38 +1942,103 @@ function touchDistance(touches) {
 }
 
 imageStage.addEventListener('touchstart', (event) => {
+  if (event.touches.length === 1) {
+    const touch = event.touches[0];
+    const bounds = previewPanBounds();
+    previewTouch = {
+      x: touch.clientX,
+      y: touch.clientY,
+      panX: state.previewPanX,
+      panY: state.previewPanY,
+      pannable: !state.previewFit && (bounds.x > 0 || bounds.y > 0),
+      moved: false,
+    };
+    return;
+  }
   if (event.touches.length !== 2) return;
   event.preventDefault();
   previewPointer = null;
+  previewTouch = null;
   imageStage.classList.remove('panning');
   const image = $('#image-viewer-image');
+  image.style.removeProperty('--preview-pinch-scale');
   const renderedZoom = image.naturalWidth
     ? image.offsetWidth / image.naturalWidth * 100
     : state.previewZoom;
+  const baseZoom = Math.min(300, Math.max(25, state.previewFit ? renderedZoom : state.previewZoom));
   previewPinch = {
     distance: Math.max(1, touchDistance(event.touches)),
-    zoom: state.previewFit ? renderedZoom : state.previewZoom,
+    zoom: baseZoom,
+    pendingZoom: baseZoom,
   };
   state.previewFit = false;
+  state.previewZoom = baseZoom;
   syncPreviewScaleControls();
+  imageStage.classList.add('pinching');
 }, { passive: false });
 
-imageStage.addEventListener('touchmove', (event) => {
-  if (!previewPinch || event.touches.length !== 2) return;
-  event.preventDefault();
-  const scale = touchDistance(event.touches) / previewPinch.distance;
-  setPreviewZoom(previewPinch.zoom * scale);
-}, { passive: false });
-
-function finishPreviewPinch(event) {
-  if (!previewPinch || event.touches.length >= 2) return;
-  previewPinch = null;
-  suppressPreviewStageClick = true;
-  persistPreviewScale();
+function renderPreviewPinch() {
+  previewPinchFrame = null;
+  if (!previewPinch) return;
+  const zoom = previewPinch.pendingZoom;
+  $('#image-viewer-image').style.setProperty('--preview-pinch-scale', String(zoom / previewPinch.zoom));
+  $('#image-zoom').value = String(Math.round(zoom));
+  $('#image-zoom-output').textContent = `${Math.round(zoom)}%`;
 }
 
-imageStage.addEventListener('touchend', finishPreviewPinch, { passive: true });
-imageStage.addEventListener('touchcancel', finishPreviewPinch, { passive: true });
+imageStage.addEventListener('touchmove', (event) => {
+  if (previewPinch && event.touches.length === 2) {
+    event.preventDefault();
+    const scale = touchDistance(event.touches) / previewPinch.distance;
+    previewPinch.pendingZoom = Math.min(300, Math.max(25, previewPinch.zoom * scale));
+    if (previewPinchFrame == null) previewPinchFrame = requestAnimationFrame(renderPreviewPinch);
+    return;
+  }
+  if (!previewTouch || event.touches.length !== 1) return;
+  const touch = event.touches[0];
+  const dx = touch.clientX - previewTouch.x;
+  const dy = touch.clientY - previewTouch.y;
+  previewTouch.moved ||= Math.abs(dx) > 3 || Math.abs(dy) > 3;
+  if (previewTouch.pannable) {
+    event.preventDefault();
+    imageStage.classList.add('panning');
+    state.previewPanX = previewTouch.panX + dx;
+    state.previewPanY = previewTouch.panY + dy;
+    applyPreviewPan();
+  } else if (Math.abs(dx) > Math.abs(dy)) {
+    event.preventDefault();
+  }
+}, { passive: false });
+
+function finishPreviewTouch(event) {
+  if (previewPinch && event.touches.length < 2) {
+    const finalZoom = Math.round(previewPinch.pendingZoom);
+    previewPinch = null;
+    previewTouch = null;
+    if (previewPinchFrame != null) cancelAnimationFrame(previewPinchFrame);
+    previewPinchFrame = null;
+    imageStage.classList.remove('pinching');
+    setPreviewZoom(finalZoom);
+    $('#image-viewer-image').style.removeProperty('--preview-pinch-scale');
+    suppressPreviewStageClick = true;
+    return;
+  }
+  if (!previewTouch || event.touches.length) return;
+  const touch = event.changedTouches[0];
+  const dx = touch.clientX - previewTouch.x;
+  const dy = touch.clientY - previewTouch.y;
+  const swiped = !previewTouch.pannable
+    && event.type === 'touchend'
+    && Math.abs(dx) > 55
+    && Math.abs(dx) > Math.abs(dy) * 1.2;
+  suppressPreviewStageClick = previewTouch.moved || swiped;
+  previewTouch = null;
+  imageStage.classList.remove('panning');
+  if (swiped) movePreview(dx > 0 ? -1 : 1);
+}
+
+imageStage.addEventListener('touchend', finishPreviewTouch, { passive: true });
+imageStage.addEventListener('touchcancel', finishPreviewTouch, { passive: true });
 
 function directorShotButton(shot) {
   const active = shot.number === state.directorShot ? 'active' : '';

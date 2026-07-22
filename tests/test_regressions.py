@@ -1728,10 +1728,29 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("function touchDistance(touches)", js)
         self.assertIn("imageStage.addEventListener('touchstart'", js)
         self.assertIn("imageStage.addEventListener('touchmove'", js)
-        self.assertIn("setPreviewZoom(previewPinch.zoom * scale)", js)
+        self.assertIn("function renderPreviewPinch()", js)
+        self.assertIn("requestAnimationFrame(renderPreviewPinch)", js)
+        self.assertIn("--preview-pinch-scale", js)
+        self.assertIn("setPreviewZoom(finalZoom)", js)
         self.assertIn("{ passive: false }", js)
         self.assertIn(".image-viewer-shell.fallback-fullscreen", css)
+        self.assertIn(".image-stage.pinching img", css)
         self.assertIn("env(safe-area-inset-top)", css)
+
+    def test_lightbox_captures_ios_swipes_without_confusing_vertical_motion(self):
+        root = Path(app.__file__).parent
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
+        self.assertIn("let previewTouch = null", js)
+        self.assertIn("event.pointerType === 'touch'", js)
+        self.assertIn("function finishPreviewTouch(event)", js)
+        self.assertIn("pannable: !state.previewFit && (bounds.x > 0 || bounds.y > 0)", js)
+        self.assertIn("event.type === 'touchend'", js)
+        self.assertIn("Math.abs(dx) > Math.abs(dy) * 1.2", js)
+        self.assertIn("if (swiped)", js)
+        self.assertIn(".image-stage { touch-action: none; }", css)
+        self.assertIn(".viewer-zoom input { display: none; }", css)
+        self.assertIn("grid-template-rows: 54px minmax(0, 1fr)", css)
 
     def test_output_cards_use_lazy_async_thumbnails(self):
         js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
@@ -1793,6 +1812,8 @@ class FrontendContractTests(unittest.TestCase):
     def test_lightbox_fit_is_enabled_by_default_for_new_sessions(self):
         js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
         self.assertIn("sessionStorage.getItem('valhalla-preview-fit') !== 'false'", js)
+        self.assertIn("(max-width: 560px) and (orientation: portrait)", js)
+        self.assertIn("stageHeight / image.naturalHeight", js)
 
     def test_output_gallery_virtualizes_rows_with_bounded_overscan(self):
         root = Path(app.__file__).parent
