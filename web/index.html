@@ -24,7 +24,8 @@
       </nav>
 
       <div class="sidebar-spacer"></div>
-      <section class="system-card" aria-label="System status">
+      <button class="mobile-system-toggle" id="mobile-system-toggle" type="button" aria-expanded="false" aria-controls="system-card"><span class="nav-icon">⋯</span><span>System</span></button>
+      <section class="system-card" id="system-card" aria-label="System status">
         <div class="system-title"><span>System</span><button class="icon-button" id="refresh-status" title="Refresh status" aria-label="Refresh status">↻</button></div>
         <div class="status-row"><span><i class="status-dot" id="comfy-dot"></i>ComfyUI</span><strong id="comfy-status">Checking</strong></div>
         <div class="status-row workflow-status-row"><span><i class="status-dot" id="workflow-dot"></i>Workflow</span><strong id="workflow-status">Checking</strong></div>

@@ -18,9 +18,9 @@ const state = {
   outputs: [],
   galleryBenchmark: false,
   galleryView: sessionStorage.getItem('valhalla-gallery-view') === 'flat' ? 'flat' : 'photoshoots',
-  galleryGroup: null,
+  galleryGroup: sessionStorage.getItem('valhalla-gallery-group') || null,
   flatScrollY: 0,
-  flatFocusName: null,
+  flatFocusKey: null,
   deletedOutputs: new Set(),
   renderMode: sessionStorage.getItem('valhalla-render-mode') === 'preview'
     ? 'preview'
@@ -48,6 +48,12 @@ const state = {
   typeSize: ['small', 'normal', 'large'].includes(sessionStorage.getItem('valhalla-type-size'))
     ? sessionStorage.getItem('valhalla-type-size') : 'normal',
   workflowProfiles: null,
+  proofsPositions: (() => {
+    try { return JSON.parse(sessionStorage.getItem('valhalla-proofs-positions') || '{}'); }
+    catch { return {}; }
+  })(),
+  restoredView: ['studio', 'director', 'outputs', 'logger'].includes(sessionStorage.getItem('valhalla-active-view'))
+    ? sessionStorage.getItem('valhalla-active-view') : 'studio',
 };
 
 const form = $('#run-form');
@@ -125,6 +131,28 @@ function activePhotoshootGroup() {
   return state.galleryGroup
     ? photoshootGroups().find((group) => group.key === state.galleryGroup) || null
     : null;
+}
+
+function proofsPositionKey() {
+  return `${state.galleryView}:${state.galleryGroup || 'root'}`;
+}
+
+function rememberProofsPosition() {
+  if (!$('#outputs-view').classList.contains('active')) return;
+  state.proofsPositions[proofsPositionKey()] = window.scrollY;
+  sessionStorage.setItem('valhalla-proofs-positions', JSON.stringify(state.proofsPositions));
+  sessionStorage.setItem('valhalla-gallery-group', state.galleryGroup || '');
+}
+
+function restoreProofsPosition({ fallbackToGrid = false } = {}) {
+  const saved = Number(state.proofsPositions[proofsPositionKey()]);
+  requestAnimationFrame(() => {
+    const fallback = fallbackToGrid
+      ? Math.max(0, window.scrollY + outputGrid.getBoundingClientRect().top - 16)
+      : 0;
+    window.scrollTo({ top: Number.isFinite(saved) ? saved : fallback, behavior: 'auto' });
+    renderVirtualOutputs(true);
+  });
 }
 
 function displayedOutputs() {
@@ -917,13 +945,30 @@ async function finishJob() {
 }
 
 function addOutputs(outputs) {
-  const names = new Set(state.outputs.map((item) => item.name));
+  const keys = new Set(state.outputs.map(outputIdentity));
   outputs.forEach((item) => {
-    if (!names.has(item.name) && !state.deletedOutputs.has(item.name)) {
+    const key = outputIdentity(item);
+    if (!keys.has(key) && !state.deletedOutputs.has(key)) {
       state.outputs.push(item);
+      keys.add(key);
     }
   });
+  sortOutputsByDate();
   renderOutputs();
+}
+
+function outputIdentity(item) {
+  return item.key || `${item.source || 'output'}:${item.name}`;
+}
+
+function sortOutputsByDate() {
+  state.outputs.sort((left, right) => {
+    const leftDate = Date.parse(left.modified_at || '') || 0;
+    const rightDate = Date.parse(right.modified_at || '') || 0;
+    return leftDate - rightDate
+      || left.name.localeCompare(right.name)
+      || outputIdentity(left).localeCompare(outputIdentity(right));
+  });
 }
 
 function isRenderActive() {
@@ -1006,14 +1051,16 @@ async function deleteOutput(index) {
   const previewPosition = previewScope.findIndex((entry) => entry.outputIndex === index);
   const confirmed = await confirmDeletion(
     'Delete this image?',
-    `${item.name} will be permanently removed from the output folder.`,
+    `${item.name} will be permanently removed from its proof directory.`,
     'Delete image',
   );
   if (!confirmed) return;
   try {
-    await api(`/api/outputs/${encodeURIComponent(item.name)}`, { method: 'DELETE' });
-    state.deletedOutputs.add(item.name);
-    state.outputs = state.outputs.filter((output) => output.name !== item.name);
+    const key = outputIdentity(item);
+    const source = encodeURIComponent(item.source || 'output');
+    await api(`/api/outputs/${encodeURIComponent(item.name)}?source=${source}`, { method: 'DELETE' });
+    state.deletedOutputs.add(key);
+    state.outputs = state.outputs.filter((output) => outputIdentity(output) !== key);
     renderOutputs();
     if (imageDialog.open) {
       const remainingScope = previewOutputs();
@@ -1038,7 +1085,7 @@ async function deleteAllOutputs() {
   const count = state.outputs.length;
   const confirmed = await confirmDeletion(
     `Delete all ${count} images?`,
-    'Every generated image in the output folder will be permanently deleted. This cannot be undone.',
+    'Every image in the configured proof directories will be permanently deleted. This cannot be undone.',
     'Delete everything',
   );
   if (!confirmed) return;
@@ -1057,6 +1104,7 @@ async function loadOutputs() {
   try {
     const result = await api('/api/outputs');
     state.outputs = result.outputs || [];
+    sortOutputsByDate();
     state.galleryBenchmark = Boolean(result.benchmark);
   } catch (error) {
     toast('Could not load proofs', error.message, 'error');
@@ -1093,6 +1141,10 @@ async function restoreApplication() {
     state.initialAutoResolved = true;
     await resolveStoryboard(null, { initial: true });
   }
+  const restoredView = state.restoredView === 'director' && !state.storyboard
+    ? 'studio'
+    : state.restoredView;
+  switchView(restoredView);
 }
 
 function renderOutputs() {
@@ -1460,36 +1512,42 @@ function rememberFlatGalleryPosition() {
   const firstVisible = $$('.output-card[data-output-index]', outputGrid)
     .find((card) => card.getBoundingClientRect().bottom > 0);
   const anchor = focused || firstVisible;
-  state.flatFocusName = anchor ? state.outputs[Number(anchor.dataset.outputIndex)]?.name || null : null;
+  const item = anchor ? state.outputs[Number(anchor.dataset.outputIndex)] : null;
+  state.flatFocusKey = item ? outputIdentity(item) : null;
 }
 
 function setGalleryView(view) {
   const next = view === 'photoshoots' ? 'photoshoots' : 'flat';
   if (next === state.galleryView && !state.galleryGroup) return;
   rememberFlatGalleryPosition();
+  rememberProofsPosition();
   state.galleryView = next;
   state.galleryGroup = null;
   sessionStorage.setItem('valhalla-gallery-view', next);
+  sessionStorage.setItem('valhalla-gallery-group', '');
   renderOutputs();
   if (next === 'flat') {
     requestAnimationFrame(() => {
-      window.scrollTo({ top: state.flatScrollY, behavior: 'auto' });
+      const saved = Number(state.proofsPositions[proofsPositionKey()]);
+      window.scrollTo({ top: Number.isFinite(saved) ? saved : state.flatScrollY, behavior: 'auto' });
       renderVirtualOutputs(true);
-      if (state.flatFocusName) {
-        const index = state.outputs.findIndex((item) => item.name === state.flatFocusName);
+      if (state.flatFocusKey) {
+        const index = state.outputs.findIndex((item) => outputIdentity(item) === state.flatFocusKey);
         const card = $(`.output-card[data-output-index="${index}"]`, outputGrid);
         if (card) card.focus({ preventScroll: true });
       }
     });
   } else {
-    window.scrollTo({ top: Math.max(0, window.scrollY + outputGrid.getBoundingClientRect().top - 16), behavior: 'auto' });
+    restoreProofsPosition({ fallbackToGrid: true });
   }
 }
 
 function openPhotoshoot(key) {
+  rememberProofsPosition();
   state.galleryGroup = key;
+  sessionStorage.setItem('valhalla-gallery-group', key);
   renderOutputs();
-  window.scrollTo({ top: Math.max(0, window.scrollY + outputGrid.getBoundingClientRect().top - 16), behavior: 'auto' });
+  restoreProofsPosition({ fallbackToGrid: true });
 }
 
 outputGrid.addEventListener('click', (event) => {
@@ -1578,6 +1636,7 @@ $$('#gallery-view-toggle button').forEach((button) => {
 });
 
 window.addEventListener('scroll', () => scheduleVirtualOutputRender(), { passive: true });
+window.addEventListener('pagehide', rememberProofsPosition);
 if ('ResizeObserver' in window) {
   new ResizeObserver(() => scheduleVirtualOutputRender(true)).observe(outputGrid);
 }
@@ -1999,6 +2058,11 @@ function clampShotPreviewWindow() {
 }
 
 function switchView(name) {
+  if (!['studio', 'director', 'outputs', 'logger'].includes(name)) name = 'studio';
+  const previousView = $('.view.active')?.id?.replace('-view', '');
+  if (previousView === 'outputs' && name !== 'outputs') rememberProofsPosition();
+  state.restoredView = name;
+  sessionStorage.setItem('valhalla-active-view', name);
   $$('.view').forEach((view) => view.classList.toggle('active', view.id === `${name}-view`));
   $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.view === name));
   $('#studio-topbar-actions').classList.toggle('hidden', name !== 'studio');
@@ -2014,7 +2078,10 @@ function switchView(name) {
   }[name] || 'Creative workspace';
   if (name === 'director') loadDirector();
   if (name === 'logger') renderLogger();
-  if (name === 'outputs') scheduleVirtualOutputRender(true);
+  if (name === 'outputs') {
+    scheduleVirtualOutputRender(true);
+    if (previousView !== 'outputs') restoreProofsPosition();
+  }
 }
 
 function renderWorkflowProfiles(profiles) {
@@ -2326,7 +2393,31 @@ $('#workflow-profile-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-profile-action]');
   if (button) manageWorkflowProfile(button);
 });
-$$('.nav-item').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
+const mobileSystemToggle = $('#mobile-system-toggle');
+const systemCard = $('#system-card');
+
+function closeMobileSystem() {
+  systemCard.classList.remove('mobile-open');
+  mobileSystemToggle.setAttribute('aria-expanded', 'false');
+}
+
+mobileSystemToggle.addEventListener('click', (event) => {
+  event.stopPropagation();
+  const isOpen = systemCard.classList.toggle('mobile-open');
+  mobileSystemToggle.setAttribute('aria-expanded', String(isOpen));
+});
+
+$$('.nav-item').forEach((button) => button.addEventListener('click', () => {
+  closeMobileSystem();
+  switchView(button.dataset.view);
+}));
+
+document.addEventListener('click', (event) => {
+  if (!systemCard.contains(event.target)) closeMobileSystem();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeMobileSystem();
+});
 
 function inspectLoggerEvent(element) {
   if (!state.job || !element?.dataset.logIndex) return;

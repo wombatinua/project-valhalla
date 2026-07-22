@@ -6,7 +6,7 @@ Unchecked items are planned work, not claims about missing historical features.
 
 ## Project constraints
 
-- Keep one `app.py`, one manually editable `database.json`, a server-side `workflows/` library, one `launcher.sh`, and static assets under `web/`.
+- Keep one `app.py`, one local `config.json`, one manually editable `database.json`, a server-side `workflows/` library, one `launcher.sh`, and static assets under `web/`.
 - Preserve compatibility with different checkpoint families through the captured workflow.
 - Do not add FaceID, IPAdapter, PuLID, reference-image, or architecture-specific identity pipelines.
 - Do not add an image-quality detector or external vision model in the current roadmap.

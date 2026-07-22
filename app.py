@@ -64,6 +64,10 @@ def database_path() -> Path:
     return Path(__file__).resolve().with_name("database.json")
 
 
+def config_path() -> Path:
+    return Path(__file__).resolve().with_name("config.json")
+
+
 def unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -91,6 +95,113 @@ def load_database() -> tuple[dict[str, Any], Path]:
         raise AppError(f"Invalid JSON in {path}: {exc}") from exc
     validate_database(data)
     return data, path
+
+
+def load_config() -> tuple[dict[str, Any], Path]:
+    path = config_path()
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_json_object)
+    except FileNotFoundError as exc:
+        raise AppError(f"Configuration not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise AppError(f"Invalid JSON in {path}: {exc}") from exc
+    if not isinstance(config, dict):
+        raise AppError(f"config.json must contain a JSON object: {path}")
+    server = config.get("server")
+    if not isinstance(server, dict):
+        raise AppError("config.server must be an object")
+    if not isinstance(server.get("host"), str) or not server["host"]:
+        raise AppError("config.server.host must be a non-empty string")
+    listen_port = server.get("port")
+    if not isinstance(listen_port, int) or isinstance(listen_port, bool) or not 1 <= listen_port <= 65535:
+        raise AppError("config.server.port must be an integer from 1 to 65535")
+    comfy = config.get("comfy")
+    if not isinstance(comfy, dict):
+        raise AppError("config.comfy must be an object")
+    for key in ("url", "workflows_dir"):
+        if not isinstance(comfy.get(key), str) or not comfy[key]:
+            raise AppError(f"config.comfy.{key} must be a non-empty string")
+    storage = config.get("storage")
+    if not isinstance(storage, dict):
+        raise AppError("config.storage must be an object")
+    if not isinstance(storage.get("output_dir"), str) or not storage["output_dir"]:
+        raise AppError("config.storage.output_dir must be a non-empty string")
+    if storage.get("output_format") not in {"png", "jpeg", "jpg"}:
+        raise AppError("config.storage.output_format must be 'png', 'jpeg', or 'jpg'")
+    jpeg_quality = storage.get("jpeg_quality")
+    if not isinstance(jpeg_quality, int) or isinstance(jpeg_quality, bool) or not 1 <= jpeg_quality <= 100:
+        raise AppError("config.storage.jpeg_quality must be an integer from 1 to 100")
+    if not isinstance(storage.get("strip_exif"), bool):
+        raise AppError("config.storage.strip_exif must be true or false")
+    proofs_dir = storage.get("proofs_dir")
+    if isinstance(proofs_dir, str):
+        if not proofs_dir:
+            raise AppError("config.storage.proofs_dir string cannot be empty")
+    elif not isinstance(proofs_dir, list) or not all(
+        isinstance(value, str) and value for value in proofs_dir
+    ):
+        raise AppError("config.storage.proofs_dir must be a path string or an array of path strings")
+    gallery = config.get("gallery")
+    if not isinstance(gallery, dict):
+        raise AppError("config.gallery must be an object")
+    thumbnail_cache_mb = gallery.get("thumbnail_cache_mb")
+    if (
+        not isinstance(thumbnail_cache_mb, int)
+        or isinstance(thumbnail_cache_mb, bool)
+        or not 0 <= thumbnail_cache_mb <= 4096
+    ):
+        raise AppError("config.gallery.thumbnail_cache_mb must be an integer from 0 to 4096")
+    thumbnail_max_edge = gallery.get("thumbnail_max_edge")
+    if (
+        not isinstance(thumbnail_max_edge, int) or isinstance(thumbnail_max_edge, bool)
+        or not 64 <= thumbnail_max_edge <= 4096
+    ):
+        raise AppError("config.gallery.thumbnail_max_edge must be an integer from 64 to 4096")
+    limits = config.get("limits")
+    if not isinstance(limits, dict):
+        raise AppError("config.limits must be an object")
+    limit_ranges = {
+        "max_scene_attempts": (1, 100_000),
+        "max_storyboards": (1, 10_000),
+        "max_jobs": (1, 10_000),
+        "max_previews": (1, 1_000),
+    }
+    for key, (minimum, maximum) in limit_ranges.items():
+        value = limits.get(key)
+        if (
+            not isinstance(value, int) or isinstance(value, bool)
+            or not minimum <= value <= maximum
+        ):
+            raise AppError(f"config.limits.{key} must be an integer from {minimum} to {maximum}")
+    number_ranges = {
+        "http_timeout_seconds": (0.1, 3600),
+        "status_timeout_seconds": (0.1, 300),
+        "poll_interval_seconds": (0.05, 60),
+        "generation_timeout_seconds": (1, 86_400),
+    }
+    for key, (minimum, maximum) in number_ranges.items():
+        value = comfy.get(key)
+        if (
+            not isinstance(value, (int, float)) or isinstance(value, bool)
+            or not minimum <= value <= maximum
+        ):
+            raise AppError(f"config.comfy.{key} must be a number from {minimum} to {maximum}")
+    profiles = comfy.get("profiles")
+    if not isinstance(profiles, dict):
+        raise AppError("config.comfy.profiles must be an object")
+    for mode in ("production", "preview"):
+        if mode not in profiles:
+            raise AppError(f"config.comfy.profiles must contain '{mode}'")
+        if profiles.get(mode) is not None and not isinstance(profiles.get(mode), str):
+            raise AppError(f"config.comfy.profiles.{mode} must be a string or null")
+    return config, path
+
+
+def save_config(config: dict[str, Any]) -> None:
+    _, path = load_config()
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    temporary.replace(path)
 
 
 def iter_content_items(db: dict[str, Any]) -> Iterable[dict[str, Any]]:
@@ -162,9 +273,6 @@ def validate_database(db: dict[str, Any]) -> None:
         if section not in db:
             raise AppError(f"database.json is missing the '{section}' section")
     settings = db["settings"]
-    for key in ("comfy_url", "workflows_dir", "output_dir"):
-        if not isinstance(settings.get(key), str) or not settings[key]:
-            raise AppError(f"settings.{key} must be a non-empty string")
     positive_prefix = db["prompt_defaults"].get("positive_prefix")
     if not isinstance(positive_prefix, str) or positive_prefix.count("{age}") != 1:
         raise AppError(
@@ -936,6 +1044,7 @@ class Composer:
     def __init__(self, db: dict[str, Any], rng: random.Random):
         self.db = db
         self.rng = rng
+        self.max_scene_attempts = load_config()[0]["limits"]["max_scene_attempts"]
         self.colors = {
             item["id"]: item for item in db["colors"] if not item.get("disabled", False)
         }
@@ -1222,7 +1331,7 @@ class Composer:
         interior: dict[str, Any] | None = None,
         content_mode: str = "progressive",
     ) -> dict[str, Any]:
-        attempts = int(self.db["settings"].get("max_scene_attempts", 100))
+        attempts = self.max_scene_attempts
         last_error = "no compatible outfit"
         for _ in range(attempts):
             try:
@@ -1240,7 +1349,7 @@ class Composer:
         )
 
     def fixed_context(self, content_mode: str = "progressive") -> dict[str, Any]:
-        attempts = int(self.db["settings"].get("max_scene_attempts", 100))
+        attempts = self.max_scene_attempts
         last_error = "no compatible fixed context"
         allowed_wardrobes = set(
             self.db["settings"]["scene_defaults"]["wardrobe_categories"]
@@ -1570,7 +1679,7 @@ class Composer:
         overrides: dict[str, str] | None = None,
         avoid: dict[str, set[str]] | None = None,
     ) -> dict[str, Any]:
-        attempts = int(self.db["settings"].get("max_scene_attempts", 100))
+        attempts = self.max_scene_attempts
         last_error = "no candidates"
         for _ in range(attempts):
             try:
@@ -2204,8 +2313,9 @@ def require_requests() -> Any:
 def comfy_session(db: dict[str, Any]) -> tuple[Any, str, float]:
     module = require_requests()
     session = module.Session()
-    url = db["settings"]["comfy_url"].rstrip("/")
-    timeout = float(db["settings"].get("http_timeout_seconds", 15))
+    config, _ = load_config()
+    url = config["comfy"]["url"].rstrip("/")
+    timeout = float(config["comfy"]["http_timeout_seconds"])
     return session, url, timeout
 
 
@@ -2236,7 +2346,8 @@ def latest_comfy_workflow(db: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 
 def workflow_profile_directory(db: dict[str, Any], db_path: Path) -> Path:
-    return resolve_path(db_path.parent, db["settings"]["workflows_dir"])
+    config, path = load_config()
+    return resolve_path(path.parent, config["comfy"]["workflows_dir"])
 
 
 def workflow_profile_slug(name: str) -> str:
@@ -2258,26 +2369,17 @@ def workflow_model_name(workflow: dict[str, Any]) -> str:
 
 
 def load_workflow_profile_registry(db: dict[str, Any], db_path: Path) -> dict[str, Any]:
-    directory = workflow_profile_directory(db, db_path)
-    path = directory / "profiles.json"
-    if not path.exists():
-        return {"production": None, "preview": None}
-    try:
-        registry = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise AppError(f"Invalid workflow profile registry {path}: {exc}") from exc
-    if not isinstance(registry, dict):
-        raise AppError(f"Workflow profile registry must be a JSON object: {path}")
-    return registry
+    config, _ = load_config()
+    return dict(config["comfy"]["profiles"])
 
 
 def save_workflow_profile_registry(db: dict[str, Any], db_path: Path, registry: dict[str, Any]) -> None:
-    directory = workflow_profile_directory(db, db_path)
-    directory.mkdir(parents=True, exist_ok=True)
-    target = directory / "profiles.json"
-    temporary = directory / ".profiles.json.tmp"
-    temporary.write_text(json.dumps(registry, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    temporary.replace(target)
+    config, _ = load_config()
+    config["comfy"]["profiles"] = {
+        "production": registry.get("production"),
+        "preview": registry.get("preview"),
+    }
+    save_config(config)
 
 
 def list_workflow_profiles(db: dict[str, Any], db_path: Path) -> dict[str, Any]:
@@ -2454,10 +2556,12 @@ def prepare_fast_workflow(
     return {node_id: node for node_id, node in workflow.items() if node_id in required}
 
 
-def wait_for_outputs(session: Any, url: str, prompt_id: str, settings: dict[str, Any]) -> dict[str, Any]:
-    deadline = time.monotonic() + float(settings.get("generation_timeout_seconds", 600))
-    interval = float(settings.get("poll_interval_seconds", 1))
-    timeout = float(settings.get("http_timeout_seconds", 15))
+def wait_for_outputs(session: Any, url: str, prompt_id: str) -> dict[str, Any]:
+    config, _ = load_config()
+    comfy = config["comfy"]
+    deadline = time.monotonic() + float(comfy["generation_timeout_seconds"])
+    interval = float(comfy["poll_interval_seconds"])
+    timeout = float(comfy["http_timeout_seconds"])
     while time.monotonic() < deadline:
         response = session.get(f"{url}/history/{prompt_id}", timeout=timeout)
         response.raise_for_status()
@@ -2493,6 +2597,37 @@ def load_workflow_runtime(
     return workflow, detect_node_mapping(workflow, include_fast=fast)
 
 
+def encode_output_image(content: bytes, storage: dict[str, Any]) -> tuple[bytes, str]:
+    if Image is None or ImageOps is None:
+        raise AppError("Output image conversion requires Pillow; restart with launcher.sh to install it")
+    try:
+        with Image.open(BytesIO(content)) as source:
+            source.load()
+            exif = source.info.get("exif")
+            image = ImageOps.exif_transpose(source) if storage["strip_exif"] else source.copy()
+            output_format = storage["output_format"]
+            save_options: dict[str, Any] = {}
+            if not storage["strip_exif"] and exif:
+                save_options["exif"] = exif
+            if output_format in {"jpeg", "jpg"}:
+                if image.mode not in {"RGB", "L"}:
+                    if "A" in image.getbands():
+                        background = Image.new("RGB", image.size, "#111318")
+                        background.paste(image, mask=image.getchannel("A"))
+                        image = background
+                    else:
+                        image = image.convert("RGB")
+                save_options.update(quality=storage["jpeg_quality"], optimize=True)
+                suffix, pillow_format = ".jpg", "JPEG"
+            else:
+                suffix, pillow_format = ".png", "PNG"
+            buffer = BytesIO()
+            image.save(buffer, format=pillow_format, **save_options)
+            return buffer.getvalue(), suffix
+    except (OSError, ValueError) as exc:
+        raise AppError(f"Could not encode generated image: {exc}") from exc
+
+
 def generate_one(
     db: dict[str, Any],
     db_path: Path,
@@ -2523,29 +2658,32 @@ def generate_one(
     prompt_id = payload.get("prompt_id")
     if not prompt_id:
         raise AppError(f"ComfyUI response has no prompt_id: {payload}")
-    outputs = wait_for_outputs(session, url, prompt_id, db["settings"])
-    output_dir = resolve_path(db_path.parent, db["settings"]["output_dir"])
+    outputs = wait_for_outputs(session, url, prompt_id)
+    config, config_file = load_config()
+    output_dir = resolve_path(config_file.parent, config["storage"]["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     saved: list[Path] = []
     image_number = 0
     for node_output in outputs.values():
         for image in node_output.get("images", []):
             image_number += 1
-            suffix = Path(image.get("filename", "image.png")).suffix or ".png"
             if mode == "photoshoot":
                 label = f"photoshoot_{photoshoot_index + 1:03d}_shot_{shot_index + 1:03d}"
             else:
                 label = f"random_shot_{shot_index + 1:03d}"
             if fast:
                 label = f"fast_{label}"
-            destination = output_dir / f"{run_id}_{label}_{seed}_image_{image_number:02d}{suffix}"
             response = session.get(
                 f"{url}/view",
                 params={"filename": image["filename"], "subfolder": image.get("subfolder", ""), "type": image.get("type", "output")},
                 timeout=timeout,
             )
             response.raise_for_status()
-            destination.write_bytes(response.content)
+            encoded, suffix = encode_output_image(response.content, config["storage"])
+            destination = output_dir / f"{run_id}_{label}_{seed}_image_{image_number:02d}{suffix}"
+            temporary = output_dir / f".{destination.name}.{uuid.uuid4().hex}.tmp"
+            temporary.write_bytes(encoded)
+            temporary.replace(destination)
             saved.append(destination)
     if not saved:
         raise AppError(f"ComfyUI completed prompt_id {prompt_id} but returned no images")
@@ -2587,7 +2725,7 @@ def generate_preview_image(
     prompt_id = payload.get("prompt_id")
     if not prompt_id:
         raise AppError(f"ComfyUI response has no prompt_id: {payload}")
-    outputs = wait_for_outputs(session, url, prompt_id, db["settings"])
+    outputs = wait_for_outputs(session, url, prompt_id)
     for node_output in outputs.values():
         for image in node_output.get("images", []):
             response = session.get(
@@ -2624,7 +2762,7 @@ def build_storyboard(
         avoid: dict[str, set[str]] = {}
         fixed = None
         if args.mode == "photoshoot":
-            attempts = int(db["settings"].get("max_scene_attempts", 100))
+            attempts = composer.max_scene_attempts
             for _ in range(attempts):
                 candidate = composer.fixed_context(args.content_mode)
                 signature = photoshoot_signature(candidate)
@@ -2757,15 +2895,10 @@ except ImportError:
     Image = ImageOps = None  # type: ignore[assignment]
 
 WEB_ROOT = Path(__file__).resolve().with_name("web")
-MAX_STORYBOARDS = 20
-MAX_JOBS = 40
-MAX_PREVIEWS = 8
-THUMBNAIL_MAX_EDGE = 512
-THUMBNAIL_CACHE_MAX_BYTES = 128 * 1024 * 1024
-THUMBNAIL_CACHE: OrderedDict[tuple[str, int, int], bytes] = OrderedDict()
+THUMBNAIL_CACHE: OrderedDict[tuple[str, str, int, int], bytes] = OrderedDict()
 THUMBNAIL_CACHE_BYTES = 0
 THUMBNAIL_CACHE_LOCK = threading.Lock()
-THUMBNAIL_IN_FLIGHT: dict[tuple[str, int, int], Future[bytes]] = {}
+THUMBNAIL_IN_FLIGHT: dict[tuple[str, str, int, int], Future[bytes]] = {}
 
 
 def _iso_now() -> str:
@@ -3168,7 +3301,7 @@ class WebState:
         }
         with self.lock:
             self.storyboards[storyboard_id] = record
-            self.trim(self.storyboards, MAX_STORYBOARDS)
+            self.trim(self.storyboards, load_config()[0]["limits"]["max_storyboards"])
         return self.storyboard_payload(record)
 
     def storyboard_payload(self, record: dict[str, Any]) -> dict[str, Any]:
@@ -4238,7 +4371,7 @@ class WebState:
         }
         with self.lock:
             self.storyboards[storyboard_id] = record
-            self.trim(self.storyboards, MAX_STORYBOARDS)
+            self.trim(self.storyboards, load_config()[0]["limits"]["max_storyboards"])
         return self.storyboard_payload(record)
 
     def reroll_shot(self, storyboard_id: str, number: int) -> dict[str, Any]:
@@ -4358,13 +4491,14 @@ class WebState:
         with self.lock:
             if any(preview["status"] in {"queued", "running"} for preview in self.previews.values()):
                 raise AppError("Wait for the active shot preview to finish")
-            while len(self.jobs) >= MAX_JOBS:
+            max_jobs = load_config()[0]["limits"]["max_jobs"]
+            while len(self.jobs) >= max_jobs:
                 removable = next((
                     job_id for job_id, item in self.jobs.items()
                     if item["status"] not in {"queued", "running"}
                 ), None)
                 if removable is None:
-                    raise AppError(f"Render queue is full ({MAX_JOBS} jobs)")
+                    raise AppError(f"Render queue is full ({max_jobs} jobs)")
                 self.jobs.pop(removable)
             self.jobs[job_id] = job
             if not self._job_worker_running:
@@ -4417,7 +4551,7 @@ class WebState:
             if any(item["status"] in {"queued", "running"} for item in self.previews.values()):
                 raise AppError("Another shot preview is already rendering")
             self.previews[preview_id] = preview
-            self.trim(self.previews, MAX_PREVIEWS)
+            self.trim(self.previews, load_config()[0]["limits"]["max_previews"])
         threading.Thread(
             target=self._run_preview, args=(preview_id,), daemon=True
         ).start()
@@ -4699,12 +4833,9 @@ class WebState:
                     job["elapsed_seconds"] = round(elapsed, 1)
                     job["eta_seconds"] = round(elapsed / completed * remaining, 1) if remaining else 0
                     for path in paths:
-                        job["outputs"].append({
-                            "name": path.name,
-                            "url": f"/api/outputs/{path.name}",
-                            "prompt_id": prompt_id,
-                            "shot": shot["number"],
-                        })
+                        published = output_payload(path)
+                        published.update(prompt_id=prompt_id, shot=shot["number"])
+                        job["outputs"].append(published)
                     shot_log.update({
                         "type": "shot_completed",
                         "position": completed,
@@ -4742,31 +4873,68 @@ GALLERY_BENCHMARK_SOURCES = 10
 
 
 def output_directory() -> Path:
-    db, db_path = load_database()
-    return resolve_path(db_path.parent, db["settings"]["output_dir"])
+    config, path = load_config()
+    return resolve_path(path.parent, config["storage"]["output_dir"])
 
 
-def output_payload(path: Path) -> dict[str, Any]:
+def proof_directories() -> list[tuple[str, Path]]:
+    config, path = load_config()
+    configured = config["storage"]["proofs_dir"]
+    values = [configured] if isinstance(configured, str) else configured
+    output = output_directory().resolve()
+    candidates = [
+        (f"proof-{index}", resolve_path(path.parent, value))
+        for index, value in enumerate(values, 1)
+    ] + [("output", output)]
+    # Always retain output_dir under the stable "output" source, even if it was
+    # repeated in proofs_dir. Additional proof sources load before live output.
+    seen: set[Path] = {output}
+    result = []
+    for source, directory in candidates:
+        resolved = directory.resolve()
+        if source == "output" or resolved not in seen:
+            seen.add(resolved)
+            result.append((source, resolved))
+    return result
+
+
+def proof_directory(source: str) -> Path:
+    if source == "output":
+        return output_directory()
+    directory = next((path for source_id, path in proof_directories() if source_id == source), None)
+    if directory is None:
+        raise AppError("Unknown proof source")
+    return directory
+
+
+def output_payload(path: Path, source: str = "output") -> dict[str, Any]:
     match = re.search(r"_shot_(\d+)_", path.name)
     stat = path.stat()
     return {
         "name": path.name,
-        "url": f"/api/outputs/{path.name}",
-        "thumbnail_url": f"/api/thumbnails/{path.name}?v={stat.st_mtime_ns}",
+        "source": source,
+        "key": f"{source}:{path.name}",
+        "url": f"/api/outputs/{path.name}?source={source}",
+        "thumbnail_url": f"/api/thumbnails/{path.name}?source={source}&v={stat.st_mtime_ns}",
         "shot": int(match.group(1)) if match else None,
         "size": stat.st_size,
         "modified_at": datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds"),
     }
 
 
-def _thumbnail_cache_remove(name: str | None = None) -> None:
+def _thumbnail_cache_remove(name: str | None = None, source: str | None = None) -> None:
     global THUMBNAIL_CACHE_BYTES
     with THUMBNAIL_CACHE_LOCK:
         keys = list(THUMBNAIL_CACHE) if name is None else [
-            key for key in THUMBNAIL_CACHE if key[0] == name
+            key for key in THUMBNAIL_CACHE if key[1] == name and (source is None or key[0] == source)
         ]
         for key in keys:
             THUMBNAIL_CACHE_BYTES -= len(THUMBNAIL_CACHE.pop(key))
+
+
+def thumbnail_cache_max_bytes() -> int:
+    config, _ = load_config()
+    return config["gallery"]["thumbnail_cache_mb"] * 1024 * 1024
 
 
 def _generate_thumbnail(target: Path) -> bytes:
@@ -4776,7 +4944,8 @@ def _generate_thumbnail(target: Path) -> bytes:
         with Image.open(target) as source:
             source.seek(0)
             thumbnail = ImageOps.exif_transpose(source)
-            thumbnail.thumbnail((THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE), Image.Resampling.LANCZOS)
+            thumbnail_max_edge = load_config()[0]["gallery"]["thumbnail_max_edge"]
+            thumbnail.thumbnail((thumbnail_max_edge, thumbnail_max_edge), Image.Resampling.LANCZOS)
             if thumbnail.mode not in {"RGB", "L"}:
                 if "A" in thumbnail.getbands():
                     background = Image.new("RGB", thumbnail.size, "#111318")
@@ -4792,17 +4961,17 @@ def _generate_thumbnail(target: Path) -> bytes:
     return body
 
 
-def output_thumbnail(name: str) -> bytes:
+def output_thumbnail(name: str, source: str = "output") -> bytes:
     global THUMBNAIL_CACHE_BYTES
     if not name or Path(name).name != name:
         raise AppError("Invalid output filename")
-    target = output_directory() / name
+    target = proof_directory(source) / name
     if target.suffix.lower() not in IMAGE_SUFFIXES:
         raise AppError("Only generated image files can be viewed")
     if not target.is_file():
         raise AppError("Output not found")
     stat = target.stat()
-    key = (name, stat.st_mtime_ns, stat.st_size)
+    key = (source, name, stat.st_mtime_ns, stat.st_size)
     with THUMBNAIL_CACHE_LOCK:
         cached = THUMBNAIL_CACHE.get(key)
         if cached is not None:
@@ -4823,7 +4992,8 @@ def output_thumbnail(name: str) -> bytes:
                 THUMBNAIL_CACHE_BYTES -= len(previous)
             THUMBNAIL_CACHE[key] = body
             THUMBNAIL_CACHE_BYTES += len(body)
-            while THUMBNAIL_CACHE_BYTES > THUMBNAIL_CACHE_MAX_BYTES and len(THUMBNAIL_CACHE) > 1:
+            cache_limit = thumbnail_cache_max_bytes()
+            while THUMBNAIL_CACHE_BYTES > cache_limit and THUMBNAIL_CACHE:
                 _, evicted = THUMBNAIL_CACHE.popitem(last=False)
                 THUMBNAIL_CACHE_BYTES -= len(evicted)
         future.set_result(body)
@@ -4837,29 +5007,31 @@ def output_thumbnail(name: str) -> bytes:
 
 
 def list_output_images() -> list[dict[str, Any]]:
-    directory = output_directory()
-    if not directory.is_dir():
-        return []
-    paths = [
-        path for path in directory.iterdir()
-        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
-    ]
-    paths.sort(key=lambda path: (path.stat().st_mtime, path.name))
+    paths = []
+    for source, directory in proof_directories():
+        if not directory.is_dir():
+            continue
+        source_paths = [
+            path for path in directory.iterdir()
+            if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+        ]
+        source_paths.sort(key=lambda path: (path.stat().st_mtime, path.name))
+        paths.extend((source, path) for path in source_paths)
     if GALLERY_BENCHMARK_COUNT:
         if not paths:
             raise AppError("Gallery benchmark requires at least one existing output image")
         sources = paths[-GALLERY_BENCHMARK_SOURCES:]
         outputs = []
         for index in range(GALLERY_BENCHMARK_COUNT):
-            source = sources[index % len(sources)]
-            payload = output_payload(source)
+            source_id, source = sources[index % len(sources)]
+            payload = output_payload(source, source_id)
             payload["name"] = f"benchmark_{index + 1:05d}_{source.name}"
             separator = "&" if "?" in payload["thumbnail_url"] else "?"
             payload["thumbnail_url"] += f"{separator}benchmark={index + 1}"
             payload["shot"] = index + 1
             outputs.append(payload)
         return outputs
-    return [output_payload(path) for path in paths]
+    return [output_payload(path, source) for source, path in paths]
 
 
 def ensure_outputs_idle() -> None:
@@ -4869,12 +5041,12 @@ def ensure_outputs_idle() -> None:
         raise AppError("Outputs cannot be deleted while a render job is active")
 
 
-def delete_output_image(name: str) -> dict[str, Any]:
+def delete_output_image(name: str, source: str = "output") -> dict[str, Any]:
     if GALLERY_BENCHMARK_COUNT:
         raise AppError("Output deletion is disabled in gallery benchmark mode")
     if not name or Path(name).name != name:
         raise AppError("Invalid output filename")
-    target = output_directory() / name
+    target = proof_directory(source) / name
     if target.suffix.lower() not in IMAGE_SUFFIXES:
         raise AppError("Only generated image files can be deleted")
     if not target.is_file():
@@ -4884,7 +5056,7 @@ def delete_output_image(name: str) -> dict[str, Any]:
         # only a file from the active run that has not yet been published as an
         # output, because it may still be in the middle of being written.
         for job in WEB_STATE.jobs.values():
-            if job["status"] not in {"queued", "running"}:
+            if source != "output" or job["status"] not in {"queued", "running"}:
                 continue
             run_id = job.get("_run_id")
             published = {item["name"] for item in job.get("outputs", [])}
@@ -4894,50 +5066,55 @@ def delete_output_image(name: str) -> dict[str, Any]:
             target.unlink()
         except OSError as exc:
             raise AppError(f"Could not delete output: {exc}") from exc
-        _thumbnail_cache_remove(name)
+        _thumbnail_cache_remove(name, source)
         # Prevent subsequent job polling from restoring a deleted card in the UI.
         for job in WEB_STATE.jobs.values():
+            if source != "output":
+                continue
             job["outputs"] = [
                 item for item in job.get("outputs", []) if item["name"] != name
             ]
-    return {"ok": True, "deleted": name}
+    return {"ok": True, "deleted": name, "source": source}
 
 
 def delete_all_output_images() -> dict[str, Any]:
     if GALLERY_BENCHMARK_COUNT:
         raise AppError("Output deletion is disabled in gallery benchmark mode")
     ensure_outputs_idle()
-    directory = output_directory()
-    if not directory.is_dir():
-        return {"ok": True, "deleted": 0, "names": []}
     targets = [
-        path for path in directory.iterdir()
+        (source, path)
+        for source, directory in proof_directories() if directory.is_dir()
+        for path in directory.iterdir()
         if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
     ]
-    deleted: list[str] = []
-    for target in targets:
+    deleted: list[dict[str, str]] = []
+    for source, target in targets:
         try:
             target.unlink()
-            deleted.append(target.name)
+            deleted.append({"name": target.name, "source": source})
         except OSError as exc:
             raise AppError(
                 f"Deleted {len(deleted)} images, then could not delete {target.name}: {exc}"
             ) from exc
     _thumbnail_cache_remove()
-    return {"ok": True, "deleted": len(deleted), "names": deleted}
+    return {"ok": True, "deleted": len(deleted), "files": deleted}
 
 
 def application_status(check_comfy: bool = True) -> dict[str, Any]:
     db, db_path = load_database()
     settings = db["settings"]
+    config, config_file = load_config()
     workflow_profiles = list_workflow_profiles(db, db_path)
-    output_path = resolve_path(db_path.parent, settings["output_dir"])
+    output_path = resolve_path(config_file.parent, config["storage"]["output_dir"])
     selectable = sum(1 for item in iter_content_items(db) if not item.get("disabled", False))
-    comfy = {"url": settings["comfy_url"], "online": False, "message": "Not checked"}
+    comfy_config = config["comfy"]
+    comfy = {"url": comfy_config["url"], "online": False, "message": "Not checked"}
     if check_comfy:
         try:
             session, url, _ = comfy_session(db)
-            response = session.get(f"{url}/system_stats", timeout=2)
+            response = session.get(
+                f"{url}/system_stats", timeout=float(comfy_config["status_timeout_seconds"])
+            )
             response.raise_for_status()
             comfy.update(online=True, message="Connected")
         except Exception as exc:
@@ -5027,9 +5204,11 @@ class ValhallaHandler(BaseHTTPRequestHandler):
                     "benchmark": bool(GALLERY_BENCHMARK_COUNT),
                 })
             elif path.startswith("/api/thumbnails/"):
-                self.serve_thumbnail(unquote(path.removeprefix("/api/thumbnails/")))
+                source = parse_qs(urlparse(self.path).query).get("source", ["output"])[0]
+                self.serve_thumbnail(unquote(path.removeprefix("/api/thumbnails/")), source)
             elif path.startswith("/api/outputs/"):
-                self.serve_output(unquote(path.removeprefix("/api/outputs/")))
+                source = parse_qs(urlparse(self.path).query).get("source", ["output"])[0]
+                self.serve_output(unquote(path.removeprefix("/api/outputs/")), source)
             elif path.startswith("/api"):
                 self.send_json({"error": "API endpoint not found"}, HTTPStatus.NOT_FOUND)
             else:
@@ -5125,7 +5304,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
                 self.send_json(WEB_STATE.clear_logger())
             elif path.startswith("/api/outputs/"):
                 name = unquote(path.removeprefix("/api/outputs/"))
-                self.send_json(delete_output_image(name))
+                source = parse_qs(urlparse(self.path).query).get("source", ["output"])[0]
+                self.send_json(delete_output_image(name, source))
             elif path.startswith("/api/previews/"):
                 self.send_json(WEB_STATE.delete_preview(path.split("/")[3]))
             elif path.startswith("/api/workflow/profiles/"):
@@ -5160,13 +5340,12 @@ class ValhallaHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def serve_output(self, name: str) -> None:
+    def serve_output(self, name: str, source: str = "output") -> None:
         if Path(name).suffix.lower() not in IMAGE_SUFFIXES:
             raise AppError("Only generated image files can be viewed")
         if not name or Path(name).name != name:
             raise AppError("Invalid output filename")
-        db, db_path = load_database()
-        target = resolve_path(db_path.parent, db["settings"]["output_dir"]) / name
+        target = proof_directory(source) / name
         if not target.is_file():
             self.send_json({"error": "Output not found"}, HTTPStatus.NOT_FOUND)
             return
@@ -5178,8 +5357,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def serve_thumbnail(self, name: str) -> None:
-        body = output_thumbnail(name)
+    def serve_thumbnail(self, name: str, source: str = "output") -> None:
+        body = output_thumbnail(name, source)
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "image/jpeg")
         self.send_header("Content-Length", str(len(body)))
@@ -5202,6 +5381,8 @@ class ValhallaHandler(BaseHTTPRequestHandler):
 def serve(host: str, port: int, open_browser: bool) -> None:
     if not WEB_ROOT.joinpath("index.html").is_file():
         raise AppError(f"Web UI assets not found: {WEB_ROOT}")
+    load_config()
+    load_database()
     server = ThreadingHTTPServer((host, port), ValhallaHandler)
     browser_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
     url = f"http://{browser_host}:{server.server_port}/"
@@ -5223,8 +5404,8 @@ def build_parser() -> argparse.ArgumentParser:
         "command", nargs="?", choices=("serve", "gallery-benchmark"), default="serve",
         help="Start the production server or an isolated synthetic gallery benchmark",
     )
-    parser.add_argument("--host", default="127.0.0.1", help="HTTP bind address")
-    parser.add_argument("--port", type=int, default=8765, help="HTTP port")
+    parser.add_argument("--host", help="Override config.json listen_host for this run")
+    parser.add_argument("--port", type=int, help="Override config.json listen_port for this run")
     parser.add_argument("--no-browser", action="store_true", help="Do not open the browser automatically")
     parser.add_argument("--count", type=int, default=2000, help="Synthetic gallery size in benchmark mode")
     return parser
@@ -5234,13 +5415,18 @@ def main() -> int:
     global GALLERY_BENCHMARK_COUNT
     args = build_parser().parse_args()
     try:
+        config, _ = load_config()
+        host = args.host if args.host is not None else config["server"]["host"]
+        port = args.port if args.port is not None else config["server"]["port"]
+        if not 1 <= port <= 65535:
+            raise AppError("Listen port must be from 1 to 65535")
         if args.command == "gallery-benchmark":
             GALLERY_BENCHMARK_COUNT = _safe_int(
                 args.count, "Gallery benchmark count", 101, 10_000
             )
             # Fail before binding the port rather than opening an unusable benchmark.
             list_output_images()
-        serve(args.host, args.port, not args.no_browser)
+        serve(host, port, not args.no_browser)
         return 0
     except AppError as exc:
         print(f"error: {exc}", file=sys.stderr)

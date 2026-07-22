@@ -1225,6 +1225,100 @@ class PreviewRegressionTests(unittest.TestCase):
 
 
 class OutputDeletionRegressionTests(unittest.TestCase):
+    def test_gallery_lists_png_jpg_and_jpeg_files_together(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            for name in ("first.png", "second.jpg", "third.jpeg"):
+                (output_dir / name).write_bytes(name.encode())
+            (output_dir / "ignore.txt").write_text("not an image", encoding="utf-8")
+            with patch.object(app, "output_directory", return_value=output_dir):
+                outputs = app.list_output_images()
+            self.assertEqual({item["name"] for item in outputs}, {
+                "first.png", "second.jpg", "third.jpeg",
+            })
+
+    def test_proofs_dirs_load_duplicate_names_and_delete_only_selected_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output_dir = root / "outputs"
+            archive_dir = root / "archive"
+            output_dir.mkdir()
+            archive_dir.mkdir()
+            (output_dir / "same.png").write_bytes(b"current")
+            (archive_dir / "same.png").write_bytes(b"archived")
+            config, _ = app.load_config()
+            config["storage"].update(
+                output_dir=str(output_dir), proofs_dir=[str(archive_dir)]
+            )
+            config_file = root / "config.json"
+            config_file.write_text(app.json.dumps(config), encoding="utf-8")
+
+            with patch.object(app, "config_path", return_value=config_file):
+                outputs = app.list_output_images()
+                self.assertEqual(
+                    {item["key"] for item in outputs},
+                    {"output:same.png", "proof-1:same.png"},
+                )
+                self.assertEqual(
+                    {item["source"] for item in outputs}, {"output", "proof-1"}
+                )
+                self.assertEqual(
+                    [item["source"] for item in outputs], ["proof-1", "output"]
+                )
+                result = app.delete_output_image("same.png", "proof-1")
+
+            self.assertEqual(result["source"], "proof-1")
+            self.assertTrue((output_dir / "same.png").is_file())
+            self.assertFalse((archive_dir / "same.png").exists())
+
+    def test_proofs_dir_accepts_one_directory_string(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output_dir = root / "outputs"
+            archive_dir = root / "archive"
+            output_dir.mkdir()
+            archive_dir.mkdir()
+            (archive_dir / "archived.jpg").write_bytes(b"image")
+            config, _ = app.load_config()
+            config["storage"].update(
+                output_dir=str(output_dir), proofs_dir=str(archive_dir)
+            )
+            config_file = root / "config.json"
+            config_file.write_text(app.json.dumps(config), encoding="utf-8")
+
+            with patch.object(app, "config_path", return_value=config_file):
+                outputs = app.list_output_images()
+
+            self.assertEqual([item["key"] for item in outputs], ["proof-1:archived.jpg"])
+
+    def test_output_encoder_creates_jpeg_and_strips_exif(self):
+        source = app.Image.new("RGB", (12, 8), "#7357d8")
+        exif = app.Image.Exif()
+        exif[0x010E] = "private metadata"
+        buffer = app.BytesIO()
+        source.save(buffer, format="PNG", exif=exif)
+        encoded, suffix = app.encode_output_image(buffer.getvalue(), {
+            "output_format": "jpeg", "jpeg_quality": 95, "strip_exif": True,
+        })
+        self.assertEqual(suffix, ".jpg")
+        with app.Image.open(app.BytesIO(encoded)) as saved:
+            self.assertEqual(saved.format, "JPEG")
+            self.assertEqual(saved.size, (12, 8))
+            self.assertFalse(saved.getexif())
+
+        retained, _ = app.encode_output_image(buffer.getvalue(), {
+            "output_format": "jpeg", "jpeg_quality": 95, "strip_exif": False,
+        })
+        with app.Image.open(app.BytesIO(retained)) as saved:
+            self.assertEqual(saved.getexif().get(0x010E), "private metadata")
+
+        jpg_alias, suffix = app.encode_output_image(buffer.getvalue(), {
+            "output_format": "jpg", "jpeg_quality": 95, "strip_exif": True,
+        })
+        self.assertEqual(suffix, ".jpg")
+        with app.Image.open(app.BytesIO(jpg_alias)) as saved:
+            self.assertEqual(saved.format, "JPEG")
+
     def test_gallery_benchmark_creates_synthetic_records_without_copying_files(self):
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
@@ -1257,8 +1351,12 @@ class OutputDeletionRegressionTests(unittest.TestCase):
             target = Path(directory) / "result.png"
             target.write_bytes(b"image")
             payload = app.output_payload(target)
-        self.assertEqual(payload["url"], "/api/outputs/result.png")
-        self.assertRegex(payload["thumbnail_url"], r"^/api/thumbnails/result\.png\?v=\d+$")
+        self.assertEqual(payload["key"], "output:result.png")
+        self.assertEqual(payload["url"], "/api/outputs/result.png?source=output")
+        self.assertRegex(
+            payload["thumbnail_url"],
+            r"^/api/thumbnails/result\.png\?source=output&v=\d+$",
+        )
 
     def test_generated_thumbnail_is_reused_from_memory_cache(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1269,7 +1367,7 @@ class OutputDeletionRegressionTests(unittest.TestCase):
                 patch.object(app, "output_directory", return_value=Path(directory)),
                 patch.object(app, "Image", None),
             ):
-                key = (target.name, target.stat().st_mtime_ns, target.stat().st_size)
+                key = ("output", target.name, target.stat().st_mtime_ns, target.stat().st_size)
                 with app.THUMBNAIL_CACHE_LOCK:
                     app.THUMBNAIL_CACHE[key] = b"thumbnail"
                     app.THUMBNAIL_CACHE_BYTES = len(b"thumbnail")
@@ -1359,7 +1457,7 @@ class OutputDeletionRegressionTests(unittest.TestCase):
             with (
                 patch.object(app, "output_directory", return_value=output_dir),
                 patch.object(app, "_generate_thumbnail", side_effect=generate),
-                patch.object(app, "THUMBNAIL_CACHE_MAX_BYTES", 10),
+                patch.object(app, "thumbnail_cache_max_bytes", return_value=10),
             ):
                 self.assertEqual(app.output_thumbnail(first.name), b"first")
                 self.assertEqual(app.output_thumbnail(second.name), b"second")
@@ -1369,6 +1467,21 @@ class OutputDeletionRegressionTests(unittest.TestCase):
                 self.assertLessEqual(app.THUMBNAIL_CACHE_BYTES, 10)
             app._thumbnail_cache_remove()
 
+    def test_zero_thumbnail_cache_budget_does_not_retain_generated_thumbnail(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "result.png"
+            target.write_bytes(b"image")
+            app._thumbnail_cache_remove()
+            with (
+                patch.object(app, "output_directory", return_value=Path(directory)),
+                patch.object(app, "_generate_thumbnail", return_value=b"thumbnail"),
+                patch.object(app, "thumbnail_cache_max_bytes", return_value=0),
+            ):
+                self.assertEqual(app.output_thumbnail(target.name), b"thumbnail")
+                self.assertEqual(app.THUMBNAIL_CACHE_BYTES, 0)
+                self.assertFalse(app.THUMBNAIL_CACHE)
+            app._thumbnail_cache_remove()
+
     def test_deleting_output_invalidates_all_cached_versions_of_its_thumbnail(self):
         state = app.WebState()
         with tempfile.TemporaryDirectory() as directory:
@@ -1376,10 +1489,10 @@ class OutputDeletionRegressionTests(unittest.TestCase):
             target = output_dir / "result.png"
             target.write_bytes(b"image")
             removed_keys = [
-                (target.name, 1, 5),
-                (target.name, 2, 5),
+                ("output", target.name, 1, 5),
+                ("output", target.name, 2, 5),
             ]
-            retained_key = ("other.png", 1, 5)
+            retained_key = ("output", "other.png", 1, 5)
             app._thumbnail_cache_remove()
             with app.THUMBNAIL_CACHE_LOCK:
                 app.THUMBNAIL_CACHE[removed_keys[0]] = b"old"
@@ -1586,6 +1699,21 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("focusOutputCard(state.previewIndex, { alignTop: true })", js)
         self.assertIn("ArrowUp: -columns, ArrowDown: columns", js)
 
+    def test_narrow_layout_keeps_all_pages_and_system_controls_accessible(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+
+        for view in ("studio", "director", "outputs", "logger"):
+            self.assertIn(f'data-view="{view}"', html)
+        self.assertIn('id="mobile-system-toggle"', html)
+        self.assertIn('aria-controls="system-card"', html)
+        self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", css)
+        self.assertIn(".system-card.mobile-open { display: block; }", css)
+        self.assertIn("const isOpen = systemCard.classList.toggle('mobile-open')", js)
+        self.assertIn("if (event.key === 'Escape') closeMobileSystem()", js)
+
 
     def test_typography_presets_use_relative_scale_with_normal_default(self):
         root = Path(__file__).resolve().parents[1]
@@ -1657,10 +1785,12 @@ class FrontendContractTests(unittest.TestCase):
         css = (root / "web" / "styles.css").read_text(encoding="utf-8")
 
         self.assertIn(".field input, .field select, .director-field select", css)
-        self.assertIn(".render-choice { position: relative; display: inline-grid;", css)
+        self.assertIn(".render-choice { --render-color: var(--success);", css)
         self.assertIn(".render-mode-popover { position: absolute;", css)
         self.assertIn(".render-choice:focus-within", css)
         self.assertIn(".render-choice:hover .button.render", css)
+        self.assertIn(".render-choice-menu > summary:hover { background: var(--render-hover); }", css)
+        self.assertIn(".render-choice.preview { --render-color: var(--brand);", css)
 
     def test_studio_and_director_use_the_same_control_column_width(self):
         root = Path(__file__).resolve().parents[1]
@@ -1690,6 +1820,16 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("state.renderMode === 'preview'", javascript)
         self.assertNotIn("retry_count", html)
         self.assertNotIn("retry_count", javascript)
+
+    def test_active_page_is_restored_after_browser_reload(self):
+        javascript = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("sessionStorage.getItem('valhalla-active-view')", javascript)
+        self.assertIn("sessionStorage.setItem('valhalla-active-view', name)", javascript)
+        self.assertIn("switchView(restoredView);", javascript)
+        self.assertIn("function rememberProofsPosition()", javascript)
+        self.assertIn("function restoreProofsPosition(", javascript)
+        self.assertIn("valhalla-proofs-positions", javascript)
+        self.assertIn("window.addEventListener('pagehide', rememberProofsPosition)", javascript)
 
     def test_global_settings_have_pending_update_and_slider_guardrails(self):
         root = Path(__file__).resolve().parents[1]
@@ -1963,6 +2103,41 @@ class VisualCompatibilityRegressionTests(unittest.TestCase):
 
 
 class WorkflowProfileTests(unittest.TestCase):
+    def test_operational_settings_live_only_in_root_config(self):
+        config, _ = app.load_config()
+        database, _ = app.load_database()
+        self.assertEqual(set(config), {"server", "comfy", "storage", "gallery", "limits"})
+        self.assertEqual(set(config["server"]), {"host", "port"})
+        self.assertEqual(
+            set(config["storage"]),
+            {"output_dir", "proofs_dir", "output_format", "jpeg_quality", "strip_exif"},
+        )
+        self.assertEqual(
+            set(config["gallery"]), {"thumbnail_cache_mb", "thumbnail_max_edge"}
+        )
+        limit_settings = {"max_scene_attempts", "max_storyboards", "max_jobs", "max_previews"}
+        self.assertEqual(set(config["limits"]), limit_settings)
+        self.assertTrue(limit_settings.isdisjoint(database["settings"]))
+        comfy_operational = {
+            "url", "workflows_dir", "http_timeout_seconds",
+            "status_timeout_seconds", "poll_interval_seconds",
+            "generation_timeout_seconds", "profiles",
+        }
+        self.assertTrue(comfy_operational.issubset(config["comfy"]))
+        self.assertTrue(comfy_operational.isdisjoint(database["settings"]))
+        self.assertTrue(comfy_operational.isdisjoint(config))
+        self.assertNotIn("comfy_url", config)
+
+    def test_server_address_defaults_come_from_root_config(self):
+        config, path = app.load_config()
+        self.assertEqual(path.name, "config.json")
+        self.assertIsInstance(config["server"]["host"], str)
+        self.assertGreater(config["server"]["port"], 0)
+        parser = app.build_parser()
+        arguments = parser.parse_args([])
+        self.assertIsNone(arguments.host)
+        self.assertIsNone(arguments.port)
+
     def test_zeroed_negative_conditioning_needs_only_one_text_prompt(self):
         workflow = {
             "text": {"class_type": "CLIPTextEncode", "inputs": {"text": "prompt", "clip": ["clip", 0]}},
@@ -1991,12 +2166,37 @@ class WorkflowProfileTests(unittest.TestCase):
     def test_profile_selection_rename_and_delete_are_deterministic(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            db = {"settings": {"workflows_dir": "./profiles"}}
+            db = {"settings": {}}
+            config = root / "config.json"
+            config.write_text(app.json.dumps({
+                "server": {"host": "127.0.0.1", "port": 8765},
+                "comfy": {
+                    "url": "http://127.0.0.1:8188",
+                    "workflows_dir": "./profiles",
+                    "http_timeout_seconds": 15,
+                    "status_timeout_seconds": 2,
+                    "poll_interval_seconds": 1,
+                    "generation_timeout_seconds": 600,
+                    "profiles": {"production": None, "preview": None},
+                },
+                "storage": {
+                    "output_dir": "./outputs", "proofs_dir": [],
+                    "output_format": "png", "jpeg_quality": 95, "strip_exif": True,
+                },
+                "gallery": {"thumbnail_cache_mb": 512, "thumbnail_max_edge": 512},
+                "limits": {
+                    "max_scene_attempts": 100, "max_storyboards": 20,
+                    "max_jobs": 40, "max_previews": 8,
+                },
+            }), encoding="utf-8")
             directory = root / "profiles"
             directory.mkdir()
             (directory / "model-a.workflow.json").write_text("{}\n", encoding="utf-8")
             (directory / "model-b.workflow.json").write_text("{}\n", encoding="utf-8")
-            with patch.object(app, "detect_node_mapping", return_value={}):
+            with (
+                patch.object(app, "config_path", return_value=config),
+                patch.object(app, "detect_node_mapping", return_value={}),
+            ):
                 selected = app.select_workflow_profiles(db, root / "database.json", "model-a", "model-b")
                 self.assertEqual(selected["production"], "model-a")
                 self.assertEqual(selected["preview"], "model-b")

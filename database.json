@@ -1,8 +1,5 @@
 {
   "settings": {
-    "comfy_url": "http://127.0.0.1:8188",
-    "workflows_dir": "./workflows",
-    "output_dir": "./outputs",
     "human_defaults": {
       "pools": {
         "age": [],
@@ -257,10 +254,6 @@
       "balanced": 230,
       "detailed": 360
     },
-    "max_scene_attempts": 100,
-    "http_timeout_seconds": 15,
-    "poll_interval_seconds": 1,
-    "generation_timeout_seconds": 600,
     "surface_modifiers": {
       "color_chance": 0.65,
       "texture_chance": 0.45,

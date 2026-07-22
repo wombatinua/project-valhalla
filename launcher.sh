@@ -6,8 +6,6 @@ set -u
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 APP="$SCRIPT_DIR/app.py"
 PYTHON_BIN=${PYTHON_BIN:-python3}
-VALHALLA_HOST=${VALHALLA_HOST:-127.0.0.1}
-VALHALLA_PORT=${VALHALLA_PORT:-8765}
 
 die() {
     printf 'Error: %s\n' "$1" >&2
@@ -32,5 +30,4 @@ command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python not found: $PYTHON_BIN"
 
 ensure_dependency requests requests
 ensure_dependency PIL Pillow
-printf 'Starting Valhalla Photo Studio at http://%s:%s/\n' "$VALHALLA_HOST" "$VALHALLA_PORT"
-exec "$PYTHON_BIN" "$APP" --host "$VALHALLA_HOST" --port "$VALHALLA_PORT"
+exec "$PYTHON_BIN" "$APP"

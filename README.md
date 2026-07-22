@@ -9,9 +9,10 @@ The application now uses a web-first architecture:
 - `app.py` contains the composition engine, ComfyUI client, HTTP API, background job runner, and static-file server.
 - `web/` contains the responsive production interface.
 - `launcher.sh` checks the Python dependency, starts the local server, and opens the browser.
+- `config.json` stores local runtime paths, the ComfyUI address, and active rendering profiles.
 - `database.json` is the manually editable production content catalog.
-- `workflows/` contains named ComfyUI API workflows and the active Production/Preview selections.
-- `outputs/` contains downloaded generated images.
+- `workflows/` is the default `comfy.workflows_dir` for named ComfyUI API workflow files.
+- `outputs/` is the default `storage.output_dir` for downloaded generated images.
 
 There is no terminal wizard and no `fzf` dependency. The terminal is used only for server startup and operational logs.
 
@@ -67,12 +68,12 @@ Run:
 ./launcher.sh
 ```
 
-The launcher installs `requests` through pip if it is missing, starts the server at `http://127.0.0.1:8765/`, and asks Python to open that address in the default browser.
+The launcher installs required Python packages if they are missing, reads `server.host` and `server.port` from `config.json`, starts the server, and asks Python to open that address in the default browser.
 
 Environment overrides:
 
 ```bash
-PYTHON_BIN=python3 VALHALLA_HOST=127.0.0.1 VALHALLA_PORT=9000 ./launcher.sh
+PYTHON_BIN=python3 ./launcher.sh
 ```
 
 You can also start the application directly:
@@ -83,6 +84,60 @@ python3 app.py --host 127.0.0.1 --port 9000
 python3 app.py --no-browser
 ```
 
+### Runtime configuration
+
+All operational settings live in root-level `config.json`, grouped into the required `server`, `comfy`, `storage`, `gallery`, and `limits` objects. Every documented key is required; profile selections may be `null`, and `storage.proofs_dir` may be an empty array. Relative paths are resolved from the project root. Restart the server after manually editing the file; this is mandatory for the listen address and also clears thumbnails created with an earlier size setting.
+
+#### Server
+
+| Parameter | Type / range | Default | Purpose |
+|---|---:|---:|---|
+| `server.host` | non-empty string | `127.0.0.1` | Interface on which the Valhalla HTTP server listens. Keep loopback for local-only access; `0.0.0.0` exposes it to the network and should be used only on a trusted network because the app has no authentication. |
+| `server.port` | integer `1–65535` | `8765` | TCP port for the Valhalla Web UI and API. Command-line `--host` and `--port` can override the two listen values for one run. |
+
+#### ComfyUI
+
+Every ComfyUI connection, workflow, and timing setting is grouped under the required `comfy` object.
+
+| Parameter | Type / range | Default | Purpose |
+|---|---:|---:|---|
+| `comfy.url` | non-empty URL string | `http://127.0.0.1:8188` | Base URL used for workflow discovery, queueing, status polling, and image download. |
+| `comfy.workflows_dir` | path string | `./workflows` | Directory containing named `*.workflow.json` rendering profiles. Capturing, renaming, importing, and deleting profiles operate here. |
+| `comfy.http_timeout_seconds` | number `0.1–3600` | `15` | Per-request timeout for normal ComfyUI HTTP operations such as workflow history, queue submission, polling requests, and generated-image downloads. It is not the total render timeout. |
+| `comfy.status_timeout_seconds` | number `0.1–300` | `2` | Short timeout used only by the system-status check that decides whether ComfyUI is shown as online. |
+| `comfy.poll_interval_seconds` | number `0.05–60` | `1` | Delay between ComfyUI history checks while waiting for one render. Lower values update sooner but create more requests. |
+| `comfy.generation_timeout_seconds` | number `1–86400` | `600` | Total time allowed for one queued ComfyUI prompt to finish. Exceeding it fails that image even if individual HTTP requests have not timed out. |
+| `comfy.profiles.production` | profile ID string or `null` | project profile | Rendering profile used for full production jobs. `null` disables production rendering until a profile is selected. |
+| `comfy.profiles.preview` | profile ID string or `null` | project profile | Rendering profile used for fast storyboard and temporary shot previews. It may point to the same profile as Production. |
+
+#### Storage and output files
+
+| Parameter | Type / range | Default | Purpose |
+|---|---:|---:|---|
+| `storage.output_dir` | path string | `./outputs` | The only directory where new production renders are saved. It is always included as a Proofs source. |
+| `storage.proofs_dir` | path string or array | `[]` | Extra read/delete sources for Proofs. They are scanned in configured order before `storage.output_dir`; duplicate resolved paths are ignored. The combined UI remains sorted by file date. Rendering never writes here. |
+| `storage.output_format` | `png`, `jpeg`, or `jpg` | `png` | Format for newly saved renders. Both JPEG spellings produce files with the `.jpg` suffix. Existing PNG, JPG, and JPEG files can coexist in Proofs. |
+| `storage.jpeg_quality` | integer `1–100` | `95` | JPEG encoder quality for new JPEG outputs. It has no effect when `storage.output_format` is `png`. |
+| `storage.strip_exif` | boolean | `true` | Removes EXIF metadata from newly saved images. Before stripping, EXIF orientation is applied to the pixels so the displayed orientation remains correct. |
+
+#### Gallery thumbnails
+
+| Parameter | Type / range | Default | Purpose |
+|---|---:|---:|---|
+| `gallery.thumbnail_cache_mb` | integer `0–4096` | `512` | Maximum server RAM used by the LRU cache of encoded thumbnails. Higher values reduce regeneration while revisiting large galleries. `0` disables retention without disabling thumbnails. |
+| `gallery.thumbnail_max_edge` | integer `64–4096` | `512` | Maximum width or height, in pixels, of a generated thumbnail. The aspect ratio is preserved. Larger values improve zoomed card detail but cost more CPU, RAM, network transfer, and browser decode memory. |
+
+#### Rendering and in-memory state
+
+| Parameter | Type / range | Default | Purpose |
+|---|---:|---:|---|
+| `limits.max_scene_attempts` | integer `1–100000` | `100` | Maximum retries used when resolving a compatible outfit, fixed photoshoot context, scene, or distinct photoshoot. Raising it can rescue restrictive databases but makes impossible combinations take longer to fail. |
+| `limits.max_storyboards` | integer `1–10000` | `20` | Maximum number of storyboard records retained in server memory. Oldest records are discarded first; generated files are never removed by this limit. |
+| `limits.max_jobs` | integer `1–10000` | `40` | Maximum render-job records held in memory. When full, the oldest inactive job is removed; if every record is queued or running, adding another job is rejected. |
+| `limits.max_previews` | integer `1–1000` | `8` | Maximum temporary shot-preview records retained in memory. These previews are not written to `storage.output_dir`. |
+
+`database.json` contains creative catalog data, selection rules, pools, weights, and production defaults—not server/runtime configuration.
+
 ### Gallery benchmark
 
 Test large-gallery behavior without rendering or copying thousands of images:
@@ -91,7 +146,7 @@ Test large-gallery behavior without rendering or copying thousands of images:
 python3 app.py gallery-benchmark --count 2000
 ```
 
-The read-only benchmark requires at least one existing image in `outputs/`. It exposes 2,000 unique synthetic gallery records that cycle through at most ten real images, gives every thumbnail a unique browser URL to exercise network transfer and decoding, opens directly on Proofs, disables deletion, and reports both the record count and current `.output-card` DOM count. The server still reuses its RAM thumbnail cache, so no image copies are created. Stop it with `Ctrl+C`, then start the normal production server again.
+The read-only benchmark requires at least one existing image in a configured Proofs source. It exposes 2,000 unique synthetic gallery records that cycle through at most ten real images, gives every thumbnail a unique browser URL to exercise network transfer and decoding, opens directly on Proofs, disables deletion, and reports both the record count and current `.output-card` DOM count. The server still reuses its RAM thumbnail cache, so no image copies are created. Stop it with `Ctrl+C`, then start the normal production server again.
 
 In browser developer tools, record initial network transfer and browser memory, scroll from the first record to the last, open and navigate the lightbox, and confirm that the displayed DOM-card count remains bounded rather than approaching 2,000.
 
@@ -99,7 +154,7 @@ Keep the default loopback host unless access from another machine is explicitly 
 
 ## HTTP layout
 
-The Web UI is served from `/`. All application endpoints are under `/api`.
+The Web UI is served from `/`. All application endpoints are under `/api`. `--host` and `--port` remain available as one-run overrides without modifying `config.json`.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
@@ -123,10 +178,10 @@ The Web UI is served from `/`. All application endpoints are under `/api`.
 | `GET` | `/api/workflow/capture-candidate` | Inspect the latest successful ComfyUI workflow and suggest a model-based name |
 | `POST` | `/api/workflow/capture` | Capture or explicitly replace a named rendering profile |
 | `POST` | `/api/workflow/profiles/select` | Select Production and Preview profiles |
-| `GET` | `/api/outputs` | List generated image files in the output directory |
-| `GET` | `/api/outputs/{filename}` | View or download a generated output |
-| `DELETE` | `/api/outputs/{filename}` | Permanently delete one generated image |
-| `DELETE` | `/api/outputs` | Permanently delete every generated image in the output directory |
+| `GET` | `/api/outputs` | List images across all configured proof directories |
+| `GET` | `/api/outputs/{filename}?source={source}` | View or download an image from its proof source |
+| `DELETE` | `/api/outputs/{filename}?source={source}` | Permanently delete one image from its proof source |
+| `DELETE` | `/api/outputs` | Permanently delete every image across all configured proof directories |
 
 Storyboard and job state is intentionally in memory. Restarting the server clears browser-session planning state but never removes generated files.
 
@@ -184,9 +239,9 @@ Breast size and shape presets define a separate `covered_prompt` for clothing an
 
 ## Workflow capture
 
-First complete a representative workflow successfully in ComfyUI. Then open **Studio files → Rendering profiles**. The manager detects the main model name, proposes an editable profile name, and saves the graph as a recognizable `<profile>.workflow.json` file under `workflows/`.
+First complete a representative workflow successfully in ComfyUI. Then open **Studio files → Rendering profiles**. The manager detects the main model name, proposes an editable profile name, and saves the graph as a recognizable `<profile>.workflow.json` file under `comfy.workflows_dir`.
 
-Safe capture refuses to overwrite a matching profile unless **Replace matching profile** is enabled. Production and Preview can select different profiles. Profiles are independently validated, can be renamed or deleted from the manager, and every queued render snapshots its selected profile name. Active selections are stored in `workflows/profiles.json`; selected profiles cannot be deleted, and profile files cannot be renamed or deleted while the render queue is active.
+Safe capture refuses to overwrite a matching profile unless **Replace matching profile** is enabled. Production and Preview can select different profiles. Profiles are independently validated, can be renamed or deleted from the manager, and every queued render snapshots its selected profile name. Active selections are stored under `comfy.profiles` in root-level `config.json`; selected profiles cannot be deleted, and profile files cannot be renamed or deleted while the render queue is active.
 
 ## Preview render
 
@@ -230,7 +285,7 @@ Validation rejects duplicate IDs, invalid references, incompatible dependencies,
 - Deletion is disabled while a render job is queued or running. Bulk deletion removes supported image files only and leaves unrelated files and directories untouched.
 ## Operational notes
 
-- Generated files are written to the configured `settings.output_dir`.
+- Generated files are written to `storage.output_dir` in `config.json`.
 - A render cancellation takes effect after the current ComfyUI image finishes.
 - Closing the browser does not stop the server or an active render job.
 - Stop the server with `Ctrl+C` in the launcher terminal.
