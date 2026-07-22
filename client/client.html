@@ -269,8 +269,9 @@
             <div><span id="logger-shot-label">Current shot</span><strong id="logger-shot">—</strong><small id="logger-seed">Seed —</small></div>
           </section>
           <section class="logger-prompt-grid">
+            <article class="logger-prompt logger-rendered panel"><header><span class="prompt-dot rendered"></span><strong>Rendered image</strong></header><button class="logger-rendered-frame" id="logger-rendered-open" type="button" aria-label="Open rendered image preview"><img id="logger-rendered-image" alt="Rendered shot being inspected"><span id="logger-rendered-empty">Waiting for a rendered frame…</span></button></article>
             <article class="logger-prompt panel"><header><span class="prompt-dot positive"></span><strong>Positive prompt</strong><button data-copy-log="positive">Copy</button></header><pre id="logger-positive">Waiting for a frame…</pre></article>
-            <article class="logger-prompt panel"><header><span class="prompt-dot negative"></span><strong>Negative prompt</strong><button data-copy-log="negative">Copy</button></header><pre id="logger-negative">Waiting for a frame…</pre></article>
+            <article class="logger-prompt panel"><header><span class="prompt-dot negative"></span><strong>Auxiliary negative</strong><button data-copy-log="negative">Copy</button></header><pre id="logger-negative">Waiting for a frame…</pre></article>
           </section>
           <section class="logger-events panel"><header><div><p class="eyebrow">Timeline</p><h3>Generation events</h3></div><span id="logger-job-id">—</span></header><div id="logger-event-list"></div></section>
         </div>
@@ -349,7 +350,7 @@
   <dialog id="prompt-dialog">
     <div class="dialog-header"><div><p class="eyebrow" id="dialog-eyebrow">Shot</p><h2 id="dialog-title">Prompt inspector</h2></div><button class="icon-button dialog-close" aria-label="Close">×</button></div>
     <div class="dialog-body">
-      <div class="prompt-tabs"><button class="active" data-prompt="positive">Positive</button><button data-prompt="negative">Negative</button><button data-prompt="ids">Selected IDs</button></div>
+      <div class="prompt-tabs"><button class="active" data-prompt="positive">Positive</button><button data-prompt="negative">Auxiliary negative</button><button data-prompt="ids">Selected IDs</button></div>
       <pre id="prompt-content"></pre>
     </div>
     <div class="dialog-footer"><button class="button ghost" id="copy-prompt">Copy to clipboard</button><button class="button primary dialog-close">Done</button></div>

@@ -23,7 +23,7 @@ The Photo Studio is designed around a review-before-render workflow:
 1. Configure the production mode, content direction, batch size, progression, render mode, and seed strategy.
 2. Select **Resolve storyboard** to assemble every compatible shot without using the GPU.
 3. Review stage, pose, action, expression, set, and surface for every shot.
-4. Inspect positive and negative prompts or reroll individual compositions.
+4. Inspect the authoritative positive prompt and the optional auxiliary negative prompt, or reroll individual compositions.
 5. Select **Generate images** when the storyboard is ready.
 6. Follow live progress and ETA while outputs appear in the gallery.
 
@@ -42,7 +42,7 @@ The UI includes:
 - editorially planned storyboard cards with camera grammar, roles, diversity scoring, one-shot reroll/render, prompt inspection, temporary Fast Preview, and compact JSON export/import tied to the exact semantic database version;
 - a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render style, stage, pose/action, surface, editorial role, shot size, angle, framing, focus, and explicit-recipe controls;
 - cancellable FIFO background render jobs that accept additional work while rendering and fail each job clearly on its first generation error;
-- a reload-safe Production Logbook with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves proofs and the displayed preview intact;
+- a reload-safe Production Logbook with live frame counts, elapsed/estimated time, current seed, the rendered frame beside its authoritative positive and auxiliary negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves proofs and the displayed preview intact;
 - shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
 - a persistent, virtualized output gallery with bounded DOM size, a browser-fullscreen lightbox with a safe-area-aware viewport fallback for iPhone browsers, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling with touch pinch zoom, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
 - a persistent Privacy Cover that immediately replaces gallery thumbnails, the lightbox image, temporary previews, and Logbook prompts with neutral placeholders, closes Prompt Inspector, and masks the open lightbox filename. Its shortcut is configured in System as middle mouse button (default), `Shift+X`, or both. One middle click covers images and a double middle click within 500 ms reveals them; `Shift+X` remains a direct toggle. Optional Auto cover activates after 1, 5, or 15 minutes without mouse, pointer/touch, or keyboard activity; the browser-local preference defaults to Off. Covering clears image `src`/`srcset` attributes and rebuilds the visible gallery without image URLs so decoded resources become eligible for browser memory reclamation; exact release timing remains browser-controlled. It does not cancel renders or delete files;
@@ -109,6 +109,7 @@ Every ComfyUI connection, workflow, and timing setting is grouped under the requ
 | `comfy.status_refresh_seconds` | number `1–3600` | `10` | Interval between automatic ComfyUI/system checks while the browser tab is visible. Checks pause for hidden tabs and run immediately when the tab becomes visible again. The refresh icon still forces a manual check. |
 | `comfy.poll_interval_seconds` | number `0.05–60` | `1` | Delay between ComfyUI history checks while waiting for one render. Lower values update sooner but create more requests. |
 | `comfy.generation_timeout_seconds` | number `1–86400` | `600` | Total time allowed for one queued ComfyUI prompt to finish. Exceeding it fails that image even if individual HTTP requests have not timed out. |
+| `comfy.preview_max_edge` | integer multiple of 64, `256–2048` | `512` | Maximum width or height used only by Preview rendering. The original aspect ratio and orientation are retained as closely as latent-safe 64 px steps allow; Production dimensions are unchanged. |
 | `comfy.profiles.production` | profile ID string or `null` | project profile | Rendering profile used for full production jobs. `null` disables production rendering until a profile is selected. |
 | `comfy.profiles.preview` | profile ID string or `null` | project profile | Rendering profile used for fast storyboard and temporary shot previews. It may point to the same profile as Production. |
 
@@ -215,7 +216,7 @@ Global structure controls are compared with the active resolved storyboard. Chan
 
 ### Full XXX
 
-Full XXX begins at the explicit level from the first frame. Progressive percentage controls are disabled, while each shot still receives a rule-compatible explicit composition.
+Full XXX begins at explicit intensity from the first frame and plans directly over enabled concrete recipes. Each photoshoot owns deterministic weighted shuffle bags for recipe, pose, action, shot-size, and camera-angle families; compatible candidates are exhausted before refill and refill boundaries cannot repeat the preceding choice. The final frame is reserved for a compatible peak recipe and peak editorial role. The same seeded rules apply to Random Full XXX, so a Storyboard seed reproduces the complete arc rather than merely reproducing independent random frames.
 
 ## Seeds
 
@@ -227,7 +228,9 @@ The UI calls the inference seed **Image variation seed** because it changes rend
 
 After a storyboard exists, changing the Storyboard seed automatically resolves a replacement after a short typing delay because it controls the direction. Changing the Image variation seed or its mode updates only frame seeds in place: scenes, prompts, manually selected directions, and custom Director values remain intact. Studio cards and Director are refreshed together.
 
-The prompt compiler keeps the subject constraint first, promotes camera and direction, removes exact duplicate fragments, and reports prompt-lint warnings without silently changing or truncating Director choices.
+The prompt compiler enforces the database-declared diffusion priority `subject → camera/direction → anatomy → traits/garments → location/treatment`, removes exact duplicate fragments, and reports prompt-lint warnings without silently changing or truncating Director choices. Named negative profiles are applied only to relevant stages: opaque coverage constraints never inherit explicit/censorship negatives, while explicit anatomy receives its recipe-specific visibility constraints.
+
+`prompt_defaults.conditioning_policy` defines the positive prompt as the only structural source of truth. Resolver compatibility, garment layering, visibility gating, camera grammar, and stage contracts must therefore remain correct when no negative encoder exists. The compiled negative prompt is an optional auxiliary hint: workflows with a connected negative text encoder receive it, while positive-only or zeroed-negative workflows ignore it without becoming invalid. Rendering profile details explicitly report which mode was detected.
 
 The compact storyboard format stores catalog references by ID and includes a semantic SHA-256 fingerprint of the complete database. Import succeeds only against the matching database content; reordering JSON keys does not break compatibility, but changing catalog data does. Imported storyboards remain fully reviewable, rerollable, and renderable.
 
@@ -237,13 +240,13 @@ Resolve or import a storyboard, then open **Director** in the sidebar. The edito
 
 Subject, wardrobe, location, mood, and render-style changes apply to the complete photoshoot SET; in Random mode they affect only that independent shot. Stage, surface, camera, editorial role, explicit recipe, pose, action, and expression affect the selected shot. Director exposes every stage compatible with the active outfit recipe, including safe, terminal, and explicit variants. A manually selected stage may intentionally depart from automatic progression and immediately rebuilds all compatible shot controls. Incompatible records remain excluded, and all updates are rejected while that storyboard is rendering.
 
-The planner keeps the model, wardrobe, location, mood, and treatment coherent per set while varying compatible surfaces and compositions. It assigns every shot an editorial role and resolves shot size, angle, framing, and focus against stage, pose, action, and surface. Exact garment-state differences are added as transition instructions only when a present garment disappears. Explicit stages use concrete database recipes with constrained pose/action/camera grammar.
+The planner keeps the model, wardrobe, location, mood, and treatment coherent per set while varying compatible surfaces and compositions. It assigns every shot an editorial role and resolves shot size, angle, framing, and focus against stage, pose, action, intensity, and surface. Each surface resolves to an explicit physical zone (bed, bed edge, wall, vanity, window, rug, sofa, chair, pool edge, bath, or garden surface) with standing, seated, reclining, kneeling, supported, and close-up capabilities; cross-family conflicts report the zone, interior, surface, and pose IDs. Exact removed garment slots accumulate across a progressive set and cannot reappear. Their transition prompt describes state only, avoiding a second hand action that could contradict the selected shot action.
 
 Cross-field camera validation rejects contradictory tuples after resolution, during Director edits, and on storyboard import. Intimate actions require intimate focus and a three-quarter-or-closer treatment; intimate macro cannot use environmental framing; and rear-display recipes require rear-compatible angle, focus, and framing. Diagnostics include the exact conflicting catalog IDs.
 
 Quick actions provide constrained remixes for the subject, current wardrobe recipe, complete scene/treatment, or selected shot. Director edits remain part of the in-memory storyboard and are preserved by compact JSON export.
 
-Breast size and shape presets define a separate `covered_prompt` for clothing and lingerie stages. These prompts describe only the clothed bust silhouette and are paired with `prompt_defaults.covered_chest_negative`, which rejects bare breasts and visible nipples while the stage marks the chest as covered. Topless/nude stages continue to use the anatomical prompt instead. Areola, nipple, pubic-hair, and genital details remain strictly visibility-gated because they should not affect a covered silhouette.
+Covered and lingerie stages use an anatomy-neutral positive contract built entirely from opaque garment construction: uninterrupted chest fabric, uniform color and weave, and a clean smooth surface. Breast size, shape, areola, and nipple vocabulary is omitted completely until the stage explicitly exposes that anatomy; safety therefore does not depend on a negative-prompt encoder being present. Lingerie stages accept only opaque non-exposing bras. The named `prompt_defaults.negative_profiles.covered_opaque` profile remains an optional additional guard for workflows that support negative conditioning. Long socks, tights, pantyhose, and stockings are structurally incompatible with jeans, trousers, leggings, and other leg-covering bottoms; ankle socks use an explicit positive layer order beneath the trouser hems.
 
 ## Workflow capture
 
@@ -253,13 +256,13 @@ Safe capture refuses to overwrite a matching profile unless **Replace matching p
 
 ## Preview render
 
-Preview render patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. The synchronized Studio and Director split-buttons switch between **Preview storyboard** and **Render storyboard**, and their primary action runs the selected workflow. Individual **Preview** buttons always use the preview workflow. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logbook. Closing the draggable preview window discards its temporary image without adding anything to Proofs.
+Preview render patches the captured graph to keep the base sampler and VAE output while bypassing LoRA application and pruning downstream refiners/detailers. It also scales the detected empty latent to `comfy.preview_max_edge` (512 px by default), preserves orientation and approximate aspect ratio in 64 px latent-safe steps, and never changes Production dimensions. Profiles whose Preview path does not expose unambiguous scalar width and height inputs are rejected with an actionable diagnostic. The synchronized Studio and Director split-buttons switch between **Preview storyboard** and **Render storyboard**, and their primary action runs the selected workflow. Individual **Preview** buttons always use the preview workflow. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logbook. Closing the draggable preview window discards its temporary image without adding anything to Proofs.
 
 While production is active, using **Preview storyboard** or **Render storyboard** again appends another immutable storyboard snapshot to the FIFO render queue. The current image is never interrupted, queued jobs start automatically in submission order, and cancelling the active job advances to the next queued job after the current image finishes.
 
 ## Database
 
-`database.json` contains more than 1,100 semantically distinct production records covering adult-model traits, garments, modifiers, outfit templates, private locations, surfaces, poses, actions, expressions, moods, camera grammar, explicit recipes, intimate arousal appearance, and photography treatments. Intimate arousal modifiers are selected deterministically only for explicit recipes with a visible intimate focus; they are excluded from rear, breast-focus, nude, and clothed compositions. Mechanical Studio/Editorial copies are prohibited: every selectable record must describe a distinct trait, garment construction, place, composition, or action. Combinatorial variety comes from composing real items with compatible colors, patterns, fabric textures, and surface finishes rather than duplicating records.
+`database.json` contains more than 1,100 semantically distinct production records covering adult-model traits, garments, modifiers, outfit templates, private locations, physical zones, surfaces, poses, actions, expressions, moods, camera grammar, explicit recipes, intimate arousal appearance, and photography treatments. Intimate arousal modifiers are selected deterministically only for explicit recipes with a visible intimate focus; they are excluded from rear, breast-focus, nude, and clothed compositions. Mechanical Studio/Editorial copies are prohibited: every selectable record must describe a distinct trait, garment construction, place, composition, or action. Combinatorial variety comes from composing real items with compatible colors, patterns, fabric textures, and surface finishes rather than duplicating records.
 
 Full-XXX direction includes asymmetric side-lying, half-roll, overhead, and edge-seated open-leg compositions plus non-penetrative intimate hand direction. These records use the normal pose/action compatibility system and are available to both automatic resolution and Director.
 
@@ -271,7 +274,7 @@ The catalog follows the order in which a scene is assembled, so related material
 2. `human_model_parts` — subject identity, face, hair, body, and styling.
 3. `colors`, `patterns`, `fabric_textures`, `garments`, `outfit_templates` — wardrobe building blocks and complete outfits.
 4. `poses`, `actions`, `props`, `expressions` — what the subject is doing and how it reads.
-5. `interiors`, `furniture` — location and physical scene context.
+5. `location_zones`, `interiors`, `furniture` — explicit zone capabilities, location, and physical scene context.
 6. `moods`, `photography_styles` — atmosphere and visual treatment.
 7. `prompt_defaults` — final prompt compiler defaults and safety exclusions.
 

@@ -3,6 +3,31 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
+function loadPreviewWindowSessions() {
+  const empty = () => ({ open: false, displayed: null, geometry: null, geometryReady: false });
+  const sessions = { studio: empty(), director: empty(), logger: empty() };
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('valhalla-floating-previews') || '{}');
+    for (const owner of Object.keys(sessions)) {
+      const source = saved?.[owner];
+      if (!source || typeof source !== 'object') continue;
+      sessions[owner] = {
+        open: Boolean(source.open),
+        displayed: source.displayed && typeof source.displayed.image_url === 'string'
+          ? source.displayed : null,
+        geometry: source.geometry && ['left', 'top', 'width', 'height'].every(
+          (key) => Number.isFinite(Number(source.geometry[key])),
+        ) ? Object.fromEntries(['left', 'top', 'width', 'height'].map(
+          (key) => [key, Number(source.geometry[key])],
+        )) : null,
+        geometryReady: Boolean(source.geometryReady),
+      };
+      if (!sessions[owner].displayed) sessions[owner].open = false;
+    }
+  } catch { /* ignore invalid per-tab UI state */ }
+  return sessions;
+}
+
 const state = {
   storyboard: null,
   director: null,
@@ -11,6 +36,11 @@ const state = {
   directorCustomField: null,
   previewJob: null,
   previewDisplayed: null,
+  previewWindowGeometry: null,
+  previewWindowGeometryReady: false,
+  previewWindowOwner: null,
+  previewJobOwner: null,
+  previewWindowSessions: loadPreviewWindowSessions(),
   previewJobTimer: null,
   job: null,
   jobTimer: null,
@@ -163,6 +193,7 @@ function applyPrivacyCover(covered, { persist = true } = {}) {
       $('#shot-preview-image').src = `${state.previewDisplayed.image_url}?v=${Date.now()}`;
     }
   }
+  renderLogger();
   syncPrivacyControls();
 }
 
@@ -213,11 +244,21 @@ window.addEventListener('pointermove', notePrivacyActivity, { capture: true, pas
 window.addEventListener('pointerdown', notePrivacyActivity, { capture: true, passive: true });
 window.addEventListener('keydown', notePrivacyActivity, { capture: true });
 
-const PHOTOSHOOT_FILENAME = /^(\d{8}_\d{6}_\d{6})_(?:fast_)?photoshoot_(\d+)_shot_(\d+)_/;
-const RANDOM_FILENAME = /^(\d{8}_\d{6}_\d{6})_(?:fast_)?random_shot_(\d+)_/;
+const PHOTOSHOOT_FILENAME = /^(\d{8}_\d{6}_\d{6})_photoshoot_(\d+)_shot_(\d+)_/;
+const PREVIEW_FILENAME = /^(\d{8}_\d{6}_\d{6})_preview_(\d+)_shot_(\d+)_/;
+const RANDOM_FILENAME = /^(\d{8}_\d{6}_\d{6})_random_shot_(\d+)_/;
 const LEGACY_RUN_FILENAME = /^(\d{8}_\d{6}_\d{6})_/;
 
 function outputGroupIdentity(item) {
+  const preview = item.name.match(PREVIEW_FILENAME);
+  if (preview) {
+    return {
+      key: `${preview[1]}:preview_${preview[2]}`,
+      run: preview[1],
+      kind: 'preview',
+      number: Number(preview[2]),
+    };
+  }
   const photoshoot = item.name.match(PHOTOSHOOT_FILENAME);
   if (photoshoot) {
     return {
@@ -249,6 +290,8 @@ function outputGroupIdentity(item) {
 }
 
 function outputShotSequence(item) {
+  const preview = item.name.match(PREVIEW_FILENAME);
+  if (preview) return Number(preview[3]);
   const photoshoot = item.name.match(PHOTOSHOOT_FILENAME);
   if (photoshoot) return Number(photoshoot[3]);
   const random = item.name.match(RANDOM_FILENAME);
@@ -274,9 +317,11 @@ function photoshootGroups() {
     });
   });
   let photoshootNumber = 0;
+  let previewNumber = 0;
   let randomNumber = 0;
   ordered.forEach((group) => {
     if (group.identity?.kind === 'photoshoot') group.displayNumber = ++photoshootNumber;
+    if (group.identity?.kind === 'preview') group.displayNumber = ++previewNumber;
     if (group.identity?.kind === 'random') group.displayNumber = ++randomNumber;
   });
   return ordered;
@@ -993,6 +1038,81 @@ function displayedLoggerPrompt() {
   return usePreview ? preview : inspectedJobPrompt(state.job);
 }
 
+let loggerImageColumnFrame = null;
+function sizeLoggerImageColumn() {
+  if (loggerImageColumnFrame != null) cancelAnimationFrame(loggerImageColumnFrame);
+  loggerImageColumnFrame = requestAnimationFrame(() => {
+    loggerImageColumnFrame = null;
+    const grid = $('.logger-prompt-grid');
+    const article = $('.logger-rendered');
+    const frame = $('.logger-rendered-frame');
+    const image = $('#logger-rendered-image');
+    if (!grid || !article || !frame || !image.hasAttribute('src')
+        || !image.naturalWidth || !image.naturalHeight
+        || window.matchMedia('(max-width: 820px)').matches) {
+      grid?.style.removeProperty('--logger-image-column');
+      return;
+    }
+    const styles = getComputedStyle(grid);
+    const gap = Number.parseFloat(styles.columnGap) || 0;
+    const gridWidth = grid.clientWidth;
+    const imageHeight = frame.clientHeight;
+    if (!gridWidth || !imageHeight) {
+      grid.style.removeProperty('--logger-image-column');
+      return;
+    }
+    const panelChrome = Math.max(0, article.offsetWidth - frame.clientWidth);
+    const aspectWidth = imageHeight * image.naturalWidth / image.naturalHeight + panelChrome;
+    const minimumPromptWidth = Math.min(240, Math.max(160, (gridWidth - gap * 2) / 5));
+    const maximumImageWidth = Math.max(1, gridWidth - gap * 2 - minimumPromptWidth * 2);
+    const columnWidth = Math.min(aspectWidth, maximumImageWidth);
+    const currentWidth = Number.parseFloat(grid.style.getPropertyValue('--logger-image-column'));
+    if (!Number.isFinite(currentWidth) || Math.abs(currentWidth - columnWidth) > 0.5) {
+      grid.style.setProperty('--logger-image-column', `${columnWidth}px`);
+    }
+  });
+}
+
+function renderLoggerImage(prompt) {
+  const image = $('#logger-rendered-image');
+  const empty = $('#logger-rendered-empty');
+  const url = state.privacyCovered ? null : prompt?.image_url;
+  if (url) {
+    if (image.getAttribute('src') !== url) image.src = url;
+    image.alt = `Rendered shot ${prompt.shot || ''}`.trim();
+    image.closest('.logger-rendered-frame').classList.add('has-image');
+    empty.textContent = 'Waiting for a rendered frame…';
+  } else {
+    image.removeAttribute('src');
+    image.alt = '';
+    image.closest('.logger-rendered-frame').classList.remove('has-image');
+    empty.textContent = state.privacyCovered
+      ? 'Preview unavailable'
+      : 'Waiting for a rendered frame…';
+  }
+  const floatingWindow = $('#shot-preview-window');
+  const loggerPreview = state.previewWindowSessions.logger;
+  if (!state.privacyCovered && loggerPreview.open && loggerPreview.displayed?.persistent) {
+    if (prompt?.image_url) {
+      const changed = loggerPreview.displayed.image_url !== prompt.image_url
+        || loggerPreview.displayed.shot !== prompt.shot;
+      loggerPreview.displayed.image_url = prompt.image_url;
+      loggerPreview.displayed.shot = prompt.shot;
+      if (changed) persistPreviewWindowSessions();
+      if (state.previewWindowOwner === 'logger' && !floatingWindow.classList.contains('hidden')) {
+        $('#shot-preview-title').textContent = prompt.shot ? `Shot ${prompt.shot}` : 'Rendered image';
+        if ($('#shot-preview-image').getAttribute('src') !== prompt.image_url) {
+          $('#shot-preview-image').src = prompt.image_url;
+        }
+      }
+    } else if (state.previewWindowOwner === 'logger' && !floatingWindow.classList.contains('hidden')) {
+      $('#shot-preview-image').removeAttribute('src');
+      $('#shot-preview-title').textContent = 'Rendered image unavailable';
+    }
+  }
+  sizeLoggerImageColumn();
+}
+
 function renderLogger() {
   const preview = state.previewJob;
   const usePreview = preview && (!state.job || new Date(preview.created_at) >= new Date(state.job.created_at));
@@ -1004,6 +1124,7 @@ function renderLogger() {
     workspace.classList.add('hidden');
     $('#log-count').textContent = '0';
     $('#clear-logger').disabled = false;
+    renderLoggerImage(null);
     return;
   }
   empty.classList.add('hidden');
@@ -1020,6 +1141,7 @@ function renderLogger() {
     $('#logger-seed').textContent = `Seed ${preview.seed}`;
     $('#logger-positive').textContent = formatLoggedPrompt(preview.positive);
     $('#logger-negative').textContent = formatLoggedPrompt(preview.negative);
+    renderLoggerImage(preview);
     $('#logger-job-id').textContent = `${preview.workflow_profile} · Preview ${preview.id.slice(0, 10)}`;
     const time = new Date(preview.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     $('#logger-event-list').innerHTML = `<div class="logger-event ${escapeHtml(preview.status)}"><time>${escapeHtml(time)}</time><i>Preview</i><span>${escapeHtml(`Shot ${preview.shot} preview ${preview.status}`)}</span><em>1/1</em></div>`;
@@ -1041,6 +1163,7 @@ function renderLogger() {
   $('#logger-seed').textContent = inspectedPrompt ? `Seed ${inspectedPrompt.seed}` : 'Seed —';
   $('#logger-positive').textContent = formatLoggedPrompt(inspectedPrompt?.positive);
   $('#logger-negative').textContent = formatLoggedPrompt(inspectedPrompt?.negative);
+  renderLoggerImage(inspectedPrompt);
   $('#logger-job-id').textContent = `${job.workflow_profile} · Job ${job.id.slice(0, 10)}`;
   $('#logger-event-list').innerHTML = logs.map((entry, logIndex) => ({ entry, logIndex })).reverse().map(({ entry, logIndex }) => {
     const time = new Date(entry.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1195,13 +1318,18 @@ function syncRenderControls() {
 
 function syncDeleteControls() {
   const disabled = Boolean(isRenderActive());
-  $('#delete-all-outputs').classList.toggle(
-    'hidden', state.outputs.length === 0 || state.galleryBenchmark,
+  const deleteButton = $('#delete-all-outputs');
+  const group = activePhotoshootGroup();
+  const photoshootList = state.galleryView === 'photoshoots' && !group;
+  deleteButton.classList.toggle(
+    'hidden', state.outputs.length === 0 || state.galleryBenchmark || photoshootList,
   );
-  $('#delete-all-outputs').disabled = disabled || state.galleryBenchmark;
-  $('#delete-all-outputs').title = disabled
+  deleteButton.disabled = disabled || state.galleryBenchmark;
+  const groupLabel = group?.identity?.kind === 'preview' ? 'preview' : 'photoshoot';
+  deleteButton.textContent = group ? `Delete ${groupLabel}` : 'Delete all';
+  deleteButton.title = disabled
     ? 'Bulk deletion is unavailable while rendering'
-    : '';
+    : (group ? `Delete only the opened ${groupLabel}` : 'Delete every proof');
   $$('.output-delete, #image-viewer-delete').forEach((button) => {
     button.disabled = false;
     button.title = 'Delete this completed image';
@@ -1262,20 +1390,56 @@ async function deleteAllOutputs() {
     toast('Deletion unavailable', 'Wait for the active render job to finish or cancel it first.', 'error');
     return;
   }
-  const count = state.outputs.length;
+  const group = activePhotoshootGroup();
+  const groupLabel = group?.identity?.kind === 'preview' ? 'preview' : 'photoshoot';
+  const targets = group
+    ? group.items.map(({ item }) => item)
+    : [...state.outputs];
+  const count = targets.length;
   const confirmed = await confirmDeletion(
-    `Delete all ${count} images?`,
-    'Every image in the configured proof directories will be permanently deleted. This cannot be undone.',
-    'Delete everything',
+    group ? `Delete this ${groupLabel} (${count} images)?` : `Delete all ${count} images?`,
+    group
+      ? `Only the opened ${groupLabel} will be permanently deleted. This cannot be undone.`
+      : 'Every image in the configured proof directories will be permanently deleted. This cannot be undone.',
+    group ? `Delete ${groupLabel}` : 'Delete everything',
   );
   if (!confirmed) return;
   try {
-    const result = await api('/api/outputs', { method: 'DELETE' });
-    state.outputs = [];
+    if (group) {
+      const results = await Promise.allSettled(
+        targets.map((item) => api(item.url, { method: 'DELETE' })),
+      );
+      const deletedKeys = new Set();
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          const key = outputIdentity(targets[index]);
+          deletedKeys.add(key);
+          state.deletedOutputs.add(key);
+        }
+      });
+      state.outputs = state.outputs.filter(
+        (item) => !deletedKeys.has(outputIdentity(item)),
+      );
+      if (results.some((result) => result.status === 'rejected')) {
+        throw new Error(
+          `${deletedKeys.size} of ${count} images were deleted; ${count - deletedKeys.size} could not be removed.`,
+        );
+      }
+      state.galleryGroup = null;
+      sessionStorage.setItem('valhalla-gallery-group', '');
+    } else {
+      const result = await api('/api/outputs', { method: 'DELETE' });
+      state.outputs = [];
+      toast('Proofs deleted', `${result.deleted} image${result.deleted === 1 ? '' : 's'} permanently removed.`, 'success');
+    }
     if (imageDialog.open) imageDialog.close();
     renderOutputs();
-    toast('Proofs deleted', `${result.deleted} image${result.deleted === 1 ? '' : 's'} permanently removed.`, 'success');
+    if (group) {
+      toast(`${groupLabel[0].toUpperCase()}${groupLabel.slice(1)} deleted`, `${count} images permanently removed.`, 'success');
+    }
   } catch (error) {
+    if (imageDialog.open) imageDialog.close();
+    renderOutputs();
     toast('Could not delete proofs', error.message, 'error');
   }
 }
@@ -1334,6 +1498,13 @@ function renderOutputs() {
   $('#outputs-empty').classList.toggle('hidden', count > 0);
   const group = activePhotoshootGroup();
   const groups = photoshootGroups();
+  const photoshootCount = groups.filter((entry) => entry.identity?.kind === 'photoshoot').length;
+  const previewCount = groups.filter((entry) => entry.identity?.kind === 'preview').length;
+  const groupedSummary = [
+    photoshootCount ? `${photoshootCount} photoshoot${photoshootCount === 1 ? '' : 's'}` : '',
+    previewCount ? `${previewCount} preview${previewCount === 1 ? '' : 's'}` : '',
+    `${count} images`,
+  ].filter(Boolean).join(' · ');
   $$('#gallery-view-toggle button').forEach((button) => {
     button.classList.toggle('active', button.dataset.galleryView === state.galleryView);
   });
@@ -1343,7 +1514,7 @@ function renderOutputs() {
       : (group
         ? `${group.items.length} image${group.items.length === 1 ? '' : 's'} in this group.`
         : (state.galleryView === 'photoshoots'
-          ? `${groups.length} photoshoot${groups.length === 1 ? '' : 's'} · ${count} images.`
+          ? `${groupedSummary}.`
           : `${count} generated image${count === 1 ? '' : 's'}.`)))
     : 'No generated images.';
   outputRenderSignature = '';
@@ -1374,13 +1545,21 @@ function outputEntryCount() {
   return showingPhotoshootList() ? photoshootGroups().length : displayedOutputs().length;
 }
 
-function outputCardHtml(item, index, layout) {
-  const shotLabel = item.shot == null ? 'Output' : `Shot ${item.shot}`;
+function outputDisplayShot(item) {
+  const group = activePhotoshootGroup();
+  if (!['photoshoot', 'preview'].includes(group?.identity?.kind)) return item.shot;
+  const localShot = outputShotSequence(item);
+  return Number.isFinite(localShot) ? localShot : item.shot;
+}
+
+function outputCardHtml(item, index, layout, position) {
+  const displayShot = outputDisplayShot(item);
+  const shotLabel = displayShot == null ? 'Output' : `Shot ${displayShot}`;
   const visual = state.privacyCovered
     ? '<div class="privacy-placeholder" aria-label="Image hidden by privacy cover"></div>'
     : `<img src="${encodeURI(item.thumbnail_url || item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy" decoding="async">`;
   return `<article class="output-card" data-output-index="${index}" tabindex="0" role="button"
-    aria-label="Maximize ${escapeHtml(shotLabel)}" aria-posinset="${index + 1}" aria-setsize="${state.outputs.length}">
+    aria-label="Maximize ${escapeHtml(shotLabel)}" aria-posinset="${position + 1}" aria-setsize="${displayedOutputs().length}">
     ${visual}
     <footer><span>${escapeHtml(shotLabel)}</span><span class="output-actions">${state.galleryBenchmark ? '' : `<button class="output-delete" data-action="delete-output" aria-label="Delete ${escapeHtml(item.name)}">Delete</button>`}<a href="${encodeURI(item.url)}" download="${escapeHtml(item.name)}">Download</a></span></footer>
   </article>`;
@@ -1390,9 +1569,11 @@ function photoshootCardHtml(group, index) {
   const representative = group.items[0].item;
   const title = group.identity?.kind === 'photoshoot'
     ? `Photoshoot ${group.displayNumber}`
+    : (group.identity?.kind === 'preview'
+      ? `Preview ${group.displayNumber}`
     : (group.identity?.kind === 'random'
       ? `Random ${group.displayNumber}`
-      : (group.identity?.kind === 'legacy' ? 'Render run' : 'Ungrouped'));
+      : (group.identity?.kind === 'legacy' ? 'Render run' : 'Ungrouped')));
   const run = group.identity ? formatOutputRun(group.identity.run) : 'Files without photoshoot naming';
   const runTitle = group.identity ? `Render ID: ${group.identity.run}` : '';
   const visual = state.privacyCovered
@@ -1412,7 +1593,7 @@ function outputEntriesHtml(start, end, layout) {
       .join('');
   }
   return displayedOutputs().slice(start, end)
-    .map(({ item, outputIndex }) => outputCardHtml(item, outputIndex, layout))
+    .map(({ item, outputIndex }, offset) => outputCardHtml(item, outputIndex, layout, start + offset))
     .join('');
 }
 
@@ -1583,7 +1764,7 @@ function showPreview(index) {
   const image = $('#image-viewer-image');
   if (state.privacyCovered) image.removeAttribute('src');
   else image.src = item.url;
-  image.alt = `Maximized generated output from shot ${item.shot}`;
+  image.alt = `Maximized generated output from shot ${outputDisplayShot(item)}`;
   $('#image-viewer-title').textContent = state.privacyCovered ? 'Preview' : item.name;
   $('#image-viewer-count').textContent = `${position + 1} of ${scope.length}`;
   const download = $('#image-viewer-download');
@@ -1815,7 +1996,9 @@ $('.image-viewer-bar').addEventListener('pointermove', () => {
   if (isViewerFullscreen()) showFullscreenControls();
 });
 $('#image-viewer-image').addEventListener('load', fitPreviewImage);
-window.addEventListener('resize', () => { if (imageDialog.open) fitPreviewImage(); });
+window.addEventListener('resize', () => {
+  if (imageDialog.open) fitPreviewImage();
+});
 
 outputGrid.addEventListener('keydown', (event) => {
   if (event.target.closest('a, button')) return;
@@ -2260,12 +2443,113 @@ async function applyDirectorChange(select) {
   }
 }
 
+function activeViewName() {
+  return $('.view.active')?.id?.replace('-view', '') || 'studio';
+}
+
+function previewWindowSession(owner = state.previewWindowOwner) {
+  return owner ? state.previewWindowSessions[owner] || null : null;
+}
+
+function persistPreviewWindowSessions() {
+  sessionStorage.setItem('valhalla-floating-previews', JSON.stringify(state.previewWindowSessions));
+}
+
+function configureFloatingPreview(displayed) {
+  const windowElement = $('#shot-preview-window');
+  const persistent = Boolean(displayed?.persistent);
+  windowElement.querySelector('.eyebrow').textContent = persistent ? 'Rendered Image' : 'Temporary Preview Render';
+  $('#shot-preview-title').textContent = persistent
+    ? (displayed.shot ? `Shot ${displayed.shot}` : 'Rendered image')
+    : `Shot ${displayed.shot} preview`;
+  $('#shot-preview-refresh').classList.toggle('hidden', persistent);
+  windowElement.querySelector('footer').textContent = persistent
+    ? 'Drag by the header · Resize from the lower-right corner.'
+    : 'Drag by the header · Resize from the lower-right corner · Closing discards the preview.';
+}
+
+function suspendFloatingPreview() {
+  const session = previewWindowSession();
+  const windowElement = $('#shot-preview-window');
+  if (!session) return;
+  rememberShotPreviewGeometry();
+  session.open = !windowElement.classList.contains('hidden');
+  session.displayed = state.previewDisplayed;
+  session.geometry = state.previewWindowGeometry;
+  session.geometryReady = state.previewWindowGeometryReady;
+  windowElement.classList.add('hidden');
+  $('#shot-preview-image').removeAttribute('src');
+  state.previewWindowOwner = null;
+  state.previewDisplayed = null;
+  persistPreviewWindowSessions();
+}
+
+function restoreFloatingPreview(owner) {
+  const session = state.previewWindowSessions[owner];
+  if (!session?.open || !session.displayed) return;
+  state.previewWindowOwner = owner;
+  state.previewDisplayed = session.displayed;
+  state.previewWindowGeometry = session.geometry;
+  state.previewWindowGeometryReady = session.geometryReady;
+  configureFloatingPreview(session.displayed);
+  const windowElement = $('#shot-preview-window');
+  if (!session.geometry) resetShotPreviewGeometryStyles();
+  windowElement.classList.remove('hidden');
+  applyShotPreviewGeometry();
+  clampShotPreviewWindow();
+  if (!state.privacyCovered) $('#shot-preview-image').src = session.displayed.image_url;
+}
+
+function rememberShotPreviewGeometry() {
+  const windowElement = $('#shot-preview-window');
+  if (!state.previewWindowGeometryReady || windowElement.classList.contains('hidden')) return;
+  const rect = windowElement.getBoundingClientRect();
+  state.previewWindowGeometry = {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  };
+  const session = previewWindowSession();
+  if (session) {
+    session.geometry = state.previewWindowGeometry;
+    session.geometryReady = true;
+    persistPreviewWindowSessions();
+  }
+}
+
+function applyShotPreviewGeometry() {
+  const geometry = state.previewWindowGeometry;
+  if (!geometry) return false;
+  const windowElement = $('#shot-preview-window');
+  windowElement.style.left = `${geometry.left}px`;
+  windowElement.style.top = `${geometry.top}px`;
+  windowElement.style.right = 'auto';
+  windowElement.style.bottom = 'auto';
+  windowElement.style.width = `${geometry.width}px`;
+  windowElement.style.height = `${geometry.height}px`;
+  return true;
+}
+
+function resetShotPreviewGeometryStyles() {
+  const style = $('#shot-preview-window').style;
+  for (const property of ['left', 'top', 'right', 'bottom', 'width', 'height']) {
+    style.removeProperty(property);
+  }
+}
+
 async function closeShotPreview() {
   const preview = state.previewDisplayed;
+  const session = previewWindowSession();
+  if (session) {
+    session.open = false;
+    session.displayed = null;
+    persistPreviewWindowSessions();
+  }
   state.previewDisplayed = null;
   $('#shot-preview-window').classList.add('hidden');
   $('#shot-preview-image').removeAttribute('src');
-  if (!preview?.id) return;
+  if (!preview?.id || preview.persistent) return;
   try {
     await api(`/api/previews/${preview.id}`, { method: 'DELETE' });
   } catch (error) {
@@ -2273,29 +2557,81 @@ async function closeShotPreview() {
   }
 }
 
-async function openShotPreview(preview) {
+async function openShotPreview(preview, owner = state.previewJobOwner || activeViewName()) {
   const windowElement = $('#shot-preview-window');
-  const previous = state.previewDisplayed;
+  if (state.previewWindowOwner && state.previewWindowOwner !== owner) suspendFloatingPreview();
+  const session = state.previewWindowSessions[owner];
+  const previous = session.displayed;
+  session.displayed = preview;
+  session.open = true;
+  persistPreviewWindowSessions();
+  state.previewWindowOwner = owner;
   state.previewDisplayed = preview;
-  $('#shot-preview-title').textContent = `Shot ${preview.shot} preview`;
+  state.previewWindowGeometry = session.geometry;
+  state.previewWindowGeometryReady = session.geometryReady;
+  configureFloatingPreview(preview);
+  if (owner !== activeViewName()) {
+    state.previewWindowOwner = null;
+    state.previewDisplayed = null;
+    if (previous?.id && !previous.persistent && previous.id !== preview.id) {
+      try { await api(`/api/previews/${previous.id}`, { method: 'DELETE' }); } catch { /* already expired */ }
+    }
+    return;
+  }
+  if (!session.geometry) resetShotPreviewGeometryStyles();
   if (state.privacyCovered) $('#shot-preview-image').removeAttribute('src');
   else $('#shot-preview-image').src = `${preview.image_url}?v=${Date.now()}`;
   windowElement.classList.remove('hidden');
-  const rect = windowElement.getBoundingClientRect();
-  windowElement.style.left = `${rect.left}px`;
-  windowElement.style.top = `${rect.top}px`;
-  windowElement.style.right = 'auto';
-  windowElement.style.bottom = 'auto';
+  if (!applyShotPreviewGeometry()) {
+    const rect = windowElement.getBoundingClientRect();
+    windowElement.style.left = `${rect.left}px`;
+    windowElement.style.top = `${rect.top}px`;
+    windowElement.style.right = 'auto';
+    windowElement.style.bottom = 'auto';
+  }
   clampShotPreviewWindow();
-  if (previous?.id && previous.id !== preview.id) {
+  if (previous?.id && !previous.persistent && previous.id !== preview.id) {
     try { await api(`/api/previews/${previous.id}`, { method: 'DELETE' }); } catch { /* already expired */ }
   }
+}
+
+function openLogbookImagePreview(prompt) {
+  const windowElement = $('#shot-preview-window');
+  if (state.previewWindowOwner && state.previewWindowOwner !== 'logger') suspendFloatingPreview();
+  const session = state.previewWindowSessions.logger;
+  state.previewDisplayed = {
+    image_url: prompt.image_url,
+    shot: prompt.shot,
+    persistent: true,
+  };
+  state.previewWindowOwner = 'logger';
+  state.previewWindowGeometry = session.geometry;
+  state.previewWindowGeometryReady = session.geometryReady;
+  session.displayed = state.previewDisplayed;
+  session.open = true;
+  persistPreviewWindowSessions();
+  configureFloatingPreview(state.previewDisplayed);
+  if (!session.geometry) resetShotPreviewGeometryStyles();
+  $('#shot-preview-image').src = prompt.image_url;
+  windowElement.classList.remove('hidden');
+  if (!applyShotPreviewGeometry()) {
+    const rect = windowElement.getBoundingClientRect();
+    windowElement.style.left = `${rect.left}px`;
+    windowElement.style.top = `${rect.top}px`;
+    windowElement.style.right = 'auto';
+    windowElement.style.bottom = 'auto';
+  }
+  clampShotPreviewWindow();
 }
 
 function fitShotPreviewWindowToImage() {
   const windowElement = $('#shot-preview-window');
   const image = $('#shot-preview-image');
   if (windowElement.classList.contains('hidden') || !image.naturalWidth || !image.naturalHeight) return;
+  if (applyShotPreviewGeometry()) {
+    clampShotPreviewWindow();
+    return;
+  }
   const headerHeight = windowElement.querySelector('header').offsetHeight;
   const footerHeight = windowElement.querySelector('footer').offsetHeight;
   const frameHeight = headerHeight + footerHeight + 2;
@@ -2310,6 +2646,8 @@ function fitShotPreviewWindowToImage() {
   windowElement.style.width = `${Math.round(image.naturalWidth * scale + 2)}px`;
   windowElement.style.height = `${Math.round(image.naturalHeight * scale + frameHeight)}px`;
   clampShotPreviewWindow();
+  state.previewWindowGeometryReady = true;
+  rememberShotPreviewGeometry();
 }
 
 function setPreviewBusy(button, busy) {
@@ -2332,7 +2670,8 @@ async function pollShotPreview(button) {
     }
     setPreviewBusy(button, false);
     if (state.previewJob.status === 'completed') {
-      await openShotPreview(state.previewJob);
+      await openShotPreview(state.previewJob, state.previewJobOwner);
+      state.previewJobOwner = null;
       toast('Shot preview ready', 'Temporary preview rendered without adding it to Proofs.', 'success');
     } else {
       const message = state.previewJob.error || 'Preview rendering failed';
@@ -2363,6 +2702,7 @@ async function startShotPreview(number, button) {
   }
   setPreviewBusy(button, true);
   try {
+    state.previewJobOwner = activeViewName();
     state.previewJob = await api('/api/previews', {
       method: 'POST',
       body: JSON.stringify({
@@ -2391,10 +2731,12 @@ function switchView(name) {
   if (!['studio', 'director', 'outputs', 'logger'].includes(name)) name = 'studio';
   const previousView = $('.view.active')?.id?.replace('-view', '');
   if (previousView === 'outputs' && name !== 'outputs') rememberProofsPosition();
+  if (state.previewWindowOwner) suspendFloatingPreview();
   state.restoredView = name;
   sessionStorage.setItem('valhalla-active-view', name);
   $$('.view').forEach((view) => view.classList.toggle('active', view.id === `${name}-view`));
   $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.view === name));
+  if (name !== 'outputs') restoreFloatingPreview(name);
   $('#studio-topbar-actions').classList.toggle('hidden', name !== 'studio');
   $('#outputs-topbar-center').classList.toggle('hidden', name !== 'outputs');
   $('#outputs-topbar-actions').classList.toggle('hidden', name !== 'outputs');
@@ -2429,7 +2771,7 @@ function renderWorkflowProfiles(profiles) {
   $('#workflow-profile-list').innerHTML = profiles.profiles.length
     ? profiles.profiles.map((profile) => `
       <div class="workflow-profile-item${profile.valid ? '' : ' invalid'}" data-profile-id="${escapeHtml(profile.id)}">
-        <div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.file)}${profile.valid ? '' : ` · ${profile.error}`}</small></div>
+        <div><strong>${escapeHtml(profile.name)}</strong><small>${escapeHtml(profile.file)}${profile.valid ? ` · ${profile.negative_conditioning ? 'Auxiliary negative connected' : 'Positive-only workflow'}` : ` · ${profile.error}`}</small></div>
         <button type="button" class="text-button" data-profile-action="rename">Rename</button>
         <button type="button" class="text-button danger" data-profile-action="delete">Delete</button>
       </div>`).join('')
@@ -2657,9 +2999,7 @@ $('#shot-preview-refresh').addEventListener('click', (event) => {
     : (state.previewDisplayed?.shot || state.previewJob?.shot);
   if (shot) startShotPreview(shot, event.currentTarget);
 });
-$('#shot-preview-image').addEventListener('error', () => {
-  toast('Could not display preview', 'The temporary preview image is no longer available.', 'error');
-});
+$('#shot-preview-image').addEventListener('error', closeShotPreview);
 $('#shot-preview-image').addEventListener('load', fitShotPreviewWindowToImage);
 let previewDrag = null;
 $('#shot-preview-drag-handle').addEventListener('pointerdown', (event) => {
@@ -2681,11 +3021,20 @@ $('#shot-preview-drag-handle').addEventListener('pointermove', (event) => {
   preview.style.left = `${Math.max(8, Math.min(maxLeft, previewDrag.left + event.clientX - previewDrag.x))}px`;
   preview.style.top = `${Math.max(8, Math.min(maxTop, previewDrag.top + event.clientY - previewDrag.y))}px`;
 });
-$('#shot-preview-drag-handle').addEventListener('pointerup', () => { previewDrag = null; });
-$('#shot-preview-drag-handle').addEventListener('pointercancel', () => { previewDrag = null; });
+$('#shot-preview-drag-handle').addEventListener('pointerup', () => {
+  previewDrag = null;
+  rememberShotPreviewGeometry();
+});
+$('#shot-preview-drag-handle').addEventListener('pointercancel', () => {
+  previewDrag = null;
+  rememberShotPreviewGeometry();
+});
 window.addEventListener('resize', clampShotPreviewWindow);
 if ('ResizeObserver' in window) {
-  new ResizeObserver(clampShotPreviewWindow).observe($('#shot-preview-window'));
+  new ResizeObserver(() => {
+    clampShotPreviewWindow();
+    rememberShotPreviewGeometry();
+  }).observe($('#shot-preview-window'));
 }
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !$('#shot-preview-window').classList.contains('hidden')) {
@@ -2792,6 +3141,22 @@ $('#logger-view').addEventListener('keydown', (event) => {
   if (!timelineEvent) return;
   event.preventDefault();
   inspectLoggerEvent(timelineEvent);
+});
+$('#logger-rendered-image').addEventListener('error', (event) => {
+  event.currentTarget.removeAttribute('src');
+  loggerRenderedFrame.classList.remove('has-image');
+  sizeLoggerImageColumn();
+  $('#logger-rendered-empty').textContent = 'Rendered image is no longer available.';
+});
+$('#logger-rendered-image').addEventListener('load', sizeLoggerImageColumn);
+const loggerRenderedFrame = $('.logger-rendered-frame');
+if ('ResizeObserver' in window) {
+  new ResizeObserver(sizeLoggerImageColumn).observe($('.logger-prompt-grid'));
+}
+loggerRenderedFrame.addEventListener('click', () => {
+  const prompt = displayedLoggerPrompt();
+  if (!prompt?.image_url || state.privacyCovered) return;
+  openLogbookImagePreview(prompt);
 });
 $('#clear-logger').addEventListener('click', async () => {
   const button = $('#clear-logger');

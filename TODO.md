@@ -86,14 +86,14 @@ Ready when:
 
 ### P0 — Full-XXX storyboard planning and shuffle bags
 
-- [ ] Replace the three broad Full-XXX stage kinds with planning over the concrete enabled recipe catalog.
-- [ ] Plan Full XXX as an explicit editorial arc rather than a sequence of independently selected explicit frames.
-- [ ] Start at explicit intensity, build variation deliberately, and reserve peak intensity for a suitable closing shot.
-- [ ] Implement seeded weighted shuffle bags for explicit recipes, pose families, action families, shot sizes, and angles.
-- [ ] Keep bags separate by photoshoot and compatible stage/recipe family.
-- [ ] Exhaust compatible recipe families before reuse, then refill deterministically.
-- [ ] Prevent identical adjacent pose/action/camera tuples even after a bag refill.
-- [ ] Use the same deterministic bag rules in photoshoot and Random Full-XXX modes.
+- [x] Replace the three broad Full-XXX stage kinds with planning over the concrete enabled recipe catalog.
+- [x] Plan Full XXX as an explicit editorial arc rather than a sequence of independently selected explicit frames.
+- [x] Start at explicit intensity, build variation deliberately, and reserve peak intensity for a suitable closing shot.
+- [x] Implement seeded weighted shuffle bags for explicit recipes, pose families, action families, shot sizes, and angles.
+- [x] Keep bags separate by photoshoot and compatible stage/recipe family.
+- [x] Exhaust compatible recipe families before reuse, then refill deterministically.
+- [x] Prevent identical adjacent pose/action/camera tuples even after a bag refill.
+- [x] Use the same deterministic bag rules in photoshoot and Random Full-XXX modes.
 
 Ready when:
 
@@ -124,11 +124,11 @@ Ready when:
 - [x] Preserve selected prompt fragments and warn about unusual length without truncation.
 - [x] Deduplicate exact normalized fragments and lint repeated subjects, conflicting framing, and contradictory clothing.
 - [x] Add covered-chest, layered-hosiery, explicit-plateau, and recipe-specific negative additions.
-- [ ] Define and test one explicit diffusion-priority order for subject → camera/direction → anatomy → traits/garments → location/treatment.
-- [ ] Keep each human trait in exactly one semantic prompt block.
-- [ ] Replace incremental negative additions with named stage-specific negative profiles.
-- [ ] Remove explicit-anatomy and censorship negatives from covered fashion stages when they are irrelevant.
-- [ ] Strengthen coverage negatives only where clothing must remain opaque and explicit negatives only where anatomy must remain visible.
+- [x] Define and test one explicit diffusion-priority order for subject → camera/direction → anatomy → traits/garments → location/treatment.
+- [x] Keep each human trait in exactly one semantic prompt block.
+- [x] Replace incremental negative additions with named stage-specific negative profiles.
+- [x] Remove explicit-anatomy and censorship negatives from covered fashion stages when they are irrelevant.
+- [x] Strengthen coverage negatives only where clothing must remain opaque and explicit negatives only where anatomy must remain visible.
 
 Ready when:
 
@@ -145,10 +145,10 @@ Ready when:
 - [x] Avoid prompts that claim cross-frame identity mechanisms the backend does not have.
 - [x] Apply seeded arousal-moisture appearance only to explicit recipes with a visible intimate focus.
 - [x] Add reachable asymmetric Full-XXX poses and non-penetrative intimate hand-direction actions.
-- [ ] Separate visually dominant traits from low-impact detail in compiler ordering.
-- [ ] Select one or two compatible distinctive facial accents when available.
-- [ ] Expand compatible beauty marks and facial accents without creating mechanical variants.
-- [ ] Add regression coverage proving each human trait is emitted once and visibility-gated anatomy is emitted only when visible.
+- [x] Separate visually dominant traits from low-impact detail in compiler ordering.
+- [x] Select one or two compatible distinctive facial accents when available.
+- [x] Expand compatible beauty marks and facial accents without creating mechanical variants.
+- [x] Add regression coverage proving each human trait is emitted once and visibility-gated anatomy is emitted only when visible.
 
 Ready when:
 
@@ -161,10 +161,10 @@ Ready when:
 - [x] Fix interior, palette, mood, and photography treatment per photoshoot.
 - [x] Allow different compatible surfaces within the same interior.
 - [x] Preserve recognizable room identity while surface, pose, and camera direction vary.
-- [ ] Model zones explicitly: bed, bed edge, wall, vanity, window, rug, sofa, chair, pool edge, and garden surface.
-- [ ] Add zone capabilities for standing, seated, reclining, kneeling, supported, and close-up compositions.
-- [ ] Match pose, action, shot size, and camera angle to zone capabilities.
-- [ ] Validate that bathroom, pool, bedroom, and outdoor zone families cannot mix incorrectly.
+- [x] Model zones explicitly: bed, bed edge, wall, vanity, window, rug, sofa, chair, pool edge, and garden surface.
+- [x] Add zone capabilities for standing, seated, reclining, kneeling, supported, and close-up compositions.
+- [x] Match pose, action, shot size, and camera angle to zone capabilities.
+- [x] Validate that bathroom, pool, bedroom, and outdoor zone families cannot mix incorrectly.
 
 Ready when:
 
@@ -176,11 +176,10 @@ Ready when:
 
 - [x] Compare visible garment slots with the previous stage.
 - [x] Calculate which slots disappeared and never describe removal of an absent garment.
-- [ ] Track removed slots explicitly across the whole photoshoot and reject restoration in progressive mode.
-- [ ] Select an undressing action matching the exact removed garment type and closure.
-- [ ] Add actions for zippers, buttons, straps, bra hooks, skirts, dresses, panties, stockings, and footwear.
-- [ ] Support intentionally retained stockings, heels, garters, and accessories as planned terminal state.
-- [ ] Add regression and stress tests proving a garment is never removed twice or restored unintentionally.
+- [x] Track removed slots explicitly across the whole photoshoot and prevent restoration in progressive mode.
+- [x] Describe the exact removed garment slots as state, without adding a second hand action that can conflict with the selected shot action.
+- [x] Support intentionally retained stockings, heels, garters, and accessories as planned terminal state.
+- [x] Add regression and stress tests proving a garment is never removed twice or restored unintentionally.
 
 Ready when:
 
@@ -191,10 +190,10 @@ Ready when:
 ## P1 — Intensity system
 
 - [x] Add the shared `fashion`, `sensual`, `erotic`, `nude`, `explicit`, and `peak` labels.
-- [ ] Assign allowed intensity ranges to poses, actions, expressions, recipes, camera framing, and lighting.
-- [ ] Reject incompatible intensity combinations and unexplained jumps.
-- [ ] Increase intensity monotonically in progressive photoshoots.
-- [ ] Integrate intensity into Full-XXX editorial planning and shuffle-bag selection.
+- [x] Assign allowed intensity ranges to poses, actions, expressions, recipes, camera framing, and treatment.
+- [x] Reject incompatible intensity combinations and unexplained jumps.
+- [x] Increase intensity monotonically in progressive photoshoots.
+- [x] Integrate intensity into Full-XXX editorial planning and shuffle-bag selection.
 
 Ready when:
 

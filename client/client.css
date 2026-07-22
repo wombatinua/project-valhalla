@@ -251,12 +251,19 @@ h3 { margin-bottom: 6px; font-size: 1rem; }
 .logger-metrics > div:last-child { border-right: 0; }
 .logger-metrics span, .logger-metrics small { display: block; color: var(--faint); font-size: 0.625rem; }
 .logger-metrics strong { display: block; margin: 3px 0 1px; overflow: hidden; color: var(--text); font-size: 1.312rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.logger-prompt-grid { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.logger-prompt-grid { --logger-image-column: minmax(0, 1fr); min-height: 0; display: grid; grid-template-columns: var(--logger-image-column) repeat(2, minmax(0, 1fr)); gap: 14px; }
 .logger-prompt { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .logger-prompt header, .logger-events > header { min-height: 48px; padding: 10px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); }
 .logger-prompt header button { margin-left: auto; border: 0; background: transparent; color: var(--brand); cursor: pointer; font-size: 0.6875rem; font-weight: 700; }
 .prompt-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+.prompt-dot.rendered { background: var(--brand); }
 .prompt-dot.negative { background: var(--danger); }
+.logger-rendered-frame { width: 100%; min-height: 0; flex: 1; padding: 0; position: relative; display: grid; place-items: center; overflow: hidden; border: 0; border-radius: 0; background: var(--surface-2); color: inherit; cursor: default; font: inherit; }
+.logger-rendered-frame.has-image { cursor: zoom-in; }
+.logger-rendered-frame img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; user-select: none; }
+.logger-rendered-frame:not(.has-image) img { display: none; }
+.logger-rendered-frame span { padding: 20px; color: var(--faint); font-size: 0.75rem; text-align: center; }
+.logger-rendered-frame.has-image > span { display: none; }
 .logger-prompt pre { min-height: 0; flex: 1; margin: 0; padding: 16px; overflow: auto; border: 0; border-radius: 0; background: var(--surface-2); color: var(--text); font: 0.75rem/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .privacy-covered .logger-prompt pre { visibility: hidden; user-select: none; }
 .privacy-covered .logger-prompt header button { visibility: hidden; pointer-events: none; }
@@ -603,7 +610,7 @@ pre { min-height: 280px; max-height: 50vh; margin: 0; padding: 15px; overflow-x:
 #shot-preview-refresh.spinning span { animation: preview-refresh-spin .75s linear infinite; }
 #shot-preview-refresh:disabled, #shot-preview-refresh:disabled:hover { background: transparent; color: var(--brand); cursor: wait; opacity: 1; }
 .shot-preview-canvas { min-height: 0; display: grid; place-items: center; overflow: auto; background: #07090c; }
-.shot-preview-canvas img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.shot-preview-canvas img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .shot-preview-window footer { padding: 8px 12px; color: var(--faint); font-size: 0.5625rem; line-height: 1.4; text-align: center; }
 /* Legibility pass: preserve hierarchy without sub-10px interface text. */
 .segmented span, .advanced summary, .switch-row strong, .batch-summary strong,
@@ -653,6 +660,7 @@ pre { min-height: 280px; max-height: 50vh; margin: 0; padding: 15px; overflow-x:
   .logger-workspace { height: calc(100dvh - 134px); }
   .studio-grid { grid-template-columns: 1fr; }
   .logger-metrics, .logger-prompt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .logger-rendered { grid-column: 1 / -1; min-height: 300px; }
   .logger-metrics > div:nth-child(2) { border-right: 0; }
   .logger-metrics > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .control-panel { position: static; }
@@ -668,6 +676,7 @@ pre { min-height: 280px; max-height: 50vh; margin: 0; padding: 15px; overflow-x:
 @media (max-width: 560px) {
   .logger-workspace { height: calc(100dvh - 164px); }
   .logger-prompt-grid { grid-template-columns: 1fr; }
+  .logger-rendered { grid-column: auto; min-height: 260px; }
   .logger-event { grid-template-columns: 68px 76px minmax(0, 1fr); gap: 7px; }
   .logger-event em { display: none; }
   .app-shell { display: block; }

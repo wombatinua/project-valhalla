@@ -207,6 +207,16 @@ def load_config() -> tuple[dict[str, Any], Path]:
             or not minimum <= value <= maximum
         ):
             raise AppError(f"config.comfy.{key} must be a number from {minimum} to {maximum}")
+    preview_max_edge = comfy.get("preview_max_edge")
+    if (
+        not isinstance(preview_max_edge, int)
+        or isinstance(preview_max_edge, bool)
+        or not 256 <= preview_max_edge <= 2048
+        or preview_max_edge % 64
+    ):
+        raise AppError(
+            "config.comfy.preview_max_edge must be a multiple of 64 from 256 to 2048"
+        )
     profiles = comfy.get("profiles")
     if not isinstance(profiles, dict):
         raise AppError("config.comfy.profiles must be an object")
@@ -238,7 +248,7 @@ def iter_content_items(db: dict[str, Any]) -> Iterable[dict[str, Any]]:
         "outfit_templates", "interiors", "furniture", "poses", "actions",
         "props", "expressions", "moods", "photography_styles", "shot_sizes",
         "camera_angles", "framings", "focus_targets", "editorial_roles",
-        "explicit_recipes", "intimate_arousal_modifiers",
+        "explicit_recipes", "intimate_arousal_modifiers", "location_zones",
     ):
         yield from db.get(section, [])
 
@@ -261,13 +271,6 @@ def validate_item(item: Any, context: str) -> None:
         not isinstance(item["menu_group"], str) or not item["menu_group"].strip()
     ):
         raise AppError(f"{context}.{item['id']}: menu_group must be a non-empty string")
-    if "covered_prompt" in item and (
-        not isinstance(item["covered_prompt"], str)
-        or not item["covered_prompt"].strip()
-    ):
-        raise AppError(
-            f"{context}.{item['id']}: covered_prompt must be a non-empty string"
-        )
     if "reveals_cameltoe" in item and not isinstance(item["reveals_cameltoe"], bool):
         raise AppError(f"{context}.{item['id']}: reveals_cameltoe must be true or false")
     hands_required = item.get("hands_required", 0)
@@ -285,7 +288,7 @@ def validate_database(db: dict[str, Any]) -> None:
     required_sections = (
         "settings", "prompt_defaults", "colors", "patterns", "fabric_textures",
         "human_model_parts", "garments",
-        "outfit_templates", "interiors", "furniture", "poses", "actions", "props",
+        "outfit_templates", "location_zones", "interiors", "furniture", "poses", "actions", "props",
         "expressions", "moods", "photography_styles", "shot_sizes",
         "camera_angles", "framings", "focus_targets", "editorial_roles",
         "explicit_recipes", "intimate_arousal_modifiers",
@@ -302,6 +305,29 @@ def validate_database(db: dict[str, Any]) -> None:
     cameltoe_prompt = db["prompt_defaults"].get("cameltoe_prompt")
     if not isinstance(cameltoe_prompt, str) or not cameltoe_prompt.strip():
         raise AppError("prompt_defaults.cameltoe_prompt must be a non-empty string")
+    expected_priority = [
+        "subject", "camera_direction", "anatomy", "traits_garments",
+        "location_treatment",
+    ]
+    if db["prompt_defaults"].get("prompt_priority") != expected_priority:
+        raise AppError(
+            "prompt_defaults.prompt_priority must define subject, camera_direction, "
+            "anatomy, traits_garments, location_treatment in that order"
+        )
+    if db["prompt_defaults"].get("conditioning_policy") != {
+        "structural_source": "positive",
+        "negative_role": "auxiliary_optional",
+    }:
+        raise AppError(
+            "prompt_defaults.conditioning_policy must keep structural guarantees "
+            "in positive and treat negative conditioning as auxiliary_optional"
+        )
+    negative_profiles = db["prompt_defaults"].get("negative_profiles")
+    if not isinstance(negative_profiles, dict) or not all(
+        isinstance(negative_profiles.get(key), str)
+        for key in ("covered_opaque", "layered_hosiery", "explicit")
+    ):
+        raise AppError("prompt_defaults.negative_profiles is incomplete")
     progression = settings.get("photoshoot_progression", {})
     nsfw_percent = progression.get("nsfw_final_percent", 50)
     if not isinstance(nsfw_percent, (int, float)) or not 0 <= nsfw_percent <= 100:
@@ -346,7 +372,7 @@ def validate_database(db: dict[str, Any]) -> None:
                 raise AppError(f"Duplicate id: {item['id']}")
             ids.add(item["id"]); index[item["id"]] = item
     for section in (
-        "colors", "patterns", "fabric_textures", "outfit_templates", "interiors", "furniture", "poses", "actions",
+        "colors", "patterns", "fabric_textures", "outfit_templates", "location_zones", "interiors", "furniture", "poses", "actions",
         "props", "expressions", "moods", "photography_styles", "shot_sizes",
         "camera_angles", "framings", "focus_targets", "editorial_roles",
         "explicit_recipes", "intimate_arousal_modifiers",
@@ -361,6 +387,14 @@ def validate_database(db: dict[str, Any]) -> None:
             ids.add(item["id"]); index[item["id"]] = item
 
     enabled_ids = {item_id for item_id, item in index.items() if not item.get("disabled", False)}
+    for zone in db["location_zones"]:
+        for field in ("match_any_tags", "capabilities", "environment_tags"):
+            if not isinstance(zone.get(field), list) or not all(
+                isinstance(value, str) and value for value in zone[field]
+            ):
+                raise AppError(
+                    f"location_zones.{zone['id']}.{field} must be a list of strings"
+                )
     for recipe in db["explicit_recipes"]:
         for field, section in (
             ("shot_size", "shot_sizes"),
@@ -681,14 +715,24 @@ def detect_fast_mode_mapping(workflow: dict[str, Any]) -> dict[str, Any]:
             and node.get("inputs", {}).get("samples") == [sampler_id, 0]
         ]
         if len(decoders) == 1:
-            base_candidates.append((sampler_id, decoders[0]))
+            base_candidates.append((sampler_id, decoders[0], str(latent_link[0])))
     if len(base_candidates) != 1:
-        found = ", ".join(sampler for sampler, _ in base_candidates) or "none"
+        found = ", ".join(candidate[0] for candidate in base_candidates) or "none"
         raise AppError(
             "Fast-test mapping is ambiguous: expected one base sampler fed by an empty "
             f"latent with one VAE Decode, found {found}"
         )
-    sampler_id, decode_id = base_candidates[0]
+    sampler_id, decode_id, latent_id = base_candidates[0]
+    latent_inputs = workflow[latent_id].get("inputs", {})
+    width = latent_inputs.get("width")
+    height = latent_inputs.get("height")
+    if (
+        not isinstance(width, int) or isinstance(width, bool) or width <= 0
+        or not isinstance(height, int) or isinstance(height, bool) or height <= 0
+    ):
+        raise AppError(
+            f"Fast-test latent {latent_id} must expose scalar width and height inputs"
+        )
     output_targets = []
     for node_id, node in workflow.items():
         class_name = str(node.get("class_type", "")).lower()
@@ -702,7 +746,17 @@ def detect_fast_mode_mapping(workflow: dict[str, Any]) -> dict[str, Any]:
             })
     if not output_targets:
         raise AppError("Fast-test mapping could not find a SaveImage or PreviewImage output")
-    return {"base_sampler": sampler_id, "output_targets": output_targets}
+    return {
+        "base_sampler": sampler_id,
+        "output_targets": output_targets,
+        "dimensions": {
+            "node": latent_id,
+            "width_input": "width",
+            "height_input": "height",
+            "width": width,
+            "height": height,
+        },
+    }
 
 
 def detect_node_mapping(
@@ -730,7 +784,6 @@ def detect_node_mapping(
     text_ids = {node_id for node_id, _ in text_candidates}
     positive_ids: set[str] = set()
     negative_ids: set[str] = set()
-    negative_is_zeroed = False
     for node in workflow.values():
         class_type = str(node.get("class_type", "")).lower()
         if "sampler" not in class_type or "detailer" in class_type:
@@ -745,11 +798,9 @@ def detect_node_mapping(
         positive_ids.update(positive_upstream & text_ids)
         if not sampler_negative_zeroed:
             negative_ids.update(negative_upstream & text_ids)
-        negative_is_zeroed = negative_is_zeroed or sampler_negative_zeroed
-    if not positive_ids and not negative_ids:
+    if not positive_ids:
         positive_ids = {node_id for node_id, _ in text_candidates if "positive" in node_id.lower()}
-        negative_ids = {node_id for node_id, _ in text_candidates if "negative" in node_id.lower()}
-    if len(positive_ids) != 1 or (len(negative_ids) != 1 and not (negative_is_zeroed and not negative_ids)):
+    if len(positive_ids) != 1 or len(negative_ids) > 1:
         candidates = ", ".join(
             f"{node_id}:{node.get('class_type')}" for node_id, node in text_candidates
         )
@@ -814,6 +865,27 @@ def hands_required(item: dict[str, Any] | None) -> int:
     return int((item or {}).get("hands_required", 0))
 
 
+def lowerwear_covers_legs(item: dict[str, Any] | None) -> bool:
+    if not item:
+        return False
+    wording = f"{item['id']} {item.get('prompt', '')}".casefold()
+    return any(term in wording for term in (
+        "jeans", "trouser", "pants", "leggings", "joggers", "sweatpants",
+    ))
+
+
+def legwear_extends_above_ankle(item: dict[str, Any] | None) -> bool:
+    if not item:
+        return False
+    wording = f"{item['id']} {item.get('prompt', '')}".casefold()
+    return bool(tags(item) & {"pantyhose", "stockings"}) or any(
+        term in wording for term in (
+            "tights", "knee-high", "knee socks", "kneesocks", "over-knee",
+            "over-the-knee", "thigh-high", "thigh stockings",
+        )
+    )
+
+
 def validate_outfit_layers(db: dict[str, Any], outfit: dict[str, Any]) -> None:
     template_id = outfit["template"]["id"]
     garments = outfit["garments"]
@@ -825,6 +897,13 @@ def validate_outfit_layers(db: dict[str, Any], outfit: dict[str, Any]) -> None:
         raise AppError(
             f"Normal outfit {template_id} cannot contain luxury garments: "
             f"{sorted(incompatible_categories)}"
+        )
+    lowerwear = garments.get("lowerwear")
+    legwear = garments.get("legwear")
+    if lowerwear_covers_legs(lowerwear) and legwear_extends_above_ankle(legwear):
+        raise AppError(
+            f"Garment layers {legwear['id']} with {lowerwear['id']} are incompatible: "
+            "long legwear cannot be composed over leg-covering trousers"
         )
     for rule in db["settings"].get("garment_layer_rules", []):
         if template_id not in rule["template_ids"]:
@@ -960,7 +1039,84 @@ def camera_candidate_compatible(
     return True
 
 
+def resolve_location_zone(
+    db: dict[str, Any], interior: dict[str, Any], furniture: dict[str, Any]
+) -> dict[str, Any]:
+    """Resolve one explicit physical zone and reject cross-location leakage."""
+    furniture_tags = tags(furniture)
+    interior_tags = tags(interior)
+    for zone in db["location_zones"]:
+        terms = zone.get("match_id_terms", [])
+        match_tags = set(zone.get("match_any_tags", []))
+        if terms:
+            matched = any(term in furniture["id"] for term in terms)
+        else:
+            matched = not match_tags or bool(match_tags & furniture_tags)
+        if not matched:
+            continue
+        allowed = set(zone.get("environment_tags", []))
+        if allowed and not allowed & interior_tags:
+            raise AppError(
+                f"Location zone conflict [{zone['id']}, {interior['id']}, "
+                f"{furniture['id']}]"
+            )
+        return zone
+    raise AppError(f"No location zone matches furniture {furniture['id']}")
+
+
+def validate_pose_zone(pose: dict[str, Any], zone: dict[str, Any]) -> None:
+    pose_tags = tags(pose)
+    needed = set()
+    if pose_tags & {"lying", "reclining", "all_fours"}:
+        needed.add("reclining")
+    if "sitting" in pose_tags:
+        needed.add("seated")
+    if "kneeling" in pose_tags:
+        needed.add("kneeling")
+    if pose_tags & {"standing", "bent_over"}:
+        needed.add("standing")
+    if pose_tags & {"closeup", "intimate_closeup", "breast_focus"}:
+        needed.add("closeup")
+    missing = needed - set(zone.get("capabilities", []))
+    if missing:
+        raise AppError(
+            f"Location zone conflict [{zone['id']}, {pose['id']}]: "
+            f"missing capabilities {sorted(missing)}"
+        )
+
+
 NSFW_LEVELS = ("topless", "nude", "explicit")
+INTENSITY_LEVELS = ("fashion", "sensual", "erotic", "nude", "explicit", "peak")
+STAGE_INTENSITIES = {
+    "covered": ("fashion", "sensual"),
+    "lingerie": ("sensual", "erotic"),
+    "topless": ("erotic", "nude"),
+    "nude": ("nude", "explicit"),
+    "explicit": ("explicit", "peak"),
+}
+
+
+def allowed_scene_intensities(scene: dict[str, Any]) -> tuple[str, ...]:
+    recipe = scene.get("explicit_recipe")
+    if recipe and recipe.get("intensity"):
+        return (recipe["intensity"],)
+    return STAGE_INTENSITIES.get(scene["stage"]["level"], INTENSITY_LEVELS)
+
+
+def item_allowed_intensities(item: dict[str, Any]) -> set[str]:
+    explicit = item.get("allowed_intensities")
+    if explicit:
+        return set(explicit)
+    levels = item.get("allowed_levels")
+    if not levels:
+        return set(INTENSITY_LEVELS)
+    return set().union(*(STAGE_INTENSITIES.get(level, ()) for level in levels))
+
+
+def item_allows_intensity(item: dict[str, Any], intensity: str) -> bool:
+    return intensity in item_allowed_intensities(item)
+
+
 SFW_BLOCKED_VISIBILITY = {"breasts", "nipples", "pubic_area", "genitals"}
 SFW_BLOCKED_GARMENT_TAGS = {
     "explicit", "erotic", "exposing", "sheer", "transparent", "open_cup", "crotchless",
@@ -1075,6 +1231,36 @@ class Composer:
             if not item.get("disabled", False)
         }
         self._category_bags: dict[str, list[str]] = {}
+        self._selection_bags: dict[str, list[str]] = {}
+        self._selection_signatures: dict[str, tuple[str, ...]] = {}
+        self._selection_last: dict[str, str] = {}
+
+    def choose_from_bag(
+        self, key: str, candidates: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Choose by seeded weighted shuffle bag, avoiding refill-boundary repeats."""
+        if not candidates:
+            raise AppError(f"No compatible candidates for {key}")
+        by_id = {item["id"]: item for item in candidates}
+        signature = tuple(sorted(by_id))
+        bag = self._selection_bags.get(key, [])
+        if self._selection_signatures.get(key) != signature:
+            bag = []
+        if not bag:
+            remaining = list(candidates)
+            bag = []
+            while remaining:
+                selected = weighted_choice(self.rng, remaining)
+                bag.append(selected["id"])
+                remaining.remove(selected)
+            last = self._selection_last.get(key)
+            if last and len(bag) > 1 and bag[-1] == last:
+                bag[0], bag[-1] = bag[-1], bag[0]
+            self._selection_bags[key] = bag
+            self._selection_signatures[key] = signature
+        selected_id = bag.pop()
+        self._selection_last[key] = selected_id
+        return by_id[selected_id]
 
     def choose_catalog_category(self, key: str, allowed: set[str]) -> str:
         """Cycle every enabled tier before repeating, with seeded random order."""
@@ -1150,7 +1336,6 @@ class Composer:
         selected_tags: set[str] = set()
         for category in order:
             if category == "facial_accents":
-                count = self.rng.choices([0, 1, 2], weights=[3, 5, 2], k=1)[0]
                 candidates = [
                     item for item in parts[category]
                     if not item.get("disabled", False)
@@ -1159,7 +1344,23 @@ class Composer:
                 if default_pools.get(category):
                     allowed_ids = set(default_pools[category])
                     candidates = [item for item in candidates if item["id"] in allowed_ids]
-                human[category] = self.rng.sample(candidates, k=min(count, len(candidates)))
+                def accent_family(item: dict[str, Any]) -> str:
+                    identifier = item["id"]
+                    for family in ("freckle", "mole", "mark", "lash", "skin"):
+                        if family in identifier:
+                            return "mark" if family in {"mole", "mark"} else family
+                    return identifier
+
+                selected_accents: list[dict[str, Any]] = []
+                if candidates:
+                    selected_accents.append(weighted_choice(self.rng, candidates))
+                    second = [
+                        item for item in candidates
+                        if accent_family(item) != accent_family(selected_accents[0])
+                    ]
+                    if second and self.rng.random() < 0.35:
+                        selected_accents.append(weighted_choice(self.rng, second))
+                human[category] = selected_accents
                 for item in human[category]:
                     selected_tags |= tags(item)
                 continue
@@ -1340,10 +1541,10 @@ class Composer:
             if (
                 stage.get("level") == "lingerie"
                 and bra in visible
-                and "explicit" in tags(bra)
+                and tags(bra) & {"explicit", "sheer", "transparent", "open_cup"}
             ):
                 raise AppError(
-                    "A lingerie stage that hides breasts cannot use an exposing bra"
+                    "A lingerie stage with covered anatomy requires an opaque bra"
                 )
 
     def choose_outfit(
@@ -1440,10 +1641,17 @@ class Composer:
         fixed: dict[str, Any],
         overrides: dict[str, str] | None = None,
         avoid: dict[str, set[str]] | None = None,
+        bag_scope: str | None = None,
     ) -> dict[str, Any]:
         overrides = overrides or {}
         avoid = avoid or {}
+        family = stage.get("plateau_kind") or stage["level"]
+
         def choose(section: str, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+            if bag_scope:
+                return self.choose_from_bag(
+                    f"{bag_scope}:{family}:{section}", candidates
+                )
             fresh = [item for item in candidates if item["id"] not in avoid.get(section, set())]
             return weighted_choice(self.rng, fresh or candidates)
 
@@ -1466,10 +1674,14 @@ class Composer:
         if overrides.get("furniture"):
             furniture_candidates = [item for item in furniture_candidates if item["id"] == overrides["furniture"]]
         furniture = choose("furniture", furniture_candidates)
+        location_zone = resolve_location_zone(
+            self.db, fixed["interior"], furniture
+        )
         surface_style = self.surface_style(fixed, furniture, overrides)
         available_tags = set(stage.get("body_visibility", [])) | {stage["level"]}
         available_tags |= set(stage.get("visible_slots", []))
         available_tags |= tags(furniture) | tags(fixed["interior"])
+        available_tags |= set(location_zone.get("capabilities", []))
         visible_slots = set(stage.get("visible_slots", []))
         available_tags |= set().union(*(
             tags(item) for slot, item in fixed["outfit"]["garments"].items()
@@ -1482,12 +1694,22 @@ class Composer:
                 recipes = [item for item in recipes if item.get("plateau_kind") == stage["plateau_kind"]]
             if overrides.get("explicit_recipe"):
                 recipes = [item for item in recipes if item["id"] == overrides["explicit_recipe"]]
+            if overrides.get("intensity"):
+                recipes = [
+                    item for item in recipes
+                    if item.get("intensity", "explicit") == overrides["intensity"]
+                ]
             if recipes:
                 recipe = choose("explicit_recipe", recipes)
                 available_tags |= tags(recipe)
+        intensity = overrides.get("intensity") or (recipe.get("intensity", "explicit") if recipe else {
+            "covered": "fashion", "lingerie": "sensual", "topless": "erotic",
+            "nude": "nude", "explicit": "explicit",
+        }.get(stage["level"], "fashion"))
         poses = [
             item for item in self.db["poses"]
             if stage["level"] in item.get("allowed_levels", [stage["level"]])
+            and item_allows_intensity(item, intensity)
             and compatible_with_requirements(item, available_tags)
         ]
         if stage.get("sfw"):
@@ -1522,6 +1744,7 @@ class Composer:
         actions = [
             item for item in self.db["actions"]
             if stage["level"] in item.get("allowed_levels", [stage["level"]])
+            and item_allows_intensity(item, intensity)
             and compatible_with_requirements(item, action_tags)
             and hands_required(pose) + hands_required(item) <= 2
         ]
@@ -1593,6 +1816,10 @@ class Composer:
             if candidates:
                 prop = weighted_choice(self.rng, candidates)
         expression_candidates = list(self.db["expressions"])
+        expression_candidates = [
+            item for item in expression_candidates
+            if item_allows_intensity(item, intensity)
+        ]
         required_expression_tags = set(action.get("requires_expression_tags", []))
         if required_expression_tags:
             expression_candidates = [
@@ -1650,6 +1877,7 @@ class Composer:
                 item for item in self.db[section]
                 if not item.get("disabled", False)
                 and stage["level"] in item.get("allowed_levels", [stage["level"]])
+                and item_allows_intensity(item, intensity)
                 and compatible_with_requirements(item, camera_tags)
             ]
             wanted = overrides.get(key) or recipe_refs.get(key)
@@ -1667,9 +1895,6 @@ class Composer:
                 candidates = casual or candidates
             camera[key] = choose(key, candidates)
             camera_tags |= tags(camera[key])
-        intensity = overrides.get("intensity") or (recipe.get("intensity", "explicit") if recipe else {
-            "covered": "fashion", "lingerie": "sensual", "topless": "erotic", "nude": "nude"
-        }.get(stage["level"], "fashion"))
         intimate_arousal_modifier = None
         if recipe and recipe.get("focus_target") == "focus_intimate":
             candidates = [
@@ -1681,6 +1906,7 @@ class Composer:
             )
         return {
             "furniture": furniture,
+            "location_zone": location_zone,
             **surface_style,
             "pose": pose,
             "action": action,
@@ -1699,13 +1925,16 @@ class Composer:
         stage: dict[str, Any],
         overrides: dict[str, str] | None = None,
         avoid: dict[str, set[str]] | None = None,
+        bag_scope: str | None = None,
     ) -> dict[str, Any]:
         attempts = self.max_scene_attempts
         last_error = "no candidates"
         for _ in range(attempts):
             try:
                 scene = dict(fixed)
-                scene.update(self.variable_context(stage, fixed, overrides, avoid))
+                scene.update(self.variable_context(
+                    stage, fixed, overrides, avoid, bag_scope
+                ))
                 scene_pools = self.db["settings"]["scene_defaults"].get("pools", {})
                 base_photo_ids = set(scene_pools.get("photography_styles", []))
                 explicit_photo_ids = scene_pools.get("explicit_photography_styles", [])
@@ -1743,7 +1972,7 @@ class Composer:
                 item for slot, item in scene["outfit"].get(modifier_key, {}).items()
                 if slot in visible_slots
             )
-        flattened.extend([scene[key] for key in ("interior", "furniture", "pose", "action", "expression", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target")])
+        flattened.extend([scene[key] for key in ("interior", "furniture", "location_zone", "pose", "action", "expression", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target")])
         flattened.extend(
             scene[key] for key in ("surface_color", "surface_texture")
             if scene.get(key)
@@ -1778,6 +2007,7 @@ class Composer:
 
     def validate_scene_rules(self, scene: dict[str, Any]) -> None:
         self.validate_outfit_environment(scene["outfit"], scene["interior"])
+        validate_pose_zone(scene["pose"], scene["location_zone"])
         if not category_allows(scene["interior"], scene["furniture"]):
             raise AppError(
                 f"Normal environment {scene['interior']['id']} cannot use luxury "
@@ -1790,7 +2020,17 @@ class Composer:
         hand_total = sum(hands_required(scene.get(key)) for key in ("pose", "action", "prop"))
         if hand_total > 2:
             raise AppError(f"Pose, action and prop require {hand_total} hands")
+        if scene.get("intensity") not in allowed_scene_intensities(scene):
+            raise AppError(
+                f"Intensity {scene.get('intensity')} conflicts with stage "
+                f"{scene['stage']['id']} and recipe "
+                f"{(scene.get('explicit_recipe') or {}).get('id', 'none')}"
+            )
         for item in flattened:
+            if not item_allows_intensity(item, scene["intensity"]):
+                raise AppError(
+                    f"Intensity {scene['intensity']} conflicts with {item['id']}"
+                )
             missing = set(item.get("requires", [])) - ids
             excluded = set(item.get("excludes", [])) & ids
             missing_tags = set(item.get("requires_tags", [])) - all_tags
@@ -1859,22 +2099,6 @@ def human_fragments(
             custom.get("human.breast_size") or human["breast_size"]["prompt"],
             custom.get("human.breast_shape") or human["breast_shape"]["prompt"],
         ])
-    elif covered_chest:
-        for key in ("breast_size", "breast_shape"):
-            override = custom.get(f"human.{key}")
-            if override:
-                if key == "breast_size":
-                    fragments.append(
-                        f"({override} visibly shaping the opaque clothing:1.35), "
-                        "clothed bust volume clearly matching that size, breasts completely covered"
-                    )
-                else:
-                    fragments.append(
-                        f"{override}, expressed through clothing only, "
-                        "breasts completely covered by opaque clothing"
-                    )
-            elif human[key].get("covered_prompt"):
-                fragments.append(human[key]["covered_prompt"])
     if "nipples" in visibility:
         fragments.extend(
             custom.get(f"human.{key}") or human[key]["prompt"]
@@ -1953,39 +2177,49 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     # explicitly in vocabulary image models reliably understand.
     stage_anchors = {
         "covered": (
-            "(one opaque bra fully covering both breasts beneath the sheer outer garment "
-            "while conforming to their actual size:1.3), the same bra remains clearly "
-            "visible through the outer layer, no bare breast skin visible"
+            "(fully opaque fitted lining beneath the translucent outer garment:1.5), "
+            "uninterrupted lining fabric across the entire chest, uniform lining color "
+            "and weave, clean smooth garment surface"
             if covered_sheer else
-            "(opaque upper-body clothing fully covering both breasts while conforming "
-            "to their actual size:1.3), unbroken opaque fabric over the entire bust, "
-            "continuous garment color and fabric texture across the entire chest, "
-            "natural clothed bust silhouette, smooth continuous same-color fabric with "
-            "no colored anatomical detail visible through it"
+            "(fully opaque upper-body garment:1.5), uninterrupted fabric across the "
+            "entire chest, uniform garment color and weave, clean smooth garment surface"
         ),
-        "lingerie": (
-            "(one coherent sheer bra or lingerie top covering both breasts while conforming "
-            "to their actual size:1.3), continuous intentional lingerie fabric across the chest"
-            if lingerie_sheer else
-            "(opaque bra, lingerie top, or upper garment fully covering both breasts "
-            "while conforming to their actual size:1.3), unbroken opaque fabric over "
-            "the entire bust, continuous garment color and fabric texture across the chest, "
-            "natural clothed bust silhouette, smooth continuous same-color fabric with "
-            "no colored anatomical detail visible through it"
-        ),
+        "lingerie": "(fully opaque lingerie top or bra:1.5), uninterrupted fabric across "
+        "the entire chest, uniform material and color, clean smooth garment surface",
         "topless": "topless, bare breasts and visible nipples, lower-body garments visible",
         "nude": "fully nude body, bare breasts, visible nipples, pubic area and genitals visible",
         "explicit": "explicit adult pose, bare breasts, visible nipples, pubic area and genitals visible",
     }
     stage_anchor = stage_anchors.get(stage.get("level"), "")
-    # A recipe can establish a stricter orientation than a generic explicit
-    # stage. Put that contract first and avoid frontal anatomy wording for rear views.
+    # Explicit compiler priority: subject -> camera/direction -> anatomy ->
+    # traits/garments -> location/treatment. Keep the order data-declared and
+    # stable because diffusion models give earlier structural tokens more weight.
+    stage_custom = custom.get("shot.stage")
+    if stage_custom:
+        fragments.append(stage_custom)
+    if scene.get("explicit_recipe"):
+        fragments.append(
+            custom.get("shot.explicit_recipe") or scene["explicit_recipe"]["prompt"]
+        )
+    for key in ("pose", "action", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target"):
+        item = scene.get(key)
+        if item:
+            fragments.append(
+                shot_prompt(key, item)
+                if key in {"editorial_role", "shot_size", "camera_angle", "framing", "focus_target"}
+                else custom.get(f"shot.{key}") or item["prompt"]
+            )
+
+    # A recipe can establish a stricter anatomical orientation than a generic
+    # explicit stage. Avoid frontal anatomy wording for rear views.
     if xxx_prompt:
         fragments.append(xxx_prompt)
     if stage_anchor and plateau_kind != "provocative_rear":
         fragments.append(stage_anchor)
-    # Stateless image inference pays more attention to earlier tokens. Keep the
-    # persistent visual identity before transient direction and camera grammar.
+    if scene.get("intensity"):
+        fragments.append(
+            custom.get("shot.intensity") or f"{scene['intensity']} visual intensity"
+        )
     fragments.extend(
         human_fragments(scene["human"], visibility, covered_chest, custom)
     )
@@ -2031,6 +2265,7 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             )
     panties = outfit["garments"].get("panties") if "panties" in visible_slots else None
     legwear = outfit["garments"].get("legwear") if "legwear" in visible_slots else None
+    lowerwear = outfit["garments"].get("lowerwear") if "lowerwear" in visible_slots else None
     legwear_prompt = (legwear or {}).get("prompt", "").casefold()
     layered_hosiery = bool(
         panties
@@ -2044,13 +2279,18 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
     if layered_hosiery:
         fragments.append(
             "the panties are worn underneath the pantyhose or tights, hosiery forms the "
-            "continuous outer layer over the panties, never panties over hosiery"
+            "continuous outer layer over the panties"
+        )
+    if lowerwear_covers_legs(lowerwear) and legwear:
+        fragments.append(
+            "trouser fabric forms the continuous outer layer from waist to ankle hems, "
+            "ankle socks begin below the trouser hems"
         )
     if reveals_cameltoe:
         fragments.append(defaults["cameltoe_prompt"])
 
     # Location and its physical surface are also persistent set identity.
-    for key in ("interior", "furniture", "mood", "photography_style"):
+    for key in ("location_zone", "interior", "furniture", "mood", "photography_style"):
         item = scene.get(key)
         if item:
             director_key = f"shot.{key}" if key == "furniture" else f"scene.{key}"
@@ -2074,25 +2314,13 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             else:
                 fragments.append(custom.get(director_key) or item["prompt"])
 
-    # Everything below describes only this inference: explicit recipe, action,
-    # expression, editorial intent, and finally camera grammar.
-    stage_custom = custom.get("shot.stage")
-    if stage_custom:
-        fragments.append(stage_custom)
-    if scene.get("explicit_recipe"):
-        fragments.append(
-            custom.get("shot.explicit_recipe") or scene["explicit_recipe"]["prompt"]
-        )
-    if scene.get("intensity"):
-        fragments.append(
-            custom.get("shot.intensity") or f"{scene['intensity']} visual intensity"
-        )
+    # Remaining transient detail does not override structural direction.
     if scene.get("garment_transition") and plateau_kind != "provocative_rear":
         fragments.append(
             custom.get("shot.garment_transition")
             or scene["garment_transition"]["prompt"]
         )
-    for key in ("pose", "action", "prop", "expression"):
+    for key in ("prop", "expression"):
         item = scene.get(key)
         if item:
             if key == "expression" and plateau_kind == "provocative_rear":
@@ -2103,10 +2331,6 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
                 fragments.append(custom.get(f"shot.{key}") or item["prompt"])
         elif key == "prop" and custom.get("shot.prop"):
             fragments.append(custom["shot.prop"])
-    for key in ("editorial_role", "shot_size", "camera_angle", "framing", "focus_target"):
-        item = scene.get(key)
-        if item:
-            fragments.append(shot_prompt(key, item))
     fragments.extend(item["prompt"] for item in scene.get("dependencies", []))
     fragments.append(defaults.get("positive_suffix", ""))
     unique_fragments = []
@@ -2119,14 +2343,14 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             seen_fragments.add(normalized)
     positive = ", ".join(unique_fragments)
     negative = defaults.get("negative_prompt", "")
-    if covered_chest and not lingerie_sheer and defaults.get("covered_chest_negative"):
-        negative = f"{negative}, {defaults['covered_chest_negative']}"
+    negative_profiles = defaults["negative_profiles"]
+    if covered_chest and not lingerie_sheer:
+        negative = f"{negative}, {negative_profiles['covered_opaque']}"
     if layered_hosiery:
-        negative = f"{negative}, panties outside pantyhose, panties over tights"
-    if plateau_kind and defaults.get("xxx_negative_additions"):
-        xxx_negative = defaults["xxx_negative_additions"]
-        negative = f"{negative}, {xxx_negative}"
-    kind_negative = defaults.get("xxx_plateau_negative_additions", {}).get(
+        negative = f"{negative}, {negative_profiles['layered_hosiery']}"
+    if plateau_kind:
+        negative = f"{negative}, {negative_profiles['explicit']}"
+    kind_negative = negative_profiles.get("explicit_by_recipe", {}).get(
         plateau_kind, ""
     )
     if kind_negative:
@@ -2144,7 +2368,7 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
         )
         if covered_sheer and "bra" in outfit.get(modifier_key, {}):
             ids.append(outfit[modifier_key]["bra"]["id"])
-    ids.extend(scene[key]["id"] for key in ("pose", "action", "expression", "interior", "furniture", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target"))
+    ids.extend(scene[key]["id"] for key in ("pose", "action", "expression", "interior", "furniture", "location_zone", "mood", "photography_style", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target"))
     ids.extend(
         scene[key]["id"] for key in ("surface_color", "surface_texture")
         if scene.get(key)
@@ -2165,8 +2389,8 @@ def prompt_lint(scene: dict[str, Any], positive: str) -> list[str]:
     if scene["stage"]["level"] == "covered" and any(term in folded for term in ("fully nude", "exposed genitals")):
         warnings.append("Covered stage contains exposed-content wording")
     coverage_anchors = {
-        "covered": "opaque upper-body clothing fully covering both breasts",
-        "lingerie": "opaque bra, lingerie top, or upper garment fully covering both breasts",
+        "covered": "fully opaque",
+        "lingerie": "fully opaque lingerie top or bra",
     }
     expected_anchor = coverage_anchors.get(scene["stage"]["level"])
     if expected_anchor and expected_anchor not in folded:
@@ -2286,26 +2510,62 @@ def stage_for_index(
     return weighted_choice(rng, stages)
 
 
+def weighted_shuffle_sequence(
+    rng: random.Random, candidates: list[dict[str, Any]], count: int
+) -> list[dict[str, Any]]:
+    """Return deterministic weighted bags, exhausted before any candidate repeats."""
+    if count <= 0:
+        return []
+    if not candidates:
+        raise AppError("Cannot build a shuffle bag without candidates")
+    result: list[dict[str, Any]] = []
+    while len(result) < count:
+        remaining = list(candidates)
+        bag: list[dict[str, Any]] = []
+        while remaining:
+            selected = weighted_choice(rng, remaining)
+            bag.append(selected)
+            remaining.remove(selected)
+        if result and len(bag) > 1 and bag[0]["id"] == result[-1]["id"]:
+            bag[0], bag[1] = bag[1], bag[0]
+        result.extend(bag)
+    return result[:count]
+
+
+def full_xxx_recipe_plan(
+    db: dict[str, Any], count: int, rng: random.Random
+) -> list[dict[str, Any]]:
+    """Plan an explicit editorial arc over concrete enabled recipe records."""
+    recipes = [
+        item for item in db["explicit_recipes"]
+        if not item.get("disabled", False)
+    ]
+    plateau = [item for item in recipes if item.get("intensity") != "peak"]
+    peak = [item for item in recipes if item.get("intensity") == "peak"]
+    if not peak:
+        raise AppError("Full XXX planning requires at least one enabled peak recipe")
+    if count == 1:
+        return weighted_shuffle_sequence(rng, peak, 1)
+    if not plateau:
+        raise AppError("Full XXX planning requires at least one enabled explicit recipe")
+    return (
+        weighted_shuffle_sequence(rng, plateau, count - 1)
+        + weighted_shuffle_sequence(rng, peak, 1)
+    )
+
+
 def full_xxx_stage(
-    template: dict[str, Any], index: int, count: int, mode: str, rng: random.Random
+    template: dict[str, Any], recipe: dict[str, Any], index: int
 ) -> dict[str, Any]:
-    """Build an immediately explicit stage for full-XXX photoshoot or random mode."""
+    """Build an explicit stage bound to one preplanned concrete recipe."""
     effective = effective_photoshoot_stages(template)
     explicit = next(stage for stage in effective if stage["level"] == "explicit")
-    kinds = ("provocative_rear", "intimate_closeup", "masturbation")
-    if mode == "photoshoot":
-        kind = kinds[min(len(kinds) - 1, index * len(kinds) // count)]
-    else:
-        kind = rng.choice(kinds)
-    if kind == "intimate_closeup" and "panties" in template.get("slots", {}) and rng.random() < 0.5:
-        kind = "panties_aside"
     result = copy.deepcopy(explicit)
-    result["id"] = f"{explicit['id']}_full_xxx_{kind}"
-    result["plateau_kind"] = kind
-    result["visible_slots"] = (
-        [slot for slot in ("panties", "legwear", "footwear", "accessories") if slot in template.get("slots", {})]
-        if kind == "panties_aside" else []
-    )
+    result["id"] = f"{explicit['id']}_full_xxx_{index + 1}_{recipe['id']}"
+    result["plateau_kind"] = recipe["plateau_kind"]
+    result["planned_recipe_id"] = recipe["id"]
+    result["planned_intensity"] = recipe.get("intensity", "explicit")
+    result["visible_slots"] = []
     result["body_visibility"] = ["breasts", "nipples", "pubic_area", "genitals"]
     return result
 
@@ -2412,11 +2672,20 @@ def list_workflow_profiles(db: dict[str, Any], db_path: Path) -> dict[str, Any]:
             profile_id = path.name.removesuffix(".workflow.json")
             try:
                 workflow = json.loads(path.read_text(encoding="utf-8"))
-                detect_node_mapping(workflow, include_fast=True)
+                mapping = detect_node_mapping(workflow, include_fast=True)
                 valid, error = True, None
+                negative_conditioning = mapping.get("negative_prompt") is not None
             except Exception as exc:
                 valid, error = False, str(exc)
-            profiles.append({"id": profile_id, "name": profile_id.replace("-", " ").title(), "file": path.name, "valid": valid, "error": error})
+                negative_conditioning = False
+            profiles.append({
+                "id": profile_id,
+                "name": profile_id.replace("-", " ").title(),
+                "file": path.name,
+                "valid": valid,
+                "error": error,
+                "negative_conditioning": negative_conditioning,
+            })
     ids = {item["id"] for item in profiles if item["valid"]}
     for mode in ("production", "preview"):
         if registry.get(mode) not in ids:
@@ -2449,7 +2718,14 @@ def capture_workflow_profile(db: dict[str, Any], db_path: Path, name: str, repla
     if not registry.get("preview"):
         registry["preview"] = profile_id
     save_workflow_profile_registry(db, db_path, registry)
-    return {"id": profile_id, "name": name.strip(), "file": path.name, "prompt_id": prompt_id, "seed_targets": len(mapping["inference_seed"])}
+    return {
+        "id": profile_id,
+        "name": name.strip(),
+        "file": path.name,
+        "prompt_id": prompt_id,
+        "seed_targets": len(mapping["inference_seed"]),
+        "negative_conditioning": mapping["negative_prompt"] is not None,
+    }
 
 
 def select_workflow_profiles(db: dict[str, Any], db_path: Path, production: str, preview: str) -> dict[str, Any]:
@@ -2518,12 +2794,36 @@ def lora_bypass_link(node: dict[str, Any], output_index: int) -> list[Any] | Non
     return None
 
 
+def preview_dimensions(width: int, height: int, max_edge: int) -> tuple[int, int]:
+    """Scale down without changing orientation, using latent-safe multiples of 64."""
+    scale = min(1.0, max_edge / max(width, height))
+    scaled_width = max(64, min(max_edge, int(width * scale // 64) * 64))
+    scaled_height = max(64, min(max_edge, int(height * scale // 64) * 64))
+    return scaled_width, scaled_height
+
+
 def prepare_fast_workflow(
     workflow: dict[str, Any], mapping: dict[str, Any]
 ) -> dict[str, Any]:
     fast_mapping = mapping.get("fast_mode")
     if not isinstance(fast_mapping, dict) or not fast_mapping.get("output_targets"):
         raise AppError("Fast workflow mapping was not detected")
+    dimensions = fast_mapping.get("dimensions")
+    if not isinstance(dimensions, dict):
+        raise AppError("Fast workflow has no safely detected latent dimensions")
+    config, _ = load_config()
+    width, height = preview_dimensions(
+        dimensions["width"], dimensions["height"],
+        config["comfy"]["preview_max_edge"],
+    )
+    try:
+        latent_inputs = workflow[dimensions["node"]]["inputs"]
+        latent_inputs[dimensions["width_input"]] = width
+        latent_inputs[dimensions["height_input"]] = height
+    except KeyError as exc:
+        raise AppError(
+            f"Detected preview dimension target is no longer valid: {exc}"
+        ) from exc
     output_nodes = []
     for target in fast_mapping["output_targets"]:
         try:
@@ -2688,12 +2988,12 @@ def generate_one(
     for node_output in outputs.values():
         for image in node_output.get("images", []):
             image_number += 1
-            if mode == "photoshoot":
+            if fast:
+                label = f"preview_{photoshoot_index + 1:03d}_shot_{shot_index + 1:03d}"
+            elif mode == "photoshoot":
                 label = f"photoshoot_{photoshoot_index + 1:03d}_shot_{shot_index + 1:03d}"
             else:
                 label = f"random_shot_{shot_index + 1:03d}"
-            if fast:
-                label = f"fast_{label}"
             response = session.get(
                 f"{url}/view",
                 params={"filename": image["filename"], "subfolder": image.get("subfolder", ""), "type": image.get("type", "output")},
@@ -2781,6 +3081,14 @@ def build_storyboard(
     storyboard: list[dict[str, Any]] = []
     for photoshoot_index in range(photoshoot_count):
         avoid: dict[str, set[str]] = {}
+        removed_slots: set[str] = set()
+        xxx_plan = (
+            full_xxx_recipe_plan(db, args.count, rng)
+            if args.content_mode == "xxx" else []
+        )
+        progressive_xxx_plan: list[dict[str, Any]] = []
+        progressive_xxx_index = 0
+        bag_scope = f"photoshoot-{photoshoot_index}"
         fixed = None
         if args.mode == "photoshoot":
             attempts = composer.max_scene_attempts
@@ -2804,7 +3112,7 @@ def build_storyboard(
                 sfw_stage(template, shot_index, args.count, args.mode, rng)
                 if args.content_mode == "sfw"
                 else (
-                    full_xxx_stage(template, shot_index, args.count, args.mode, rng)
+                    full_xxx_stage(template, xxx_plan[shot_index], shot_index)
                     if args.content_mode == "xxx"
                     else stage_for_index(
                         template, shot_index, args.count, args.mode, rng,
@@ -2812,23 +3120,76 @@ def build_storyboard(
                     )
                 )
             )
-            role_id = "role_peak" if shot_index == args.count - 1 and stage["level"] == "explicit" else {
+            if (
+                args.mode == "photoshoot"
+                and args.content_mode == "progressive"
+                and stage["level"] == "explicit"
+            ):
+                if not progressive_xxx_plan:
+                    progressive_xxx_plan = full_xxx_recipe_plan(
+                        db, args.count - shot_index, rng
+                    )
+                stage = full_xxx_stage(
+                    template,
+                    progressive_xxx_plan[progressive_xxx_index],
+                    shot_index,
+                )
+                progressive_xxx_index += 1
+            if args.mode == "photoshoot" and removed_slots:
+                stage = copy.deepcopy(stage)
+                stage["visible_slots"] = [
+                    slot for slot in stage.get("visible_slots", [])
+                    if slot not in removed_slots
+                ]
+            role_id = "role_peak" if stage.get("planned_intensity") == "peak" else {
                 "covered": "role_establishing" if shot_index == 0 else "role_portrait",
                 "lingerie": "role_development", "topless": "role_reveal", "nude": "role_nude_study",
                 "explicit": "role_plateau",
             }.get(stage["level"], "portrait")
+            overrides = {"editorial_role": role_id}
+            if stage.get("planned_recipe_id"):
+                overrides["explicit_recipe"] = stage["planned_recipe_id"]
+                overrides["intensity"] = stage["planned_intensity"]
             try:
                 scene = composer.resolve_scene(
-                    context, stage, {"editorial_role": role_id}, avoid
+                    context, stage, overrides, avoid, bag_scope
                 )
             except AppError:
                 # Diversity is a preference; compatibility always wins.
                 scene = composer.resolve_scene(
-                    context, stage, {"editorial_role": role_id}
+                    context, stage, overrides, bag_scope=bag_scope
                 )
+            previous_scene = (
+                storyboard[-1]["scene"]
+                if storyboard
+                and storyboard[-1]["photoshoot_index"] == photoshoot_index
+                else None
+            )
+            tuple_keys = ("pose", "action", "shot_size", "camera_angle")
+            if previous_scene:
+                previous_tuple = tuple(previous_scene[key]["id"] for key in tuple_keys)
+                for _ in range(composer.max_scene_attempts):
+                    current_tuple = tuple(scene[key]["id"] for key in tuple_keys)
+                    if current_tuple != previous_tuple:
+                        break
+                    scene = composer.resolve_scene(
+                        context, stage, overrides, bag_scope=bag_scope
+                    )
+                else:
+                    raise AppError(
+                        "Could not avoid an adjacent pose/action/camera tuple repeat"
+                    )
             previous = storyboard[-1] if storyboard and storyboard[-1]["photoshoot_index"] == photoshoot_index else None
             previous_slots = set(previous["stage"].get("visible_slots", [])) if previous else set(stage.get("visible_slots", []))
-            removed = previous_slots - set(stage.get("visible_slots", []))
+            current_slots = set(stage.get("visible_slots", []))
+            if args.mode == "photoshoot" and current_slots & removed_slots:
+                restored = sorted(current_slots & removed_slots)
+                raise AppError(
+                    f"Progressive garment state restored removed slots: {restored}"
+                )
+            removed = previous_slots - current_slots
+            if args.mode == "photoshoot":
+                removed_slots |= removed
             if removed:
                 names = [
                     context["outfit"]["garments"][slot]["prompt"]
@@ -2841,6 +3202,7 @@ def build_storyboard(
                         "prompt": "fully removed and no longer wearing " + " and ".join(names),
                         "slots": sorted(removed),
                     }
+            scene["removed_garment_slots"] = sorted(removed_slots)
             for key in ("furniture", "pose", "action", "expression", "editorial_role", "shot_size", "camera_angle", "framing", "focus_target", "explicit_recipe", "intimate_arousal_modifier"):
                 item = scene.get(key)
                 if item:
@@ -3638,7 +4000,7 @@ class WebState:
                 for level in (
                     ("fashion", "sensual")
                     if record["args"].content_mode == "sfw"
-                    else ("fashion", "sensual", "erotic", "nude", "explicit", "peak")
+                    else allowed_scene_intensities(shot["scene"])
                 )
             ],
         })
@@ -4151,10 +4513,14 @@ class WebState:
                     shot.setdefault("custom_values", {}).pop(field, None)
                 self._apply_director_customs(shot, shot["scene"], context)
             elif key == "intensity":
-                if value not in {"fashion", "sensual", "erotic", "nude", "explicit", "peak"}:
+                if value not in INTENSITY_LEVELS:
                     raise AppError("Unknown intensity")
                 if record["args"].content_mode == "sfw" and value not in {"fashion", "sensual"}:
                     raise AppError("SFW only storyboards allow fashion or sensual intensity")
+                if value not in allowed_scene_intensities(shot["scene"]):
+                    raise AppError(
+                        f"Intensity {value} is incompatible with this stage and recipe"
+                    )
                 shot["scene"]["intensity"] = value
                 if clear_custom:
                     shot.setdefault("custom_values", {}).pop(field, None)
@@ -4853,16 +5219,21 @@ class WebState:
                     job["progress"] = round(completed * 100 / len(selected_shots), 1)
                     job["elapsed_seconds"] = round(elapsed, 1)
                     job["eta_seconds"] = round(elapsed / completed * remaining, 1) if remaining else 0
+                    shot_outputs = []
                     for path in paths:
                         published = output_payload(path)
                         published.update(prompt_id=prompt_id, shot=shot["number"])
                         job["outputs"].append(published)
+                        shot_outputs.append(published)
                     shot_log.update({
                         "type": "shot_completed",
                         "position": completed,
                         "elapsed_seconds": round(elapsed, 1),
                         "duration_seconds": round(time.monotonic() - shot_started, 1),
+                        "image_url": shot_outputs[0]["url"] if shot_outputs else None,
                     })
+                    if job.get("current_prompt") is not None:
+                        job["current_prompt"]["image_url"] = shot_log["image_url"]
                     if completed == len(selected_shots):
                         job["status"] = "completed"
                         job["progress"] = 100

@@ -342,7 +342,7 @@ class DirectorRegressionTests(unittest.TestCase):
         )
         self.assertIn("erotic", app.tags(garment))
         self.assertTrue(app.tags(garment) & app.SFW_BLOCKED_GARMENT_TAGS)
-        negative = database["prompt_defaults"]["covered_chest_negative"]
+        negative = database["prompt_defaults"]["negative_profiles"]["covered_opaque"]
         for phrase in ("missing top", "absent upper garment", "breasts outside clothing"):
             self.assertIn(phrase, negative)
 
@@ -426,8 +426,8 @@ class DirectorRegressionTests(unittest.TestCase):
             )
             positive = payload["positive_prompt"].casefold()
             stage_marker = {
-                "covered": "opaque upper-body clothing",
-                "lingerie": "opaque bra",
+                "covered": "fully opaque upper-body garment",
+                "lingerie": "fully opaque lingerie top or bra",
                 "topless": "topless",
                 "nude": "fully nude body",
                 "explicit": "explicit adult pose",
@@ -551,14 +551,76 @@ class DirectorRegressionTests(unittest.TestCase):
         self.assertGreaterEqual(len(poses), 35)
         self.assertGreaterEqual(len(actions), 30)
         self.assertGreaterEqual(len(recipes), 8)
-        self.assertTrue({
-            "pose_explicit_side_scissor", "pose_explicit_half_roll_open",
-            "pose_explicit_overhead_asymmetric", "pose_explicit_edge_side_open",
-        }.issubset(poses))
         self.assertEqual(
             plateau_kinds,
-            {"provocative_rear", "intimate_closeup", "panties_aside", "masturbation"},
+            {"provocative_rear", "intimate_closeup", "masturbation"},
         )
+
+    def test_full_xxx_uses_concrete_seeded_recipe_arc_with_peak_finale(self):
+        state, storyboard_id = self.make_storyboard(
+            count=20, prompt_seed=774411, content_mode="xxx"
+        )
+        shots = state.get_storyboard(storyboard_id)["shots"]
+        recipes = [shot["scene"]["explicit_recipe"] for shot in shots]
+        self.assertTrue(all(recipe is not None for recipe in recipes))
+        self.assertTrue(all(
+            shot["stage"]["planned_recipe_id"] == recipe["id"]
+            for shot, recipe in zip(shots, recipes)
+        ))
+        self.assertTrue(all(recipe["intensity"] == "explicit" for recipe in recipes[:-1]))
+        self.assertEqual(recipes[-1]["intensity"], "peak")
+        self.assertEqual(shots[-1]["scene"]["editorial_role"]["id"], "role_peak")
+        self.assertTrue(all(
+            left["id"] != right["id"]
+            for left, right in zip(recipes, recipes[1:])
+        ))
+
+        database = state.get_storyboard(storyboard_id)["db"]
+        explicit_ids = {
+            item["id"] for item in database["explicit_recipes"]
+            if not item.get("disabled", False) and item.get("intensity") != "peak"
+        }
+        first_bag = {recipe["id"] for recipe in recipes[:len(explicit_ids)]}
+        self.assertEqual(first_bag, explicit_ids)
+
+        second_state, second_id = self.make_storyboard(
+            count=20, prompt_seed=774411, content_mode="xxx"
+        )
+        second = [
+            shot["scene"]["explicit_recipe"]["id"]
+            for shot in second_state.get_storyboard(second_id)["shots"]
+        ]
+        self.assertEqual([recipe["id"] for recipe in recipes], second)
+
+    def test_progressive_intensity_is_monotonic_and_recipe_compatible(self):
+        order = {level: index for index, level in enumerate(app.INTENSITY_LEVELS)}
+        for seed in range(20):
+            state, storyboard_id = self.make_storyboard(
+                count=16, prompt_seed=seed, content_mode="progressive"
+            )
+            shots = state.get_storyboard(storyboard_id)["shots"]
+            intensities = [order[shot["scene"]["intensity"]] for shot in shots]
+            self.assertEqual(intensities, sorted(intensities))
+            for shot in shots:
+                recipe = shot["scene"].get("explicit_recipe")
+                if recipe:
+                    self.assertEqual(shot["scene"]["intensity"], recipe["intensity"])
+
+    def test_location_zones_match_pose_capabilities_and_environment(self):
+        for seed in range(20):
+            state, storyboard_id = self.make_storyboard(count=12, prompt_seed=seed)
+            for shot in state.get_storyboard(storyboard_id)["shots"]:
+                scene = shot["scene"]
+                app.validate_pose_zone(scene["pose"], scene["location_zone"])
+                allowed = set(scene["location_zone"]["environment_tags"])
+                self.assertTrue(allowed & app.tags(scene["interior"]))
+
+    def test_subject_has_one_or_two_compatible_facial_accents(self):
+        for seed in range(40):
+            state, storyboard_id = self.make_storyboard(prompt_seed=seed)
+            accents = state.get_storyboard(storyboard_id)["shots"][0]["context"]["human"]["facial_accents"]
+            self.assertIn(len(accents), {1, 2})
+            self.assertEqual(len({item["id"] for item in accents}), len(accents))
 
     def test_sequence_seeds_are_stable_and_unique(self):
         first_state, first_id = self.make_storyboard(inference_strategy="sequence")
@@ -773,8 +835,8 @@ class DirectorRegressionTests(unittest.TestCase):
 
     def test_compiler_preserves_stage_and_visible_garments(self):
         anchors = {
-            "covered": "opaque upper-body clothing fully covering both breasts",
-            "lingerie": "opaque bra, lingerie top, or upper garment fully covering both breasts",
+            "covered": "fully opaque upper-body garment",
+            "lingerie": "fully opaque lingerie top or bra",
             "topless": "topless, bare breasts and visible nipples",
             "nude": "fully nude body",
             "explicit": "explicit adult pose",
@@ -788,13 +850,7 @@ class DirectorRegressionTests(unittest.TestCase):
             expected_anchor = (
                 "anatomically coherent rear-facing nude pose"
                 if scene["stage"].get("plateau_kind") == "provocative_rear"
-                else "one coherent sheer bra or lingerie top"
-                if scene["stage"]["level"] == "lingerie" and any(
-                    "sheer" in app.tags(scene["outfit"]["garments"][slot])
-                    for slot in scene["stage"].get("visible_slots", [])
-                    if slot in scene["outfit"]["garments"]
-                )
-                else "one opaque bra fully covering both breasts beneath the sheer outer garment"
+                else "fully opaque fitted lining beneath the translucent outer garment"
                 if scene["stage"]["level"] == "covered" and any(
                     "sheer" in app.tags(scene["outfit"]["garments"][slot])
                     for slot in scene["stage"].get("visible_slots", [])
@@ -880,7 +936,14 @@ class DirectorRegressionTests(unittest.TestCase):
             self.assertTrue(prompt.startswith("fully removed and no longer wearing "))
             self.assertNotIn("deliberately removing", prompt)
 
-    def test_compiler_prioritizes_persistent_visual_identity(self):
+        shots = state.get_storyboard(storyboard_id)["shots"]
+        removed = set()
+        for shot in shots:
+            visible = set(shot["stage"].get("visible_slots", []))
+            self.assertFalse(visible & removed)
+            removed = set(shot["scene"]["removed_garment_slots"])
+
+    def test_compiler_uses_declared_diffusion_priority(self):
         state, storyboard_id = self.make_storyboard(count=8, prompt_seed=4141)
         record = state.get_storyboard(storyboard_id)
         shot = record["shots"][0]
@@ -894,15 +957,22 @@ class DirectorRegressionTests(unittest.TestCase):
         )
         positions = [
             positive.index("single subject"),
+            positive.index(scene["pose"]["prompt"].casefold()),
+            positive.index(scene["shot_size"]["prompt"].casefold()),
             positive.index(scene["human"]["ethnic_appearance"]["prompt"].casefold()),
             positive.index(first_visible_garment["prompt"].casefold()),
             positive.index(scene["interior"]["prompt"].casefold()),
-            positive.index(scene["pose"]["prompt"].casefold()),
-            positive.index(scene["shot_size"]["prompt"].casefold()),
         ]
         self.assertEqual(positions, sorted(positions))
+        self.assertEqual(
+            record["db"]["prompt_defaults"]["prompt_priority"],
+            [
+                "subject", "camera_direction", "anatomy",
+                "traits_garments", "location_treatment",
+            ],
+        )
 
-    def test_covered_chest_blocks_nipple_clipping_without_losing_bust_shape(self):
+    def test_covered_chest_positive_contract_is_anatomy_neutral(self):
         state, storyboard_id = self.make_storyboard(count=12, prompt_seed=24680)
         record = state.get_storyboard(storyboard_id)
         payload = state.storyboard_payload(record)
@@ -915,19 +985,11 @@ class DirectorRegressionTests(unittest.TestCase):
         for scene, rendered in covered:
             positive = rendered["positive_prompt"].casefold()
             negative = rendered["negative_prompt"].casefold()
-            if "unbroken opaque fabric over the entire bust" not in positive:
-                self.assertTrue(
-                    "one coherent sheer bra" in positive
-                    or "one opaque bra fully covering both breasts beneath" in positive
-                )
-                continue
-            self.assertIn("unbroken opaque fabric over the entire bust", positive)
-            self.assertIn("natural clothed bust silhouette", positive)
-            self.assertIn("continuous garment color and fabric texture", positive)
-            self.assertIn("smooth continuous same-color fabric", positive)
-            self.assertNotIn("nipple", positive)
-            self.assertNotIn("areola", positive)
-            self.assertIn("bust", positive)
+            self.assertIn("fully opaque", positive)
+            self.assertIn("uninterrupted", positive)
+            self.assertIn("clean smooth garment surface", positive)
+            for unsafe_concept in ("breast", "nipple", "areola", "bust"):
+                self.assertNotIn(unsafe_concept, positive)
             self.assertIn("nipples clipping through clothing", negative)
             self.assertIn("skin-colored nipples through clothing", negative)
             self.assertIn("areola color visible through fabric", negative)
@@ -960,7 +1022,7 @@ class DirectorRegressionTests(unittest.TestCase):
         focus = next(item for item in database["focus_targets"] if item["id"] == "focus_rear")
         self.assertEqual(focus["requires_any_tags"], ["provocative_rear"])
 
-    def test_extremely_large_breasts_keep_their_scale_under_clothing(self):
+    def test_covered_stage_visibility_gates_breast_traits_from_positive_prompt(self):
         state, storyboard_id = self.make_storyboard(count=12, prompt_seed=24680)
         state.update_director(
             storyboard_id,
@@ -977,12 +1039,10 @@ class DirectorRegressionTests(unittest.TestCase):
         nude = next(
             shot for shot in shots if shot["stage"]["level"] in {"nude", "explicit"}
         )
-        self.assertIn(
-            "extremely large heavy natural breasts under opaque clothing:1.55",
-            covered["positive_prompt"],
-        )
-        self.assertIn("enormous wide deep projecting clothed bust:1.5", covered["positive_prompt"])
-        self.assertIn("breasts completely covered", covered["positive_prompt"])
+        folded = covered["positive_prompt"].casefold()
+        for unsafe_concept in ("breast", "nipple", "areola", "bust"):
+            self.assertNotIn(unsafe_concept, folded)
+        self.assertIn("fully opaque", folded)
         self.assertIn("extremely large heavy natural breasts", nude["positive_prompt"])
         self.assertNotIn("under opaque clothing", nude["positive_prompt"])
 
@@ -1140,6 +1200,37 @@ class PreviewRegressionTests(unittest.TestCase):
         )
         self.assertEqual(state.delete_preview(preview["id"]), {"deleted": True})
         self.assertNotIn(preview["id"], state.previews)
+
+    def test_completed_preview_images_have_independent_memory_entries(self):
+        state = app.WebState()
+        board = state.create_storyboard(
+            {"count": 2, "prompt_seed": 71, "inference_seed": 72}
+        )
+        rendered = iter((b"studio-preview", b"director-preview"))
+
+        def render_preview(*_args, **_kwargs):
+            return "preview-prompt", next(rendered), "image/png"
+
+        preview_ids = []
+        with (
+            patch.object(app, "load_workflow_runtime", return_value=({}, {})),
+            patch.object(app, "generate_preview_image", side_effect=render_preview),
+        ):
+            for shot in (1, 2):
+                preview = state.create_preview(board["id"], shot, True)
+                preview_ids.append(preview["id"])
+                for _ in range(100):
+                    preview = state.get_preview(preview["id"])
+                    if preview["status"] not in {"queued", "running"}:
+                        break
+                    time.sleep(0.01)
+
+        self.assertNotEqual(*preview_ids)
+        self.assertEqual(state.preview_image(preview_ids[0])[0], b"studio-preview")
+        self.assertEqual(state.preview_image(preview_ids[1])[0], b"director-preview")
+        state.delete_preview(preview_ids[1])
+        self.assertEqual(state.preview_image(preview_ids[0])[0], b"studio-preview")
+        self.assertNotIn(preview_ids[1], state.previews)
 
     def test_preview_always_uses_preview_workflow_without_toggle(self):
         state = app.WebState()
@@ -1666,12 +1757,46 @@ class FrontendContractTests(unittest.TestCase):
         html = (root / "client" / "client.html").read_text(encoding="utf-8")
         js = (root / "client" / "client.js").read_text(encoding="utf-8")
         css = (root / "client" / "client.css").read_text(encoding="utf-8")
+        server = (root / "server.py").read_text(encoding="utf-8")
         self.assertIn('id="logger-shot-label"', html)
+        self.assertIn('id="logger-rendered-open"', html)
+        self.assertIn('id="logger-rendered-image"', html)
+        self.assertIn('id="logger-positive"', html)
+        self.assertIn('id="logger-negative"', html)
         self.assertIn("function inspectedJobPrompt(job)", js)
+        self.assertIn("function renderLoggerImage(prompt)", js)
+        self.assertIn("renderLoggerImage(inspectedPrompt)", js)
+        self.assertIn("loggerRenderedFrame.addEventListener('click'", js)
+        self.assertIn("function sizeLoggerImageColumn()", js)
+        self.assertIn("imageHeight * image.naturalWidth / image.naturalHeight", js)
+        self.assertIn("new ResizeObserver(sizeLoggerImageColumn).observe($('.logger-prompt-grid'))", js)
+        self.assertIn("function openLogbookImagePreview(prompt)", js)
+        self.assertIn("persistent: true", js)
+        self.assertIn("state.previewWindowSessions.logger", js)
+        self.assertIn("loggerPreview.displayed.image_url = prompt.image_url", js)
+        self.assertIn("if (!preview?.id || preview.persistent) return", js)
+        self.assertIn("function rememberShotPreviewGeometry()", js)
+        self.assertIn("function applyShotPreviewGeometry()", js)
+        self.assertIn("previewWindowGeometryReady", js)
+        self.assertIn(".shot-preview-canvas img { display: block; width: 100%; height: 100%; object-fit: contain; }", css)
+        self.assertIn("$('#shot-preview-image').addEventListener('error', closeShotPreview)", js)
+        self.assertIn("previewWindowSessions", js)
+        self.assertIn("function loadPreviewWindowSessions()", js)
+        self.assertIn("valhalla-floating-previews", js)
+        self.assertIn("function persistPreviewWindowSessions()", js)
+        self.assertIn("function suspendFloatingPreview()", js)
+        self.assertIn("function restoreFloatingPreview(owner)", js)
+        self.assertIn("if (name !== 'outputs') restoreFloatingPreview(name)", js)
+        self.assertIn("state.previewJobOwner = activeViewName()", js)
         self.assertIn('data-log-index="${logIndex}"', js)
         self.assertIn("function inspectLoggerEvent(element)", js)
         self.assertIn("displayedLoggerPrompt()", js)
+        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", css)
+        self.assertIn(".logger-rendered-frame.has-image", css)
+        self.assertIn("object-fit: contain", css)
+        self.assertIn("var(--logger-image-column) repeat(2, minmax(0, 1fr))", css)
         self.assertIn(".logger-event.inspectable.selected", css)
+        self.assertIn('"image_url": shot_outputs[0]["url"] if shot_outputs else None', server)
 
     def test_gallery_benchmark_is_read_only_and_reports_bounded_dom_size(self):
         js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
@@ -1839,16 +1964,20 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('data-gallery-view="flat"', html)
         self.assertIn('data-gallery-view="photoshoots"', html)
         self.assertIn("const PHOTOSHOOT_FILENAME", js)
+        self.assertIn("const PREVIEW_FILENAME", js)
         self.assertIn("const RANDOM_FILENAME", js)
         self.assertIn("const LEGACY_RUN_FILENAME", js)
         self.assertIn("`${photoshoot[1]}:photoshoot_${photoshoot[2]}`", js)
         self.assertIn("`${random[1]}:random`", js)
         self.assertIn("kind: 'random'", js)
+        self.assertIn("kind: 'preview'", js)
         self.assertIn("kind: 'legacy'", js)
         self.assertIn("group.displayNumber = ++randomNumber", js)
         self.assertIn("group.displayNumber = ++photoshootNumber", js)
+        self.assertIn("group.displayNumber = ++previewNumber", js)
         self.assertIn("`Random ${group.displayNumber}`", js)
         self.assertIn("`Photoshoot ${group.displayNumber}`", js)
+        self.assertIn("`Preview ${group.displayNumber}`", js)
         self.assertIn("'Render run'", js)
         self.assertIn("sessionStorage.getItem('valhalla-gallery-view') === 'flat' ? 'flat' : 'photoshoots'", js)
         self.assertIn("function formatOutputRun(run)", js)
@@ -1862,6 +1991,29 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("sessionStorage.setItem('valhalla-gallery-view', next)", js)
         self.assertIn("state.flatScrollY = window.scrollY", js)
         self.assertIn("activePhotoshootGroup()?.items", js)
+        self.assertIn("function outputDisplayShot(item)", js)
+        self.assertIn("['photoshoot', 'preview'].includes(group?.identity?.kind)", js)
+        self.assertIn("const localShot = outputShotSequence(item)", js)
+        self.assertIn("outputCardHtml(item, outputIndex, layout, start + offset)", js)
+        self.assertIn("aria-posinset=\"${position + 1}\"", js)
+
+    def test_bulk_delete_is_scoped_to_the_opened_photoshoot(self):
+        js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
+        self.assertIn("const photoshootList = state.galleryView === 'photoshoots' && !group", js)
+        self.assertIn("group?.identity?.kind === 'preview' ? 'preview' : 'photoshoot'", js)
+        self.assertIn("group ? `Delete ${groupLabel}` : 'Delete all'", js)
+        self.assertIn("group.items.map(({ item }) => item)", js)
+        self.assertIn("targets.map((item) => api(item.url, { method: 'DELETE' }))", js)
+        self.assertIn("Only the opened ${groupLabel} will be permanently deleted", js)
+        self.assertIn("api('/api/outputs', { method: 'DELETE' })", js)
+
+    def test_fast_storyboard_outputs_use_preview_filenames(self):
+        server = (Path(app.__file__).parent / "server.py").read_text(encoding="utf-8")
+        self.assertIn(
+            'label = f"preview_{photoshoot_index + 1:03d}_shot_{shot_index + 1:03d}"',
+            server,
+        )
+        self.assertNotIn('label = f"fast_{label}"', server)
 
     def test_virtual_output_navigation_uses_stable_absolute_indexes(self):
         js = (Path(app.__file__).parent / "client" / "client.js").read_text(encoding="utf-8")
@@ -2219,29 +2371,27 @@ class VisualCompatibilityRegressionTests(unittest.TestCase):
                 break
         self.assertTrue(found)
 
-    def test_lingerie_stage_never_hides_breasts_with_an_exposing_bra(self):
+    def test_lingerie_stage_uses_only_opaque_anatomy_neutral_bras(self):
         database, _ = app.load_database()
         composer = app.Composer(database, app.random.Random(778899))
-        sheer_checked = False
+        checked = 0
         for _ in range(250):
             fixed = composer.fixed_context()
             for stage in fixed["outfit"]["template"]["stages"]:
                 if stage["level"] != "lingerie" or "bra" not in stage.get("visible_slots", []):
                     continue
                 bra = fixed["outfit"]["garments"]["bra"]
-                self.assertNotIn("explicit", app.tags(bra))
-                if "sheer" not in app.tags(bra):
-                    continue
+                self.assertFalse(app.tags(bra) & {"explicit", "sheer", "transparent", "open_cup"})
                 scene = composer.resolve_scene(fixed, stage)
-                positive, negative, _ = app.compile_scene(database, scene)
-                self.assertIn("one coherent sheer bra", positive)
-                self.assertNotIn("opaque bra, lingerie top", positive)
-                self.assertNotIn("transparent chest fabric", negative)
-                sheer_checked = True
+                positive, _, _ = app.compile_scene(database, scene)
+                self.assertIn("fully opaque lingerie top or bra", positive)
+                for unsafe_concept in ("breast", "nipple", "areola", "bust"):
+                    self.assertNotIn(unsafe_concept, positive.casefold())
+                checked += 1
                 break
-            if sheer_checked:
+            if checked >= 40:
                 break
-        self.assertTrue(sheer_checked)
+        self.assertGreaterEqual(checked, 40)
 
     def test_covered_prompt_avoids_nipple_like_raised_disc_instruction(self):
         database, _ = app.load_database()
@@ -2255,8 +2405,9 @@ class VisualCompatibilityRegressionTests(unittest.TestCase):
             if stage:
                 break
         positive, _, _ = app.compile_scene(database, composer.resolve_scene(fixed, stage))
-        self.assertNotIn("raised cloth contour at each bust apex", positive)
-        self.assertIn("no colored anatomical detail visible", positive)
+        self.assertIn("clean smooth garment surface", positive)
+        for unsafe_concept in ("breast", "nipple", "areola", "bust"):
+            self.assertNotIn(unsafe_concept, positive.casefold())
 
     def test_panties_are_compiled_beneath_pantyhose_and_tights(self):
         database, _ = app.load_database()
@@ -2290,6 +2441,50 @@ class VisualCompatibilityRegressionTests(unittest.TestCase):
                 break
         self.assertGreaterEqual(checked, 10)
 
+    def test_long_legwear_is_rejected_with_jeans_and_trousers(self):
+        database, _ = app.load_database()
+        jeans = next(
+            item for item in database["garments"]["lowerwear"]
+            if item["id"] == "lower_blue_jeans"
+        )
+        knee_socks = next(
+            item for item in database["garments"]["legwear"]
+            if item["id"] == "legwear_white_kneesocks"
+        )
+        template = next(
+            item for item in database["outfit_templates"]
+            if {"lowerwear", "legwear"}.issubset(item["slots"])
+        )
+        with self.assertRaisesRegex(app.AppError, "long legwear cannot be composed"):
+            app.validate_outfit_layers(database, {
+                "template": template,
+                "garments": {"lowerwear": jeans, "legwear": knee_socks},
+            })
+
+        composer = app.Composer(database, app.random.Random(884422))
+        checked = 0
+        for _ in range(1000):
+            fixed = composer.fixed_context()
+            lowerwear = fixed["outfit"]["garments"].get("lowerwear")
+            legwear = fixed["outfit"]["garments"].get("legwear")
+            if not app.lowerwear_covers_legs(lowerwear) or not legwear:
+                continue
+            self.assertFalse(app.legwear_extends_above_ankle(legwear))
+            stage = next((
+                item for item in fixed["outfit"]["template"]["stages"]
+                if {"lowerwear", "legwear"}.issubset(item.get("visible_slots", []))
+            ), None)
+            if not stage:
+                continue
+            positive, _, _ = app.compile_scene(
+                database, composer.resolve_scene(fixed, stage)
+            )
+            self.assertIn("ankle socks begin below the trouser hems", positive)
+            checked += 1
+            if checked >= 10:
+                break
+        self.assertGreaterEqual(checked, 10)
+
 
 class WorkflowProfileTests(unittest.TestCase):
     def test_operational_settings_live_only_in_root_config(self):
@@ -2314,7 +2509,7 @@ class WorkflowProfileTests(unittest.TestCase):
         comfy_operational = {
             "url", "workflows_dir", "http_timeout_seconds",
             "status_timeout_seconds", "status_refresh_seconds", "poll_interval_seconds",
-            "generation_timeout_seconds", "profiles",
+            "generation_timeout_seconds", "preview_max_edge", "profiles",
         }
         self.assertTrue(comfy_operational.issubset(config["comfy"]))
         self.assertTrue(comfy_operational.isdisjoint(database["settings"]))
@@ -2348,6 +2543,82 @@ class WorkflowProfileTests(unittest.TestCase):
         self.assertEqual(workflow["text"]["inputs"]["text"], "new positive")
         self.assertEqual(workflow["sampler"]["inputs"]["seed"], 99)
 
+    def test_workflow_without_negative_conditioning_is_valid_and_positive_only(self):
+        workflow = {
+            "positive": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {"text": "prompt", "clip": ["clip", 0]},
+            },
+            "orphan_negative": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {"text": "unused", "clip": ["clip", 0]},
+            },
+            "latent": {"class_type": "EmptyLatentImage", "inputs": {}},
+            "sampler": {"class_type": "SamplerCustomAdvanced", "inputs": {
+                "positive": ["positive", 0],
+                "latent_image": ["latent", 0],
+                "noise_seed": 7,
+            }},
+        }
+        mapping = app.detect_node_mapping(workflow)
+        self.assertEqual(mapping["positive_prompt"]["node"], "positive")
+        self.assertIsNone(mapping["negative_prompt"])
+        app.patch_workflow(workflow, mapping, "authoritative", "auxiliary", 88)
+        self.assertEqual(workflow["positive"]["inputs"]["text"], "authoritative")
+        self.assertEqual(workflow["orphan_negative"]["inputs"]["text"], "unused")
+        self.assertEqual(workflow["sampler"]["inputs"]["noise_seed"], 88)
+
+    def test_preview_scales_only_fast_workflow_to_configured_max_edge(self):
+        workflow = {
+            "positive": {"class_type": "CLIPTextEncode", "inputs": {"text": "prompt"}},
+            "latent": {"class_type": "EmptySD3LatentImage", "inputs": {
+                "width": 1152, "height": 896, "batch_size": 1,
+            }},
+            "sampler": {"class_type": "KSampler", "inputs": {
+                "positive": ["positive", 0], "latent_image": ["latent", 0], "seed": 1,
+            }},
+            "decode": {"class_type": "VAEDecode", "inputs": {"samples": ["sampler", 0]}},
+            "save": {"class_type": "SaveImage", "inputs": {"images": ["decode", 0]}},
+        }
+        mapping = app.detect_node_mapping(workflow, include_fast=True)
+        prepared = app.prepare_fast_workflow(app.copy.deepcopy(workflow), mapping)
+        self.assertEqual(
+            (prepared["latent"]["inputs"]["width"], prepared["latent"]["inputs"]["height"]),
+            (512, 384),
+        )
+        self.assertEqual(
+            (workflow["latent"]["inputs"]["width"], workflow["latent"]["inputs"]["height"]),
+            (1152, 896),
+        )
+        self.assertEqual(app.preview_dimensions(896, 1152, 512), (384, 512))
+
+    def test_fast_profile_requires_scalar_latent_dimensions(self):
+        workflow = {
+            "positive": {"class_type": "CLIPTextEncode", "inputs": {"text": "prompt"}},
+            "latent": {"class_type": "EmptySD3LatentImage", "inputs": {
+                "width": ["size", 0], "height": ["size", 1],
+            }},
+            "sampler": {"class_type": "KSampler", "inputs": {
+                "positive": ["positive", 0], "latent_image": ["latent", 0], "seed": 1,
+            }},
+            "decode": {"class_type": "VAEDecode", "inputs": {"samples": ["sampler", 0]}},
+            "save": {"class_type": "SaveImage", "inputs": {"images": ["decode", 0]}},
+        }
+        with self.assertRaisesRegex(app.AppError, "must expose scalar width and height"):
+            app.detect_node_mapping(workflow, include_fast=True)
+
+    def test_database_declares_negative_conditioning_auxiliary(self):
+        database, _ = app.load_database()
+        self.assertEqual(database["prompt_defaults"]["conditioning_policy"], {
+            "structural_source": "positive",
+            "negative_role": "auxiliary_optional",
+        })
+        root = Path(app.__file__).parent
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        javascript = (root / "client" / "client.js").read_text(encoding="utf-8")
+        self.assertIn("Auxiliary negative", html)
+        self.assertIn("Positive-only workflow", javascript)
+
     def test_model_name_becomes_a_readable_safe_profile_filename(self):
         workflow = {
             "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "models/Lumina_2-F16.safetensors"}},
@@ -2371,6 +2642,7 @@ class WorkflowProfileTests(unittest.TestCase):
                     "status_refresh_seconds": 10,
                     "poll_interval_seconds": 1,
                     "generation_timeout_seconds": 600,
+                    "preview_max_edge": 512,
                     "profiles": {"production": None, "preview": None},
                 },
                 "storage": {

@@ -1586,97 +1586,79 @@
     "breast_size": [
       {
         "id": "breasts_small",
-        "prompt": "small breasts",
-        "covered_prompt": "(small breasts under opaque clothing:1.2), compact shallow clothed bust volume, breasts completely covered"
+        "prompt": "small breasts"
       },
       {
         "id": "breasts_medium",
-        "prompt": "medium-sized breasts",
-        "covered_prompt": "(medium-sized breasts under opaque clothing:1.2), clearly defined medium projecting clothed bust, breasts completely covered"
+        "prompt": "medium-sized breasts"
       },
       {
         "id": "breasts_large",
-        "prompt": "large breasts",
-        "covered_prompt": "(large natural breasts under opaque clothing:1.35), (large projecting clothed bust:1.3), substantial wide and deep breast volume visibly shaping the garment, breasts completely covered"
+        "prompt": "large breasts"
       },
       {
         "id": "breasts_full",
-        "prompt": "full heavy breasts",
-        "covered_prompt": "(full heavy breasts under opaque clothing:1.35), (heavy projecting clothed bust:1.3), substantial rounded breast volume visibly shaping the garment, breasts completely covered"
+        "prompt": "full heavy breasts"
       },
       {
         "id": "breasts_very_small",
-        "prompt": "very small natural breasts",
-        "covered_prompt": "(very small breasts under opaque clothing:1.2), very shallow compact clothed chest contour, breasts completely covered"
+        "prompt": "very small natural breasts"
       },
       {
         "id": "breasts_small_full",
-        "prompt": "small full breasts",
-        "covered_prompt": "(small full breasts under opaque clothing:1.22), compact but rounded clothed bust volume, breasts completely covered"
+        "prompt": "small full breasts"
       },
       {
         "id": "breasts_medium_full",
-        "prompt": "full medium-sized breasts",
-        "covered_prompt": "(full medium-sized breasts under opaque clothing:1.25), rounded medium projecting clothed bust volume, breasts completely covered"
+        "prompt": "full medium-sized breasts"
       },
       {
         "id": "breasts_very_large",
-        "prompt": "very large natural breasts",
-        "covered_prompt": "(very large natural breasts under opaque clothing:1.45), (very large wide projecting clothed bust:1.4), pronounced deep breast volume visibly stretching and shaping the garment, breasts completely covered"
+        "prompt": "very large natural breasts"
       },
       {
         "id": "breasts_extremely_large",
         "prompt": "extremely large heavy natural breasts",
-        "covered_prompt": "(extremely large heavy natural breasts under opaque clothing:1.55), (enormous wide deep projecting clothed bust:1.5), unmistakably massive breast volume visibly stretching and shaping the garment, breasts completely covered",
         "weight": 0.35
       },
       {
         "id": "breasts_asymmetric_subtle",
         "prompt": "naturally full breasts with subtle realistic asymmetry",
-        "covered_prompt": "(naturally full breasts under opaque clothing:1.3), substantial projecting clothed bust with subtle realistic asymmetry, breasts completely covered",
         "weight": 0.6
       }
     ],
     "breast_shape": [
       {
         "id": "breasts_round",
-        "prompt": "round natural breast shape",
-        "covered_prompt": "rounded bust contour beneath clothing"
+        "prompt": "round natural breast shape"
       },
       {
         "id": "breasts_teardrop",
-        "prompt": "natural teardrop breast shape",
-        "covered_prompt": "natural teardrop bust contour beneath clothing"
+        "prompt": "natural teardrop breast shape"
       },
       {
         "id": "breasts_perky",
-        "prompt": "firm uplifted breast shape",
-        "covered_prompt": "firm uplifted bust contour beneath clothing"
+        "prompt": "firm uplifted breast shape"
       },
       {
         "id": "breasts_bell",
-        "prompt": "natural bell-shaped breasts",
-        "covered_prompt": "natural bell-shaped bust contour beneath clothing"
+        "prompt": "natural bell-shaped breasts"
       },
       {
         "id": "breasts_wide_set",
-        "prompt": "naturally wide-set breasts",
-        "covered_prompt": "naturally wide-set bust contour beneath clothing"
+        "prompt": "naturally wide-set breasts"
       },
       {
         "id": "breasts_close_set",
-        "prompt": "naturally close-set breasts",
-        "covered_prompt": "naturally close-set bust contour beneath clothing"
+        "prompt": "naturally close-set breasts"
       },
       {
         "id": "breasts_soft_heavy",
-        "prompt": "soft naturally hanging breast shape",
-        "covered_prompt": "soft naturally low-set bust contour beneath clothing"
+        "prompt": "soft naturally hanging breast shape"
       },
       {
         "id": "breasts_shallow",
-        "prompt": "shallow gently sloped breast shape",
-        "covered_prompt": "shallow gently sloped bust contour beneath clothing"
+        "prompt": "shallow gently sloped breast shape"
       }
     ],
     "areola_size": [
@@ -18297,6 +18279,20 @@
       ]
     }
   ],
+  "location_zones": [
+    {"id": "zone_bed_edge", "prompt": "at the edge of the bed", "match_any_tags": ["bed"], "match_id_terms": ["bed_edge"], "capabilities": ["standing", "seated", "kneeling", "supported", "closeup"], "environment_tags": ["bedroom"]},
+    {"id": "zone_bed", "prompt": "on or beside the bed", "match_any_tags": ["bed"], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["bedroom"]},
+    {"id": "zone_wall", "prompt": "beside the wall", "match_any_tags": ["wall"], "capabilities": ["standing", "supported", "closeup"], "environment_tags": ["indoor", "outdoor"]},
+    {"id": "zone_vanity", "prompt": "at the vanity or counter", "match_any_tags": ["vanity", "counter"], "capabilities": ["standing", "seated", "supported", "closeup"], "environment_tags": ["indoor"]},
+    {"id": "zone_window", "prompt": "at the window", "match_any_tags": ["window"], "capabilities": ["standing", "seated", "supported", "closeup"], "environment_tags": ["indoor"]},
+    {"id": "zone_rug", "prompt": "on the rug or floor surface", "match_any_tags": ["floor", "blanket"], "capabilities": ["standing", "seated", "reclining", "kneeling", "closeup"], "environment_tags": ["indoor", "outdoor"]},
+    {"id": "zone_sofa", "prompt": "on or beside the sofa", "match_any_tags": ["sofa", "lounger"], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["indoor", "outdoor"]},
+    {"id": "zone_chair", "prompt": "on or beside the chair", "match_any_tags": ["chair", "bench"], "capabilities": ["standing", "seated", "kneeling", "supported", "closeup"], "environment_tags": ["indoor", "outdoor"]},
+    {"id": "zone_pool_edge", "prompt": "at the pool edge", "match_any_tags": ["pool_edge"], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["pool"]},
+    {"id": "zone_bath", "prompt": "in the private bathing area", "match_any_tags": ["bathtub"], "capabilities": ["seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["bathroom"]},
+    {"id": "zone_garden_surface", "prompt": "on a private garden surface", "match_any_tags": ["garden", "nature", "tree"], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["outdoor"]},
+    {"id": "zone_general", "prompt": "within the selected private setting", "match_any_tags": [], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["indoor", "outdoor", "pool"]}
+  ],
   "interiors": [
     {
       "id": "interior_modern_bedroom",
@@ -19891,10 +19887,21 @@
     }
   ],
   "prompt_defaults": {
+    "conditioning_policy": {
+      "structural_source": "positive",
+      "negative_role": "auxiliary_optional"
+    },
     "positive_prefix": "(solo {age}:1.4), (single subject:1.4)",
     "positive_suffix": "coherent visible anatomy, realistic photography, natural skin texture, high detail",
     "negative_prompt": "extra limbs, missing limbs, fused limbs, malformed hands, extra fingers, fused fingers, malformed feet, extra toes, malformed anatomy, distorted face",
-    "covered_chest_negative": "bare breasts, exposed breasts, topless, nude, naked, missing top, absent upper garment, uncovered chest, breasts outside clothing, open clothing exposing breasts, wardrobe removal, exposed nipple skin, nipples clipping through clothing, skin-colored nipples through clothing, areola color visible through fabric, pink nipple patches on clothing, brown nipple patches on clothing, colored nipple shapes on fabric, see-through fabric over breasts, transparent chest fabric, torn chest fabric, wardrobe malfunction, multiple bras, layered bras, extra bra straps, mismatched contrasting bra straps, contrasting under-bra",
+    "negative_profiles": {
+      "covered_opaque": "bare breasts, exposed breasts, topless, nude, naked, missing top, absent upper garment, uncovered chest, breasts outside clothing, open clothing exposing breasts, wardrobe removal, exposed nipple skin, nipples clipping through clothing, skin-colored nipples through clothing, areola color visible through fabric, pink nipple patches on clothing, brown nipple patches on clothing, colored nipple shapes on fabric, see-through fabric over breasts, transparent chest fabric, torn chest fabric, wardrobe malfunction, multiple bras, layered bras, extra bra straps, mismatched contrasting bra straps, contrasting under-bra",
+      "layered_hosiery": "panties outside pantyhose, panties over tights",
+      "explicit": "covered breasts, covered genitals, censorship, mosaic, black bars, implied nudity",
+      "explicit_by_recipe": {
+        "provocative_rear": "front-facing shoulders, front-facing torso, chest facing camera, frontal breasts, simultaneous front and rear view, twisted spine, reversed torso, impossible torso rotation, disconnected waist, giant foreground buttocks, fisheye body distortion"
+      }
+    },
     "cameltoe_prompt": "clearly visible natural cameltoe contour through the tight fabric",
     "xxx_plateau_prompts": {
       "provocative_rear": "(anatomically coherent rear-facing nude pose:1.5), back, shoulders, torso, pelvis and buttocks all facing away from the camera in one consistent direction, only the head and neck may turn to look back, exposed buttocks and genitals from behind, uncensored",
@@ -19902,9 +19909,12 @@
       "panties_aside": "(explicit panties-pulled-aside view:1.5), exposed vulva between parted legs, uncensored",
       "masturbation": "(hands-only masturbation:1.5), exposed genitals, fully nude, uncensored"
     },
-    "xxx_plateau_negative_additions": {
-      "provocative_rear": "front-facing shoulders, front-facing torso, chest facing camera, frontal breasts, simultaneous front and rear view, twisted spine, reversed torso, impossible torso rotation, disconnected waist, giant foreground buttocks, fisheye body distortion"
-    },
-    "xxx_negative_additions": "covered breasts, covered genitals, censorship, mosaic, black bars, implied nudity"
+    "prompt_priority": [
+      "subject",
+      "camera_direction",
+      "anatomy",
+      "traits_garments",
+      "location_treatment"
+    ]
   }
 }

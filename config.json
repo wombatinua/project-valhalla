@@ -11,6 +11,7 @@
     "status_refresh_seconds": 10,
     "poll_interval_seconds": 1,
     "generation_timeout_seconds": 600,
+    "preview_max_edge": 512,
     "profiles": {
       "production": "ciel-bleu-zit-v2",
       "preview": "ciel-bleu-zit-v2"
