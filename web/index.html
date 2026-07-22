@@ -30,6 +30,9 @@
         <div class="status-row"><span><i class="status-dot" id="comfy-dot"></i>ComfyUI</span><strong id="comfy-status">Checking</strong></div>
         <div class="status-row workflow-status-row"><span><i class="status-dot" id="workflow-dot"></i>Workflow</span><strong id="workflow-status">Checking</strong></div>
         <div class="status-row"><span>Catalog</span><strong id="catalog-status">—</strong></div>
+        <details class="system-settings" id="system-settings">
+          <summary><span>Options</span><i aria-hidden="true">⌄</i></summary>
+          <div class="system-settings-body">
         <div class="system-theme-row">
           <span>Appearance</span>
           <div class="system-choice-control theme-control" role="group" aria-label="Appearance theme">
@@ -54,6 +57,24 @@
             <button type="button" data-accent="rose" aria-label="Rose accent" title="Rose"><i></i></button>
           </div>
         </div>
+        <div class="system-privacy-row">
+          <span>Privacy cover</span>
+          <div class="system-choice-control privacy-control" role="group" aria-label="Privacy cover shortcut">
+            <button type="button" data-privacy-shortcut="middle" aria-label="Middle click to cover, double middle click to reveal" title="Middle click to cover · Double middle click to reveal">M</button>
+            <button type="button" data-privacy-shortcut="shift-x" aria-label="Use Shift plus X" title="Shift+X">X</button>
+            <button type="button" data-privacy-shortcut="both" aria-label="Middle click to cover, double middle click to reveal, or use Shift plus X" title="Middle: click to cover, double-click to reveal · Shift+X: toggle">M+X</button>
+          </div>
+        </div>
+        <div class="system-privacy-idle-row">
+          <span>Auto cover</span>
+          <div class="system-choice-control privacy-idle-control" role="group" aria-label="Automatically cover after inactivity">
+            <button type="button" data-privacy-idle="0" aria-label="Disable automatic privacy cover" title="Auto cover off">Off</button>
+            <button type="button" data-privacy-idle-option="0" data-privacy-idle="5" aria-label="Cover after 5 minutes of inactivity" title="After 5 minutes idle">5</button>
+            <button type="button" data-privacy-idle-option="1" data-privacy-idle="15" aria-label="Cover after 15 minutes of inactivity" title="After 15 minutes idle">15</button>
+          </div>
+        </div>
+          </div>
+        </details>
       </section>
       <div class="sidebar-footer"><span>Local workspace</span><span class="version">v2.1.0</span></div>
     </aside>

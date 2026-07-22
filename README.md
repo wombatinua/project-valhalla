@@ -45,6 +45,7 @@ The UI includes:
 - a reload-safe Production Logbook with live frame counts, elapsed/estimated time, current seed, formatted positive/negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves proofs and the displayed preview intact;
 - shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
 - a persistent, virtualized output gallery with bounded DOM size, a browser-fullscreen lightbox, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
+- a persistent Privacy Cover that immediately replaces gallery thumbnails, the lightbox image, temporary previews, and Logbook prompts with neutral placeholders, closes Prompt Inspector, and masks the open lightbox filename. Its shortcut is configured in System as middle mouse button (default), `Shift+X`, or both. One middle click covers images and a double middle click within 500 ms reveals them; `Shift+X` remains a direct toggle. Optional Auto cover activates after 1, 5, or 15 minutes without mouse, pointer/touch, or keyboard activity; the browser-local preference defaults to Off. Covering clears image `src`/`srcset` attributes and rebuilds the visible gallery without image URLs so decoded resources become eligible for browser memory reclamation; exact release timing remains browser-controlled. It does not cancel renders or delete files;
 - safe or forced workflow capture from the latest successful ComfyUI run.
 
 ## Requirements
@@ -86,7 +87,7 @@ python3 app.py --no-browser
 
 ### Runtime configuration
 
-All operational settings live in root-level `config.json`, grouped into the required `server`, `comfy`, `storage`, `gallery`, and `limits` objects. Every documented key is required; profile selections may be `null`, and `storage.proofs_dir` may be an empty array. Relative paths are resolved from the project root. Restart the server after manually editing the file; this is mandatory for the listen address and also clears thumbnails created with an earlier size setting.
+All operational settings live in root-level `config.json`, grouped into the required `server`, `comfy`, `storage`, `gallery`, `interface`, and `limits` objects. Every documented key is required; profile selections may be `null`, and `storage.proofs_dir` may be an empty array. Relative paths are resolved from the project root. Restart the server after manually editing the file; this is mandatory for the listen address and also clears thumbnails created with an earlier size setting.
 
 #### Server
 
@@ -105,6 +106,7 @@ Every ComfyUI connection, workflow, and timing setting is grouped under the requ
 | `comfy.workflows_dir` | path string | `./workflows` | Directory containing named `*.workflow.json` rendering profiles. Capturing, renaming, importing, and deleting profiles operate here. |
 | `comfy.http_timeout_seconds` | number `0.1–3600` | `15` | Per-request timeout for normal ComfyUI HTTP operations such as workflow history, queue submission, polling requests, and generated-image downloads. It is not the total render timeout. |
 | `comfy.status_timeout_seconds` | number `0.1–300` | `2` | Short timeout used only by the system-status check that decides whether ComfyUI is shown as online. |
+| `comfy.status_refresh_seconds` | number `1–3600` | `10` | Interval between automatic ComfyUI/system checks while the browser tab is visible. Checks pause for hidden tabs and run immediately when the tab becomes visible again. The refresh icon still forces a manual check. |
 | `comfy.poll_interval_seconds` | number `0.05–60` | `1` | Delay between ComfyUI history checks while waiting for one render. Lower values update sooner but create more requests. |
 | `comfy.generation_timeout_seconds` | number `1–86400` | `600` | Total time allowed for one queued ComfyUI prompt to finish. Exceeding it fails that image even if individual HTTP requests have not timed out. |
 | `comfy.profiles.production` | profile ID string or `null` | project profile | Rendering profile used for full production jobs. `null` disables production rendering until a profile is selected. |
@@ -115,7 +117,7 @@ Every ComfyUI connection, workflow, and timing setting is grouped under the requ
 | Parameter | Type / range | Default | Purpose |
 |---|---:|---:|---|
 | `storage.output_dir` | path string | `./outputs` | The only directory where new production renders are saved. It is always included as a Proofs source. |
-| `storage.proofs_dir` | path string or array | `[]` | Extra read/delete sources for Proofs. They are scanned in configured order before `storage.output_dir`; duplicate resolved paths are ignored. The combined UI remains sorted by file date. Rendering never writes here. |
+| `storage.proofs_dir` | path string or array | `[]` | Extra recursively scanned read/delete sources for Proofs. They are scanned in configured order before the non-recursive `storage.output_dir`; duplicate resolved paths are ignored. If a source is an ancestor of `storage.output_dir`, the complete output subtree is excluded from that source and treated only as live output. The combined UI is sorted by filename, whose generated prefix contains the run timestamp. Rendering never writes here. |
 | `storage.output_format` | `png`, `jpeg`, or `jpg` | `png` | Format for newly saved renders. Both JPEG spellings produce files with the `.jpg` suffix. Existing PNG, JPG, and JPEG files can coexist in Proofs. |
 | `storage.jpeg_quality` | integer `1–100` | `95` | JPEG encoder quality for new JPEG outputs. It has no effect when `storage.output_format` is `png`. |
 | `storage.strip_exif` | boolean | `true` | Removes EXIF metadata from newly saved images. Before stripping, EXIF orientation is applied to the pixels so the displayed orientation remains correct. |
@@ -126,6 +128,12 @@ Every ComfyUI connection, workflow, and timing setting is grouped under the requ
 |---|---:|---:|---|
 | `gallery.thumbnail_cache_mb` | integer `0–4096` | `512` | Maximum server RAM used by the LRU cache of encoded thumbnails. Higher values reduce regeneration while revisiting large galleries. `0` disables retention without disabling thumbnails. |
 | `gallery.thumbnail_max_edge` | integer `64–4096` | `512` | Maximum width or height, in pixels, of a generated thumbnail. The aspect ratio is preserved. Larger values improve zoomed card detail but cost more CPU, RAM, network transfer, and browser decode memory. |
+
+#### Interface privacy
+
+| Parameter | Type / range | Default | Purpose |
+|---|---:|---:|---|
+| `interface.privacy.auto_cover_minutes` | two increasing integers `1–1440` | `[5, 15]` | The two inactivity intervals offered beside `Off` in System → Options → Auto cover. Changing the values changes the button labels and timers after the server is restarted and the page is reloaded. A previously selected interval that is no longer offered safely resets to `Off`. |
 
 #### Rendering and in-memory state
 
@@ -179,8 +187,8 @@ The Web UI is served from `/`. All application endpoints are under `/api`. `--ho
 | `POST` | `/api/workflow/capture` | Capture or explicitly replace a named rendering profile |
 | `POST` | `/api/workflow/profiles/select` | Select Production and Preview profiles |
 | `GET` | `/api/outputs` | List images across all configured proof directories |
-| `GET` | `/api/outputs/{filename}?source={source}` | View or download an image from its proof source |
-| `DELETE` | `/api/outputs/{filename}?source={source}` | Permanently delete one image from its proof source |
+| `GET` | `/api/outputs/{relative-path}?source={source}` | View or download an image from its proof source |
+| `DELETE` | `/api/outputs/{relative-path}?source={source}` | Permanently delete one image from its proof source |
 | `DELETE` | `/api/outputs` | Permanently delete every image across all configured proof directories |
 
 Storyboard and job state is intentionally in memory. Restarting the server clears browser-session planning state but never removes generated files.

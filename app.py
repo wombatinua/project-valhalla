@@ -8,6 +8,7 @@ import copy
 import hashlib
 import json
 import math
+import os
 import random
 import re
 import secrets
@@ -157,6 +158,25 @@ def load_config() -> tuple[dict[str, Any], Path]:
         or not 64 <= thumbnail_max_edge <= 4096
     ):
         raise AppError("config.gallery.thumbnail_max_edge must be an integer from 64 to 4096")
+    interface = config.get("interface")
+    if not isinstance(interface, dict):
+        raise AppError("config.interface must be an object")
+    privacy = interface.get("privacy")
+    if not isinstance(privacy, dict):
+        raise AppError("config.interface.privacy must be an object")
+    auto_cover_minutes = privacy.get("auto_cover_minutes")
+    if (
+        not isinstance(auto_cover_minutes, list) or len(auto_cover_minutes) != 2
+        or any(
+            not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 1440
+            for value in auto_cover_minutes
+        )
+        or auto_cover_minutes[0] >= auto_cover_minutes[1]
+    ):
+        raise AppError(
+            "config.interface.privacy.auto_cover_minutes must contain two increasing "
+            "integer minute values from 1 to 1440"
+        )
     limits = config.get("limits")
     if not isinstance(limits, dict):
         raise AppError("config.limits must be an object")
@@ -176,6 +196,7 @@ def load_config() -> tuple[dict[str, Any], Path]:
     number_ranges = {
         "http_timeout_seconds": (0.1, 3600),
         "status_timeout_seconds": (0.1, 300),
+        "status_refresh_seconds": (1, 3600),
         "poll_interval_seconds": (0.05, 60),
         "generation_timeout_seconds": (1, 86_400),
     }
@@ -2887,7 +2908,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from types import SimpleNamespace
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 try:
     from PIL import Image, ImageOps
@@ -4907,18 +4928,58 @@ def proof_directory(source: str) -> Path:
     return directory
 
 
-def output_payload(path: Path, source: str = "output") -> dict[str, Any]:
+def proof_image_path(relative_path: str, source: str = "output") -> Path:
+    if not relative_path:
+        raise AppError("Invalid proof path")
+    relative = Path(relative_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise AppError("Invalid proof path")
+    root = proof_directory(source).resolve()
+    target = (root / relative).resolve()
+    if target == root or root not in target.parents:
+        raise AppError("Invalid proof path")
+    return target
+
+
+def is_live_output_path(path: Path, output: Path | None = None) -> bool:
+    output = (output or output_directory()).resolve()
+    resolved = path.resolve()
+    return resolved == output or output in resolved.parents
+
+
+def proof_source_files(source: str, directory: Path, live_output: Path) -> Iterable[Path]:
+    if source == "output":
+        yield from directory.iterdir()
+        return
+    proof_root = directory.resolve()
+    for current, directories, filenames in os.walk(proof_root, followlinks=False):
+        current_path = Path(current)
+        directories[:] = [
+            name for name in directories
+            if proof_root in (current_path / name).resolve().parents
+            and not is_live_output_path(current_path / name, live_output)
+        ]
+        yield from (current_path / name for name in filenames)
+
+
+def output_payload(path: Path, source: str = "output", root: Path | None = None) -> dict[str, Any]:
+    root = (root or path.parent).resolve()
+    try:
+        relative_path = path.resolve().relative_to(root).as_posix()
+    except ValueError as exc:
+        raise AppError("Proof image is outside its configured directory") from exc
     match = re.search(r"_shot_(\d+)_", path.name)
     stat = path.stat()
+    encoded_path = quote(relative_path, safe="")
     return {
         "name": path.name,
+        "relative_path": relative_path,
         "source": source,
-        "key": f"{source}:{path.name}",
-        "url": f"/api/outputs/{path.name}?source={source}",
-        "thumbnail_url": f"/api/thumbnails/{path.name}?source={source}&v={stat.st_mtime_ns}",
+        "key": f"{source}:{relative_path}",
+        "url": f"/api/outputs/{encoded_path}?source={source}",
+        "thumbnail_url": f"/api/thumbnails/{encoded_path}?source={source}&v={stat.st_mtime_ns}",
         "shot": int(match.group(1)) if match else None,
         "size": stat.st_size,
-        "modified_at": datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds"),
     }
 
 
@@ -4961,17 +5022,15 @@ def _generate_thumbnail(target: Path) -> bytes:
     return body
 
 
-def output_thumbnail(name: str, source: str = "output") -> bytes:
+def output_thumbnail(relative_path: str, source: str = "output") -> bytes:
     global THUMBNAIL_CACHE_BYTES
-    if not name or Path(name).name != name:
-        raise AppError("Invalid output filename")
-    target = proof_directory(source) / name
+    target = proof_image_path(relative_path, source)
     if target.suffix.lower() not in IMAGE_SUFFIXES:
         raise AppError("Only generated image files can be viewed")
     if not target.is_file():
         raise AppError("Output not found")
     stat = target.stat()
-    key = (source, name, stat.st_mtime_ns, stat.st_size)
+    key = (source, relative_path, stat.st_mtime_ns, stat.st_size)
     with THUMBNAIL_CACHE_LOCK:
         cached = THUMBNAIL_CACHE.get(key)
         if cached is not None:
@@ -5008,30 +5067,33 @@ def output_thumbnail(name: str, source: str = "output") -> bytes:
 
 def list_output_images() -> list[dict[str, Any]]:
     paths = []
+    live_output = output_directory().resolve()
     for source, directory in proof_directories():
         if not directory.is_dir():
             continue
         source_paths = [
-            path for path in directory.iterdir()
+            path for path in proof_source_files(source, directory, live_output)
             if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+            and directory.resolve() in path.resolve().parents
         ]
-        source_paths.sort(key=lambda path: (path.stat().st_mtime, path.name))
-        paths.extend((source, path) for path in source_paths)
+        source_paths.sort(key=lambda path: (path.name, path.relative_to(directory).as_posix()))
+        paths.extend((source, directory, path) for path in source_paths)
     if GALLERY_BENCHMARK_COUNT:
         if not paths:
             raise AppError("Gallery benchmark requires at least one existing output image")
         sources = paths[-GALLERY_BENCHMARK_SOURCES:]
         outputs = []
         for index in range(GALLERY_BENCHMARK_COUNT):
-            source_id, source = sources[index % len(sources)]
-            payload = output_payload(source, source_id)
+            source_id, root, source = sources[index % len(sources)]
+            payload = output_payload(source, source_id, root)
             payload["name"] = f"benchmark_{index + 1:05d}_{source.name}"
+            payload["key"] = f"benchmark:{index + 1}"
             separator = "&" if "?" in payload["thumbnail_url"] else "?"
             payload["thumbnail_url"] += f"{separator}benchmark={index + 1}"
             payload["shot"] = index + 1
             outputs.append(payload)
         return outputs
-    return [output_payload(path, source) for source, path in paths]
+    return [output_payload(path, source, root) for source, root, path in paths]
 
 
 def ensure_outputs_idle() -> None:
@@ -5041,12 +5103,10 @@ def ensure_outputs_idle() -> None:
         raise AppError("Outputs cannot be deleted while a render job is active")
 
 
-def delete_output_image(name: str, source: str = "output") -> dict[str, Any]:
+def delete_output_image(relative_path: str, source: str = "output") -> dict[str, Any]:
     if GALLERY_BENCHMARK_COUNT:
         raise AppError("Output deletion is disabled in gallery benchmark mode")
-    if not name or Path(name).name != name:
-        raise AppError("Invalid output filename")
-    target = proof_directory(source) / name
+    target = proof_image_path(relative_path, source)
     if target.suffix.lower() not in IMAGE_SUFFIXES:
         raise AppError("Only generated image files can be deleted")
     if not target.is_file():
@@ -5059,39 +5119,48 @@ def delete_output_image(name: str, source: str = "output") -> dict[str, Any]:
             if source != "output" or job["status"] not in {"queued", "running"}:
                 continue
             run_id = job.get("_run_id")
-            published = {item["name"] for item in job.get("outputs", [])}
-            if run_id and name.startswith(f"{run_id}_") and name not in published:
+            published = {
+                item.get("relative_path", item["name"]) for item in job.get("outputs", [])
+            }
+            if (
+                run_id and relative_path.startswith(f"{run_id}_")
+                and relative_path not in published
+            ):
                 raise AppError("This frame is still being written and cannot be deleted yet")
         try:
             target.unlink()
         except OSError as exc:
             raise AppError(f"Could not delete output: {exc}") from exc
-        _thumbnail_cache_remove(name, source)
+        _thumbnail_cache_remove(relative_path, source)
         # Prevent subsequent job polling from restoring a deleted card in the UI.
         for job in WEB_STATE.jobs.values():
             if source != "output":
                 continue
             job["outputs"] = [
-                item for item in job.get("outputs", []) if item["name"] != name
+                item for item in job.get("outputs", [])
+                if item.get("relative_path", item["name"]) != relative_path
             ]
-    return {"ok": True, "deleted": name, "source": source}
+    return {"ok": True, "deleted": relative_path, "source": source}
 
 
 def delete_all_output_images() -> dict[str, Any]:
     if GALLERY_BENCHMARK_COUNT:
         raise AppError("Output deletion is disabled in gallery benchmark mode")
     ensure_outputs_idle()
+    live_output = output_directory().resolve()
     targets = [
-        (source, path)
+        (source, directory, path)
         for source, directory in proof_directories() if directory.is_dir()
-        for path in directory.iterdir()
+        for path in proof_source_files(source, directory, live_output)
         if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+        and directory.resolve() in path.resolve().parents
     ]
     deleted: list[dict[str, str]] = []
-    for source, target in targets:
+    for source, directory, target in targets:
+        relative_path = target.relative_to(directory).as_posix()
         try:
             target.unlink()
-            deleted.append({"name": target.name, "source": source})
+            deleted.append({"name": target.name, "relative_path": relative_path, "source": source})
         except OSError as exc:
             raise AppError(
                 f"Deleted {len(deleted)} images, then could not delete {target.name}: {exc}"
@@ -5108,7 +5177,12 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
     output_path = resolve_path(config_file.parent, config["storage"]["output_dir"])
     selectable = sum(1 for item in iter_content_items(db) if not item.get("disabled", False))
     comfy_config = config["comfy"]
-    comfy = {"url": comfy_config["url"], "online": False, "message": "Not checked"}
+    comfy = {
+        "url": comfy_config["url"],
+        "online": False,
+        "message": "Not checked",
+        "refresh_seconds": comfy_config["status_refresh_seconds"],
+    }
     if check_comfy:
         try:
             session, url, _ = comfy_session(db)
@@ -5134,6 +5208,11 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
         "defaults": {
             "nsfw_percent": progression.get("nsfw_final_percent", 50),
             "plateau_percent": progression.get("explicit_plateau_percent", 30),
+        },
+        "interface": {
+            "privacy": {
+                "auto_cover_minutes": config["interface"]["privacy"]["auto_cover_minutes"],
+            },
         },
     }
 
@@ -5340,12 +5419,10 @@ class ValhallaHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def serve_output(self, name: str, source: str = "output") -> None:
-        if Path(name).suffix.lower() not in IMAGE_SUFFIXES:
+    def serve_output(self, relative_path: str, source: str = "output") -> None:
+        target = proof_image_path(relative_path, source)
+        if target.suffix.lower() not in IMAGE_SUFFIXES:
             raise AppError("Only generated image files can be viewed")
-        if not name or Path(name).name != name:
-            raise AppError("Invalid output filename")
-        target = proof_directory(source) / name
         if not target.is_file():
             self.send_json({"error": "Output not found"}, HTTPStatus.NOT_FOUND)
             return

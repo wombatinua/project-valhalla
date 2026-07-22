@@ -47,6 +47,11 @@ const state = {
     ? sessionStorage.getItem('valhalla-accent') : 'lavender',
   typeSize: ['small', 'normal', 'large'].includes(sessionStorage.getItem('valhalla-type-size'))
     ? sessionStorage.getItem('valhalla-type-size') : 'normal',
+  privacyCovered: localStorage.getItem('valhalla-privacy-covered') === 'true',
+  privacyShortcut: ['middle', 'shift-x', 'both'].includes(localStorage.getItem('valhalla-privacy-shortcut'))
+    ? localStorage.getItem('valhalla-privacy-shortcut') : 'middle',
+  privacyIdleMinutes: Math.max(0, Number(localStorage.getItem('valhalla-privacy-idle-minutes')) || 0),
+  privacyIdleOptions: [5, 15],
   workflowProfiles: null,
   proofsPositions: (() => {
     try { return JSON.parse(sessionStorage.getItem('valhalla-proofs-positions') || '{}'); }
@@ -73,6 +78,140 @@ const OUTPUT_VIRTUALIZATION_THRESHOLD = 100;
 let outputLayout = null;
 let outputRenderFrame = null;
 let outputRenderSignature = '';
+let privacyMiddleClickAt = 0;
+const PRIVACY_UNLOCK_DOUBLE_CLICK_MS = 500;
+let privacyIdleTimer = null;
+let privacyLastActivityAt = Date.now();
+let statusRefreshTimer = null;
+let statusRefreshActive = false;
+let statusRefreshSeconds = 10;
+
+function syncPrivacyControls() {
+  $$('[data-privacy-shortcut]').forEach((button) => {
+    const active = button.dataset.privacyShortcut === state.privacyShortcut;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  $$('[data-privacy-idle]').forEach((button) => {
+    const active = Number(button.dataset.privacyIdle) === state.privacyIdleMinutes;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function applyPrivacyIdleOptions(values) {
+  if (!Array.isArray(values) || values.length !== 2) return;
+  state.privacyIdleOptions = values.map(Number);
+  $$('[data-privacy-idle-option]').forEach((button) => {
+    const minutes = state.privacyIdleOptions[Number(button.dataset.privacyIdleOption)];
+    button.dataset.privacyIdle = String(minutes);
+    button.textContent = String(minutes);
+    button.title = `After ${minutes} minutes idle`;
+    button.setAttribute('aria-label', `Cover after ${minutes} minutes of inactivity`);
+  });
+  if (state.privacyIdleMinutes && !state.privacyIdleOptions.includes(state.privacyIdleMinutes)) {
+    state.privacyIdleMinutes = 0;
+    localStorage.setItem('valhalla-privacy-idle-minutes', '0');
+  }
+  syncPrivacyControls();
+  schedulePrivacyIdleCover();
+}
+
+function schedulePrivacyIdleCover() {
+  clearTimeout(privacyIdleTimer);
+  privacyIdleTimer = null;
+  if (state.privacyCovered || !state.privacyIdleMinutes) return;
+  const delay = Math.max(0, state.privacyIdleMinutes * 60_000 - (Date.now() - privacyLastActivityAt));
+  privacyIdleTimer = setTimeout(() => applyPrivacyCover(true), delay);
+}
+
+function notePrivacyActivity() {
+  if (state.privacyCovered || !state.privacyIdleMinutes) return;
+  const now = Date.now();
+  if (now - privacyLastActivityAt < 1000) return;
+  privacyLastActivityAt = now;
+  schedulePrivacyIdleCover();
+}
+
+function stripImageResources() {
+  $$('img').forEach((image) => {
+    image.removeAttribute('srcset');
+    image.removeAttribute('sizes');
+    image.removeAttribute('src');
+  });
+}
+
+function applyPrivacyCover(covered, { persist = true } = {}) {
+  state.privacyCovered = Boolean(covered);
+  document.documentElement.classList.toggle('privacy-covered', state.privacyCovered);
+  if (persist) localStorage.setItem('valhalla-privacy-covered', String(state.privacyCovered));
+  if (state.privacyCovered) {
+    clearTimeout(privacyIdleTimer);
+    privacyIdleTimer = null;
+    stopSlideshow();
+    if (promptDialog.open) promptDialog.close();
+    if (imageDialog.open) $('#image-viewer-title').textContent = 'Preview';
+    stripImageResources();
+  }
+  outputRenderSignature = '';
+  renderVirtualOutputs(true);
+  if (!state.privacyCovered) {
+    privacyLastActivityAt = Date.now();
+    schedulePrivacyIdleCover();
+    if (imageDialog.open && state.outputs[state.previewIndex]) showPreview(state.previewIndex);
+    if (state.previewDisplayed && !$('#shot-preview-window').classList.contains('hidden')) {
+      $('#shot-preview-image').src = `${state.previewDisplayed.image_url}?v=${Date.now()}`;
+    }
+  }
+  syncPrivacyControls();
+}
+
+function togglePrivacyCover() {
+  applyPrivacyCover(!state.privacyCovered);
+}
+
+function usesMiddlePrivacyShortcut() {
+  return state.privacyShortcut === 'middle' || state.privacyShortcut === 'both';
+}
+
+function usesKeyboardPrivacyShortcut() {
+  return state.privacyShortcut === 'shift-x' || state.privacyShortcut === 'both';
+}
+
+window.addEventListener('pointerdown', (event) => {
+  if (event.button !== 1 || !usesMiddlePrivacyShortcut()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (!state.privacyCovered) {
+    privacyMiddleClickAt = 0;
+    applyPrivacyCover(true);
+    return;
+  }
+  const now = performance.now();
+  if (privacyMiddleClickAt && now - privacyMiddleClickAt <= PRIVACY_UNLOCK_DOUBLE_CLICK_MS) {
+    privacyMiddleClickAt = 0;
+    applyPrivacyCover(false);
+  } else {
+    privacyMiddleClickAt = now;
+  }
+}, { capture: true, passive: false });
+
+window.addEventListener('auxclick', (event) => {
+  if (event.button !== 1 || !usesMiddlePrivacyShortcut()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}, { capture: true, passive: false });
+
+window.addEventListener('keydown', (event) => {
+  if (!usesKeyboardPrivacyShortcut() || !event.shiftKey || event.code !== 'KeyX' || event.repeat) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  togglePrivacyCover();
+}, { capture: true });
+
+window.addEventListener('pointermove', notePrivacyActivity, { capture: true, passive: true });
+window.addEventListener('pointerdown', notePrivacyActivity, { capture: true, passive: true });
+window.addEventListener('keydown', notePrivacyActivity, { capture: true });
 
 const PHOTOSHOOT_FILENAME = /^(\d{8}_\d{6}_\d{6})_(?:fast_)?photoshoot_(\d+)_shot_(\d+)_/;
 const RANDOM_FILENAME = /^(\d{8}_\d{6}_\d{6})_(?:fast_)?random_shot_(\d+)_/;
@@ -109,6 +248,15 @@ function outputGroupIdentity(item) {
   return null;
 }
 
+function outputShotSequence(item) {
+  const photoshoot = item.name.match(PHOTOSHOOT_FILENAME);
+  if (photoshoot) return Number(photoshoot[3]);
+  const random = item.name.match(RANDOM_FILENAME);
+  if (random) return Number(random[2]);
+  const shot = Number(item.shot);
+  return Number.isFinite(shot) ? shot : Number.POSITIVE_INFINITY;
+}
+
 function photoshootGroups() {
   const groups = new Map();
   state.outputs.forEach((item, outputIndex) => {
@@ -118,6 +266,13 @@ function photoshootGroups() {
     groups.get(key).items.push({ item, outputIndex });
   });
   const ordered = [...groups.values()].sort((a, b) => a.firstIndex - b.firstIndex);
+  ordered.forEach((group) => {
+    group.items.sort((left, right) => {
+      return outputShotSequence(left.item) - outputShotSequence(right.item)
+        || left.item.name.localeCompare(right.item.name)
+        || outputIdentity(left.item).localeCompare(outputIdentity(right.item));
+    });
+  });
   let photoshootNumber = 0;
   let randomNumber = 0;
   ordered.forEach((group) => {
@@ -269,11 +424,16 @@ function setAccent(accent) {
 }
 
 async function refreshStatus(showToast = false) {
+  clearTimeout(statusRefreshTimer);
+  statusRefreshTimer = null;
+  if (statusRefreshActive) return;
+  statusRefreshActive = true;
   const button = $('#refresh-status');
   button.textContent = '…';
   try {
     const status = await api('/api/status');
     $('#comfy-status').textContent = status.comfy.online ? 'Online' : 'Offline';
+    statusRefreshSeconds = Number(status.comfy.refresh_seconds) || statusRefreshSeconds;
     $('#comfy-dot').className = `status-dot ${status.comfy.online ? 'online' : 'error'}`;
     const productionProfile = status.workflow.profiles.find(
       (profile) => profile.id === status.workflow.production,
@@ -286,14 +446,33 @@ async function refreshStatus(showToast = false) {
       : '';
     $('#workflow-dot').className = `status-dot ${status.workflow.ready ? 'online' : 'error'}`;
     $('#catalog-status').textContent = status.catalog_records.toLocaleString();
+    applyPrivacyIdleOptions(status.interface.privacy.auto_cover_minutes);
   } catch (error) {
     $('#comfy-status').textContent = 'Error';
     $('#comfy-dot').className = 'status-dot error';
     if (showToast) toast('Status failed', error.message, 'error');
   } finally {
+    statusRefreshActive = false;
     button.textContent = '↻';
+    scheduleStatusRefresh();
   }
 }
+
+function scheduleStatusRefresh() {
+  clearTimeout(statusRefreshTimer);
+  statusRefreshTimer = null;
+  if (document.hidden) return;
+  statusRefreshTimer = setTimeout(() => refreshStatus(), statusRefreshSeconds * 1000);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    clearTimeout(statusRefreshTimer);
+    statusRefreshTimer = null;
+  } else {
+    refreshStatus();
+  }
+});
 
 function syncForm(event) {
   const mode = form.elements.mode.value;
@@ -690,6 +869,7 @@ async function randomizeShotSeed(number, button) {
 }
 
 function openPrompt(shot) {
+  if (state.privacyCovered) return;
   state.promptShot = shot;
   state.promptTab = 'positive';
   $('#dialog-eyebrow').textContent = `Set ${shot.photoshoot_index + 1} · Shot ${shot.shot_index + 1}`;
@@ -953,7 +1133,7 @@ function addOutputs(outputs) {
       keys.add(key);
     }
   });
-  sortOutputsByDate();
+  sortOutputsByFilename();
   renderOutputs();
 }
 
@@ -961,12 +1141,9 @@ function outputIdentity(item) {
   return item.key || `${item.source || 'output'}:${item.name}`;
 }
 
-function sortOutputsByDate() {
+function sortOutputsByFilename() {
   state.outputs.sort((left, right) => {
-    const leftDate = Date.parse(left.modified_at || '') || 0;
-    const rightDate = Date.parse(right.modified_at || '') || 0;
-    return leftDate - rightDate
-      || left.name.localeCompare(right.name)
+    return left.name.localeCompare(right.name)
       || outputIdentity(left).localeCompare(outputIdentity(right));
   });
 }
@@ -1057,8 +1234,7 @@ async function deleteOutput(index) {
   if (!confirmed) return;
   try {
     const key = outputIdentity(item);
-    const source = encodeURIComponent(item.source || 'output');
-    await api(`/api/outputs/${encodeURIComponent(item.name)}?source=${source}`, { method: 'DELETE' });
+    await api(item.url, { method: 'DELETE' });
     state.deletedOutputs.add(key);
     state.outputs = state.outputs.filter((output) => outputIdentity(output) !== key);
     renderOutputs();
@@ -1104,7 +1280,7 @@ async function loadOutputs() {
   try {
     const result = await api('/api/outputs');
     state.outputs = result.outputs || [];
-    sortOutputsByDate();
+    sortOutputsByFilename();
     state.galleryBenchmark = Boolean(result.benchmark);
   } catch (error) {
     toast('Could not load proofs', error.message, 'error');
@@ -1196,9 +1372,12 @@ function outputEntryCount() {
 
 function outputCardHtml(item, index, layout) {
   const shotLabel = item.shot == null ? 'Output' : `Shot ${item.shot}`;
+  const visual = state.privacyCovered
+    ? '<div class="privacy-placeholder" aria-label="Image hidden by privacy cover"></div>'
+    : `<img src="${encodeURI(item.thumbnail_url || item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy" decoding="async">`;
   return `<article class="output-card" data-output-index="${index}" tabindex="0" role="button"
     aria-label="Maximize ${escapeHtml(shotLabel)}" aria-posinset="${index + 1}" aria-setsize="${state.outputs.length}">
-    <img src="${encodeURI(item.thumbnail_url || item.url)}" alt="Generated ${escapeHtml(shotLabel)}" loading="lazy" decoding="async">
+    ${visual}
     <footer><span>${escapeHtml(shotLabel)}</span><span class="output-actions">${state.galleryBenchmark ? '' : `<button class="output-delete" data-action="delete-output" aria-label="Delete ${escapeHtml(item.name)}">Delete</button>`}<a href="${encodeURI(item.url)}" download="${escapeHtml(item.name)}">Download</a></span></footer>
   </article>`;
 }
@@ -1212,9 +1391,12 @@ function photoshootCardHtml(group, index) {
       : (group.identity?.kind === 'legacy' ? 'Render run' : 'Ungrouped'));
   const run = group.identity ? formatOutputRun(group.identity.run) : 'Files without photoshoot naming';
   const runTitle = group.identity ? `Render ID: ${group.identity.run}` : '';
+  const visual = state.privacyCovered
+    ? '<div class="privacy-placeholder" aria-label="Image hidden by privacy cover"></div>'
+    : `<img src="${encodeURI(representative.thumbnail_url || representative.url)}" alt="${escapeHtml(title)} representative frame" loading="lazy" decoding="async">`;
   return `<article class="output-card photoshoot-card" data-group-key="${escapeHtml(group.key)}" data-group-index="${index}" tabindex="0" role="button"
     aria-label="Open ${escapeHtml(title)}, ${group.items.length} images">
-    <img src="${encodeURI(representative.thumbnail_url || representative.url)}" alt="${escapeHtml(title)} representative frame" loading="lazy" decoding="async">
+    ${visual}
     <footer><span title="${escapeHtml(runTitle)}"><strong>${escapeHtml(title)}</strong><br>${escapeHtml(run)}</span><span class="photoshoot-count">${group.items.length}</span></footer>
   </article>`;
 }
@@ -1392,9 +1574,10 @@ function showPreview(index) {
   const item = state.outputs[state.previewIndex];
   resetPreviewPan();
   const image = $('#image-viewer-image');
-  image.src = item.url;
+  if (state.privacyCovered) image.removeAttribute('src');
+  else image.src = item.url;
   image.alt = `Maximized generated output from shot ${item.shot}`;
-  $('#image-viewer-title').textContent = item.name;
+  $('#image-viewer-title').textContent = state.privacyCovered ? 'Preview' : item.name;
   $('#image-viewer-count').textContent = `${position + 1} of ${scope.length}`;
   const download = $('#image-viewer-download');
   download.href = item.url;
@@ -1949,7 +2132,8 @@ async function openShotPreview(preview) {
   const previous = state.previewDisplayed;
   state.previewDisplayed = preview;
   $('#shot-preview-title').textContent = `Shot ${preview.shot} preview`;
-  $('#shot-preview-image').src = `${preview.image_url}?v=${Date.now()}`;
+  if (state.privacyCovered) $('#shot-preview-image').removeAttribute('src');
+  else $('#shot-preview-image').src = `${preview.image_url}?v=${Date.now()}`;
   windowElement.classList.remove('hidden');
   const rect = windowElement.getBoundingClientRect();
   windowElement.style.left = `${rect.left}px`;
@@ -2201,6 +2385,18 @@ form.addEventListener('input', scheduleSeedResolve);
 $$('[data-theme-choice]').forEach((button) => button.addEventListener('click', () => setTheme(button.dataset.themeChoice)));
 $$('[data-type-size]').forEach((button) => button.addEventListener('click', () => setTypeSize(button.dataset.typeSize)));
 $$('[data-accent]').forEach((button) => button.addEventListener('click', () => setAccent(button.dataset.accent)));
+$$('[data-privacy-shortcut]').forEach((button) => button.addEventListener('click', () => {
+  state.privacyShortcut = button.dataset.privacyShortcut;
+  localStorage.setItem('valhalla-privacy-shortcut', state.privacyShortcut);
+  syncPrivacyControls();
+}));
+$$('[data-privacy-idle]').forEach((button) => button.addEventListener('click', () => {
+  state.privacyIdleMinutes = Number(button.dataset.privacyIdle);
+  localStorage.setItem('valhalla-privacy-idle-minutes', String(state.privacyIdleMinutes));
+  privacyLastActivityAt = Date.now();
+  schedulePrivacyIdleCover();
+  syncPrivacyControls();
+}));
 $('#refresh-status').addEventListener('click', () => refreshStatus(true));
 $('#reset-config').addEventListener('click', () => {
   form.reset();
@@ -2436,7 +2632,7 @@ $('#logger-view').addEventListener('click', async (event) => {
   }
   const button = event.target.closest('[data-copy-log]');
   const prompt = displayedLoggerPrompt();
-  if (!button || !prompt) return;
+  if (!button || !prompt || state.privacyCovered) return;
   const key = button.dataset.copyLog;
   try {
     await navigator.clipboard.writeText(prompt[key] || '');
@@ -2470,6 +2666,9 @@ $('#clear-logger').addEventListener('click', async () => {
 applyTheme();
 applyTypeSize();
 applyAccent();
+document.documentElement.classList.toggle('privacy-covered', state.privacyCovered);
+syncPrivacyControls();
+schedulePrivacyIdleCover();
 syncForm();
 syncPendingState();
 syncRenderControls();

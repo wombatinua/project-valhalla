@@ -1231,7 +1231,7 @@ class OutputDeletionRegressionTests(unittest.TestCase):
             for name in ("first.png", "second.jpg", "third.jpeg"):
                 (output_dir / name).write_bytes(name.encode())
             (output_dir / "ignore.txt").write_text("not an image", encoding="utf-8")
-            with patch.object(app, "output_directory", return_value=output_dir):
+            with patch.object(app, "proof_directories", return_value=[("output", output_dir)]):
                 outputs = app.list_output_images()
             self.assertEqual({item["name"] for item in outputs}, {
                 "first.png", "second.jpg", "third.jpeg",
@@ -1245,7 +1245,13 @@ class OutputDeletionRegressionTests(unittest.TestCase):
             output_dir.mkdir()
             archive_dir.mkdir()
             (output_dir / "same.png").write_bytes(b"current")
+            output_nested = output_dir / "not-scanned"
+            output_nested.mkdir()
+            (output_nested / "hidden.png").write_bytes(b"live nested")
             (archive_dir / "same.png").write_bytes(b"archived")
+            nested_dir = archive_dir / "older" / "session"
+            nested_dir.mkdir(parents=True)
+            (nested_dir / "same.png").write_bytes(b"nested archived")
             config, _ = app.load_config()
             config["storage"].update(
                 output_dir=str(output_dir), proofs_dir=[str(archive_dir)]
@@ -1257,19 +1263,37 @@ class OutputDeletionRegressionTests(unittest.TestCase):
                 outputs = app.list_output_images()
                 self.assertEqual(
                     {item["key"] for item in outputs},
-                    {"output:same.png", "proof-1:same.png"},
+                    {
+                        "output:same.png", "proof-1:same.png",
+                        "proof-1:older/session/same.png",
+                    },
                 )
                 self.assertEqual(
                     {item["source"] for item in outputs}, {"output", "proof-1"}
                 )
                 self.assertEqual(
-                    [item["source"] for item in outputs], ["proof-1", "output"]
+                    [item["source"] for item in outputs],
+                    ["proof-1", "proof-1", "output"],
                 )
-                result = app.delete_output_image("same.png", "proof-1")
+                self.assertNotIn("output:not-scanned/hidden.png", {
+                    item["key"] for item in outputs
+                })
+                nested = next(
+                    item for item in outputs
+                    if item["key"] == "proof-1:older/session/same.png"
+                )
+                self.assertIn("older%2Fsession%2Fsame.png", nested["url"])
+                result = app.delete_output_image(nested["relative_path"], "proof-1")
+                outside = root / "outside.png"
+                outside.write_bytes(b"outside")
+                with self.assertRaisesRegex(app.AppError, "Invalid proof path"):
+                    app.delete_output_image("../outside.png", "proof-1")
+                self.assertTrue(outside.is_file())
 
             self.assertEqual(result["source"], "proof-1")
             self.assertTrue((output_dir / "same.png").is_file())
-            self.assertFalse((archive_dir / "same.png").exists())
+            self.assertTrue((archive_dir / "same.png").is_file())
+            self.assertFalse((nested_dir / "same.png").exists())
 
     def test_proofs_dir_accepts_one_directory_string(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1290,6 +1314,39 @@ class OutputDeletionRegressionTests(unittest.TestCase):
                 outputs = app.list_output_images()
 
             self.assertEqual([item["key"] for item in outputs], ["proof-1:archived.jpg"])
+
+    def test_parent_proof_source_excludes_nested_live_output_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proof_root = root / "proofs"
+            output_dir = proof_root / "live"
+            archive_dir = proof_root / "archive"
+            output_dir.mkdir(parents=True)
+            archive_dir.mkdir()
+            (output_dir / "same.png").write_bytes(b"live")
+            (output_dir / "nested").mkdir()
+            (output_dir / "nested" / "hidden.png").write_bytes(b"live nested")
+            (archive_dir / "same.png").write_bytes(b"archive")
+            config, _ = app.load_config()
+            config["storage"].update(
+                output_dir=str(output_dir),
+                proofs_dir=[str(proof_root), str(output_dir)],
+            )
+            config_file = root / "config.json"
+            config_file.write_text(app.json.dumps(config), encoding="utf-8")
+
+            with patch.object(app, "config_path", return_value=config_file):
+                outputs = app.list_output_images()
+                self.assertEqual(
+                    [item["key"] for item in outputs],
+                    ["proof-1:archive/same.png", "output:same.png"],
+                )
+                result = app.delete_all_output_images()
+
+            self.assertEqual(result["deleted"], 2)
+            self.assertFalse((output_dir / "same.png").exists())
+            self.assertTrue((output_dir / "nested" / "hidden.png").is_file())
+            self.assertFalse((archive_dir / "same.png").exists())
 
     def test_output_encoder_creates_jpeg_and_strips_exif(self):
         source = app.Image.new("RGB", (12, 8), "#7357d8")
@@ -1327,7 +1384,7 @@ class OutputDeletionRegressionTests(unittest.TestCase):
             first.write_bytes(b"first")
             second.write_bytes(b"second")
             with (
-                patch.object(app, "output_directory", return_value=output_dir),
+                patch.object(app, "proof_directories", return_value=[("output", output_dir)]),
                 patch.object(app, "GALLERY_BENCHMARK_COUNT", 2000),
                 patch.object(app, "GALLERY_BENCHMARK_SOURCES", 10),
             ):
@@ -1352,6 +1409,7 @@ class OutputDeletionRegressionTests(unittest.TestCase):
             target.write_bytes(b"image")
             payload = app.output_payload(target)
         self.assertEqual(payload["key"], "output:result.png")
+        self.assertNotIn("modified_at", payload)
         self.assertEqual(payload["url"], "/api/outputs/result.png?source=output")
         self.assertRegex(
             payload["thumbnail_url"],
@@ -1584,6 +1642,15 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("queuedJob.queue_position", js)
         self.assertIn("session.active_job.id !== job.id", js)
 
+    def test_system_status_refreshes_while_the_browser_is_active(self):
+        js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("function scheduleStatusRefresh()", js)
+        self.assertIn("statusRefreshSeconds * 1000", js)
+        self.assertIn("if (document.hidden) return", js)
+        self.assertIn("document.addEventListener('visibilitychange'", js)
+        self.assertIn("statusRefreshActive", js)
+        self.assertIn("status.comfy.refresh_seconds", js)
+
     def test_logger_timeline_can_inspect_historical_shot_prompts(self):
         root = Path(app.__file__).parent
         html = (root / "web" / "index.html").read_text(encoding="utf-8")
@@ -1645,6 +1712,48 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("item.thumbnail_url || item.url", js)
         self.assertIn('loading="lazy" decoding="async"', js)
 
+    def test_privacy_cover_is_persistent_high_priority_and_releases_image_sources(self):
+        root = Path(app.__file__).parent
+        html = (root / "web" / "index.html").read_text(encoding="utf-8")
+        js = (root / "web" / "app.js").read_text(encoding="utf-8")
+        css = (root / "web" / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('data-privacy-shortcut="middle"', html)
+        self.assertIn('<summary><span>Options</span>', html)
+        self.assertIn('data-privacy-shortcut="shift-x"', html)
+        self.assertIn('data-privacy-shortcut="both"', html)
+        self.assertIn('Double middle click to reveal', html)
+        for idle in ("0", "5", "15"):
+            self.assertIn(f'data-privacy-idle="{idle}"', html)
+        self.assertEqual(html.count('data-privacy-idle-option="'), 2)
+        self.assertIn("localStorage.getItem('valhalla-privacy-covered')", js)
+        self.assertIn("localStorage.setItem('valhalla-privacy-covered'", js)
+        self.assertIn("image.removeAttribute('srcset')", js)
+        self.assertIn("image.removeAttribute('src')", js)
+        self.assertIn("stopSlideshow();", js)
+        self.assertIn("event.stopImmediatePropagation();", js)
+        self.assertIn("{ capture: true, passive: false }", js)
+        self.assertIn("const PRIVACY_UNLOCK_DOUBLE_CLICK_MS = 500", js)
+        self.assertIn("now - privacyMiddleClickAt <= PRIVACY_UNLOCK_DOUBLE_CLICK_MS", js)
+        self.assertIn("applyPrivacyCover(true)", js)
+        self.assertIn("applyPrivacyCover(false)", js)
+        self.assertIn("localStorage.getItem('valhalla-privacy-idle-minutes')", js)
+        self.assertIn("function schedulePrivacyIdleCover()", js)
+        self.assertIn("window.addEventListener('pointermove', notePrivacyActivity", js)
+        self.assertIn("if (promptDialog.open) promptDialog.close()", js)
+        self.assertIn("$('#image-viewer-title').textContent = 'Preview'", js)
+        self.assertIn("state.privacyCovered ? 'Preview' : item.name", js)
+        self.assertIn("state.privacyCovered", js)
+        self.assertIn(".privacy-covered img", css)
+        self.assertIn(".privacy-placeholder", css)
+        self.assertIn(".privacy-covered .privacy-control", css)
+        self.assertIn(".privacy-covered .system-settings > summary", css)
+        self.assertIn(".privacy-covered .logger-prompt pre", css)
+        self.assertIn(".privacy-covered .logger-prompt::after", css)
+        self.assertIn("!button || !prompt || state.privacyCovered", js)
+        self.assertGreaterEqual(css.count('content: "⊝"'), 3)
+        self.assertNotIn('content: "Image covered"', css)
+
     def test_lightbox_fit_is_enabled_by_default_for_new_sessions(self):
         js = (Path(app.__file__).parent / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("sessionStorage.getItem('valhalla-preview-fit') !== 'false'", js)
@@ -1688,6 +1797,10 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("function formatOutputRun(run)", js)
         self.assertIn("Render ID: ${group.identity.run}", js)
         self.assertIn("function photoshootGroups()", js)
+        self.assertIn("function outputShotSequence(item)", js)
+        self.assertIn("outputShotSequence(left.item) - outputShotSequence(right.item)", js)
+        self.assertIn("function sortOutputsByFilename()", js)
+        self.assertNotIn("modified_at", js)
         self.assertIn("function openPhotoshoot(key)", js)
         self.assertIn("sessionStorage.setItem('valhalla-gallery-view', next)", js)
         self.assertIn("state.flatScrollY = window.scrollY", js)
@@ -1735,13 +1848,14 @@ class FrontendContractTests(unittest.TestCase):
         css = (root / "web" / "styles.css").read_text(encoding="utf-8")
         for accent in ("lavender", "azure", "rose"):
             self.assertIn(f'data-accent="{accent}"', html)
-        self.assertEqual(html.count('system-choice-control'), 3)
+        self.assertEqual(html.count('system-choice-control'), 5)
         for theme in ("system", "light", "dark"):
             self.assertIn(f'data-theme-choice="{theme}"', html)
         self.assertIn("sessionStorage.setItem('valhalla-accent', accent)", js)
         self.assertIn("sessionStorage.setItem('valhalla-theme', state.theme)", js)
         self.assertIn("function applyAccent()", js)
         self.assertIn(".system-choice-control button.active", css)
+        self.assertIn(".system-choice-control:not(.accent-control) button.active", css)
         self.assertIn(':root[data-accent="azure"]', css)
         self.assertIn(':root[data-accent="rose"]', css)
         for semantic in ("success", "warning", "danger"):
@@ -2106,7 +2220,7 @@ class WorkflowProfileTests(unittest.TestCase):
     def test_operational_settings_live_only_in_root_config(self):
         config, _ = app.load_config()
         database, _ = app.load_database()
-        self.assertEqual(set(config), {"server", "comfy", "storage", "gallery", "limits"})
+        self.assertEqual(set(config), {"server", "comfy", "storage", "gallery", "interface", "limits"})
         self.assertEqual(set(config["server"]), {"host", "port"})
         self.assertEqual(
             set(config["storage"]),
@@ -2115,12 +2229,16 @@ class WorkflowProfileTests(unittest.TestCase):
         self.assertEqual(
             set(config["gallery"]), {"thumbnail_cache_mb", "thumbnail_max_edge"}
         )
+        self.assertEqual(set(config["interface"]), {"privacy"})
+        self.assertEqual(
+            set(config["interface"]["privacy"]), {"auto_cover_minutes"}
+        )
         limit_settings = {"max_scene_attempts", "max_storyboards", "max_jobs", "max_previews"}
         self.assertEqual(set(config["limits"]), limit_settings)
         self.assertTrue(limit_settings.isdisjoint(database["settings"]))
         comfy_operational = {
             "url", "workflows_dir", "http_timeout_seconds",
-            "status_timeout_seconds", "poll_interval_seconds",
+            "status_timeout_seconds", "status_refresh_seconds", "poll_interval_seconds",
             "generation_timeout_seconds", "profiles",
         }
         self.assertTrue(comfy_operational.issubset(config["comfy"]))
@@ -2175,6 +2293,7 @@ class WorkflowProfileTests(unittest.TestCase):
                     "workflows_dir": "./profiles",
                     "http_timeout_seconds": 15,
                     "status_timeout_seconds": 2,
+                    "status_refresh_seconds": 10,
                     "poll_interval_seconds": 1,
                     "generation_timeout_seconds": 600,
                     "profiles": {"production": None, "preview": None},
@@ -2184,6 +2303,7 @@ class WorkflowProfileTests(unittest.TestCase):
                     "output_format": "png", "jpeg_quality": 95, "strip_exif": True,
                 },
                 "gallery": {"thumbnail_cache_mb": 512, "thumbnail_max_edge": 512},
+                "interface": {"privacy": {"auto_cover_minutes": [5, 15]}},
                 "limits": {
                     "max_scene_attempts": 100, "max_storyboards": 20,
                     "max_jobs": 40, "max_previews": 8,

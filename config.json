@@ -8,6 +8,7 @@
     "workflows_dir": "./workflows",
     "http_timeout_seconds": 15,
     "status_timeout_seconds": 2,
+    "status_refresh_seconds": 10,
     "poll_interval_seconds": 1,
     "generation_timeout_seconds": 600,
     "profiles": {
@@ -25,6 +26,11 @@
   "gallery": {
     "thumbnail_cache_mb": 512,
     "thumbnail_max_edge": 512
+  },
+  "interface": {
+    "privacy": {
+      "auto_cover_minutes": [5, 15]
+    }
   },
   "limits": {
     "max_scene_attempts": 100,
