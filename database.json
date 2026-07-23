@@ -6,153 +6,56 @@
         "ethnic_appearance": [
           "appearance_slavic"
         ],
-        "skin_tone": [
-          "skin_fair",
-          "skin_porcelain",
-          "skin_light_warm"
-        ],
-        "face_shape": [
-          "face_oval",
-          "face_heart",
-          "face_round",
-          "face_square_soft"
-        ],
-        "eye_shape": [
-          "eyes_almond",
-          "eyes_round",
-          "eyes_hooded",
-          "eyes_deep_set"
-        ],
-        "eye_color": [
-          "eyes_brown",
-          "eyes_blue",
-          "eyes_green",
-          "eyes_hazel",
-          "eyes_gray",
-          "eyes_dark_brown",
-          "eyes_aqua",
-          "eyes_violet"
-        ],
-        "eyebrows": [
-          "brows_soft_arch",
-          "brows_defined",
-          "brows_straight"
-        ],
-        "nose": [
-          "nose_straight",
-          "nose_delicate",
-          "nose_button",
-          "nose_aquiline"
-        ],
-        "lips": [
-          "lips_bow",
-          "lips_soft",
-          "lips_delicate"
-        ],
-        "cheekbones": [
-          "cheekbones_high",
-          "cheekbones_soft",
-          "cheekbones_prominent",
-          "cheeks_full"
-        ],
-        "jawline": [
-          "jaw_delicate",
-          "jaw_defined",
-          "jaw_tapered",
-          "jaw_strong"
-        ],
-        "hair_texture": [
-          "hair_texture_straight",
-          "hair_texture_wavy",
-          "hair_texture_silky",
-          "hair_texture_beach_waves"
-        ],
-        "hair_length": [
-          "hair_length_shoulder",
-          "hair_length_long",
-          "hair_length_very_long"
-        ],
-        "hair_style": [
-          "hair_style_loose",
-          "hair_style_ponytail",
-          "hair_style_lob",
-          "hair_style_messy_bun",
-          "hair_style_low_bun",
-          "hair_style_braid"
-        ],
+        "skin_tone": [],
+        "face_shape": [],
+        "eye_shape": [],
+        "eye_color": [],
+        "eyebrows": [],
+        "nose": [],
+        "lips": [],
+        "cheekbones": [],
+        "jawline": [],
+        "hair_texture": [],
+        "hair_length": [],
+        "hair_style": [],
         "hair_color": [
+          "hair_black",
           "hair_brown",
           "hair_blonde",
-          "hair_dark_brown"
+          "hair_auburn",
+          "hair_platinum",
+          "hair_dark_brown",
+          "hair_chestnut",
+          "hair_copper",
+          "hair_strawberry_blonde",
+          "hair_ash_blonde",
+          "hair_blue_black"
         ],
-        "makeup": [
-          "makeup_no_makeup",
-          "makeup_natural"
-        ],
+        "makeup": [],
         "manicure": [
-          "manicure_none",
-          "manicure_nude"
+          "manicure_none"
         ],
-        "height": [
-          "height_petite",
-          "height_average"
-        ],
-        "body_frame": [
-          "body_slender",
-          "body_petite",
-          "body_lithe"
-        ],
-        "body_state": [
-          "body_state_none"
-        ],
-        "waist": [
-          "waist_tiny",
-          "waist_slender"
-        ],
-        "hips": [
-          "hips_petite",
-          "hips_narrow"
-        ],
+        "height": [],
+        "body_frame": [],
+        "body_state": [],
+        "waist": [],
+        "hips": [],
         "breast_size": [
           "breasts_very_small",
-          "breasts_small"
+          "breasts_small",
+          "breasts_small_full"
         ],
-        "breast_shape": [
-          "breasts_round",
-          "breasts_teardrop"
-        ],
-        "areola_size": [
-          "areola_very_small",
-          "areola_small"
-        ],
-        "areola_color": [
-          "areola_rose",
-          "areola_pale_pink",
-          "areola_peach"
-        ],
-        "nipple_size": [
-          "nipples_tiny",
-          "nipples_small"
-        ],
-        "nipple_shape": [
-          "nipples_soft",
-          "nipples_flat"
-        ],
+        "breast_shape": [],
+        "areola_size": [],
+        "areola_color": [],
+        "nipple_size": [],
+        "nipple_shape": [],
         "pubic_hair": [
           "pubic_shaved",
-          "pubic_very_short",
-          "pubic_natural"
+          "pubic_full_natural"
         ],
-        "genital_appearance": [
-          "genitals_small_delicate",
-          "genitals_subtle",
-          "genitals_compact"
-        ],
-        "facial_accents": [
-          "accent_freckles",
-          "accent_beauty_mark",
-          "accent_dimples"
-        ]
+        "genital_appearance": [],
+        "facial_accents": []
       }
     },
     "scene_defaults": {
@@ -544,6 +447,7 @@
         "id": "face_sculpted",
         "prompt": "elegantly sculpted face",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_european",
           "heritage_african",
           "heritage_mediterranean",
@@ -567,6 +471,7 @@
         "id": "face_diamond",
         "prompt": "refined diamond-shaped face",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_african",
           "heritage_south_asian",
           "heritage_mediterranean",
@@ -579,6 +484,7 @@
         "id": "face_oblong",
         "prompt": "graceful oblong face",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_european",
           "heritage_south_asian",
           "heritage_african",
@@ -624,6 +530,7 @@
         "id": "eyes_upturned",
         "prompt": "elegant upturned eyes",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_east_asian",
           "heritage_latina",
           "heritage_southeast_asian",
@@ -647,6 +554,7 @@
         "id": "eyes_catlike",
         "prompt": "striking catlike eyes",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_european",
           "heritage_east_asian",
           "heritage_south_asian",
@@ -661,6 +569,7 @@
         "id": "eyes_wide_set",
         "prompt": "beautiful wide-set eyes",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_european",
           "heritage_south_asian",
           "heritage_african",
@@ -725,6 +634,7 @@
         "id": "eyes_amber",
         "prompt": "luminous amber eyes",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_african",
           "heritage_south_asian",
           "heritage_mediterranean",
@@ -780,6 +690,7 @@
         "id": "brows_full",
         "prompt": "full natural eyebrows",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_south_asian",
           "heritage_african",
           "heritage_mediterranean",
@@ -792,6 +703,7 @@
         "id": "brows_high_arch",
         "prompt": "dramatically arched eyebrows",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_european",
           "heritage_african",
           "heritage_mediterranean",
@@ -831,6 +743,7 @@
         "id": "nose_broad_refined",
         "prompt": "beautifully proportioned broad nose",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_african",
           "heritage_south_asian",
           "heritage_latina",
@@ -844,6 +757,7 @@
         "id": "lips_full",
         "prompt": "full shapely lips",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_african",
           "heritage_south_asian",
           "heritage_mediterranean",
@@ -874,6 +788,7 @@
         "id": "lips_plush",
         "prompt": "plush sensual lips",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_african",
           "heritage_south_asian",
           "heritage_mediterranean",
@@ -887,6 +802,7 @@
         "id": "lips_wide",
         "prompt": "wide expressive mouth with shapely lips",
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_african",
           "heritage_south_asian",
           "heritage_latina",
@@ -1028,6 +944,7 @@
           "curly_hair"
         ],
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_european",
           "heritage_south_asian",
           "heritage_african",
@@ -1044,6 +961,7 @@
           "coily_hair"
         ],
         "requires_any_tags": [
+          "heritage_slavic",
           "heritage_african",
           "heritage_latina",
           "heritage_mixed"

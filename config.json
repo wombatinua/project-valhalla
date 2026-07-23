@@ -12,7 +12,7 @@
     "poll_interval_seconds": 1,
     "generation_timeout_seconds": 600,
     "preview_max_edge": 512,
-    "workflow_source": "live",
+    "workflow_source": "profiles",
     "profiles": {
       "production": "cielbleu-v2-innie-detailslider",
       "preview": "cielbleu-v2-innie-detailslider"

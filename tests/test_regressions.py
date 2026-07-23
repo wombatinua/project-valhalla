@@ -55,6 +55,54 @@ class StudioGenerationLimitTests(unittest.TestCase):
 
 
 class CatalogQualityTests(unittest.TestCase):
+    def test_slavic_human_defaults_are_universal_except_explicit_constraints(self):
+        database, _ = app.load_database()
+        pools = database["settings"]["human_defaults"]["pools"]
+        self.assertEqual(pools["ethnic_appearance"], ["appearance_slavic"])
+        self.assertEqual(
+            set(pools["breast_size"]),
+            {"breasts_very_small", "breasts_small", "breasts_small_full"},
+        )
+        self.assertEqual(pools["manicure"], ["manicure_none"])
+        self.assertEqual(
+            set(pools["pubic_hair"]), {"pubic_shaved", "pubic_full_natural"}
+        )
+        self.assertEqual(
+            set(pools["hair_color"]),
+            {
+                "hair_black", "hair_brown", "hair_blonde", "hair_auburn",
+                "hair_platinum", "hair_dark_brown", "hair_chestnut",
+                "hair_copper", "hair_strawberry_blonde", "hair_ash_blonde",
+                "hair_blue_black",
+            },
+        )
+        constrained = {
+            "ethnic_appearance", "hair_color", "manicure", "breast_size",
+            "pubic_hair",
+        }
+        self.assertTrue(all(not values for key, values in pools.items() if key not in constrained))
+
+        slavic = next(
+            item for item in database["human_model_parts"]["ethnic_appearance"]
+            if item["id"] == "appearance_slavic"
+        )
+        for category in (
+            "face_shape", "eye_shape", "eye_color", "eyebrows", "nose",
+            "lips", "hair_texture",
+        ):
+            self.assertTrue(all(
+                app.compatible_with_requirements(item, app.tags(slavic))
+                for item in database["human_model_parts"][category]
+                if not item.get("disabled", False)
+            ), category)
+
+        observed_lengths = {
+            app.Composer(database, app.random.Random(seed)).choose_human()["hair_length"]["id"]
+            for seed in range(250)
+        }
+        self.assertIn("hair_length_short", observed_lengths)
+        self.assertIn("hair_length_chin", observed_lengths)
+
     def test_classical_ballet_is_a_reachable_complete_luxury_outfit(self):
         database, _ = app.load_database()
         template = next(
