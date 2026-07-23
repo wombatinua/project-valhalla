@@ -2829,15 +2829,6 @@ def patch_workflow(workflow: dict[str, Any], mapping: dict[str, Any], positive: 
             raise AppError(f"Workflow no longer matches inference seed mapping: missing {exc}") from exc
 
 
-def lora_bypass_link(node: dict[str, Any], output_index: int) -> list[Any] | None:
-    preferred = ("model", "model1", "base_model") if output_index == 0 else ("clip", "clip1")
-    for input_name in preferred:
-        value = node.get("inputs", {}).get(input_name)
-        if isinstance(value, list) and len(value) == 2:
-            return value
-    return None
-
-
 def preview_dimensions(width: int, height: int, max_edge: int) -> tuple[int, int]:
     """Scale down without changing orientation, using latent-safe multiples of 64."""
     scale = min(1.0, max_edge / max(width, height))
@@ -2883,27 +2874,6 @@ def prepare_fast_workflow(
             raise AppError(
                 f"Detected fast workflow target is no longer valid: {exc}"
             ) from exc
-
-    # Disconnect LoRA nodes from every live model/CLIP chain before pruning.
-    while True:
-        changed = False
-        for node in workflow.values():
-            for input_name, value in list(node.get("inputs", {}).items()):
-                if not (isinstance(value, list) and len(value) == 2):
-                    continue
-                source_node = workflow.get(str(value[0]))
-                if not source_node or "lora" not in str(source_node.get("class_type", "")).lower():
-                    continue
-                replacement = lora_bypass_link(source_node, int(value[1]))
-                if replacement is None:
-                    raise AppError(
-                        f"Cannot bypass LoRA node {value[0]} output {value[1]}; "
-                        "use production mode or recapture a supported workflow"
-                    )
-                node["inputs"][input_name] = replacement
-                changed = True
-        if not changed:
-            break
 
     required: set[str] = set()
     pending = list(output_nodes)

@@ -2668,6 +2668,42 @@ class WorkflowProfileTests(unittest.TestCase):
         )
         self.assertEqual(app.preview_dimensions(896, 1152, 512), (384, 512))
 
+    def test_preview_retains_lora_model_and_clip_design(self):
+        workflow = {
+            "checkpoint": {"class_type": "CheckpointLoaderSimple", "inputs": {
+                "ckpt_name": "base.safetensors",
+            }},
+            "lora": {"class_type": "LoraLoader", "inputs": {
+                "model": ["checkpoint", 0], "clip": ["checkpoint", 1],
+                "lora_name": "art-direction.safetensors",
+                "strength_model": 0.8, "strength_clip": 0.6,
+            }},
+            "positive": {"class_type": "CLIPTextEncode", "inputs": {
+                "text": "prompt", "clip": ["lora", 1],
+            }},
+            "latent": {"class_type": "EmptyLatentImage", "inputs": {
+                "width": 1024, "height": 1024,
+            }},
+            "sampler": {"class_type": "KSampler", "inputs": {
+                "model": ["lora", 0], "positive": ["positive", 0],
+                "latent_image": ["latent", 0], "seed": 1,
+            }},
+            "decode": {"class_type": "VAEDecode", "inputs": {
+                "samples": ["sampler", 0], "vae": ["checkpoint", 2],
+            }},
+            "save": {"class_type": "SaveImage", "inputs": {"images": ["decode", 0]}},
+            "detailer": {"class_type": "FaceDetailer", "inputs": {
+                "model": ["lora", 0], "image": ["decode", 0], "seed": 2,
+            }},
+        }
+        mapping = app.detect_node_mapping(workflow, include_fast=True)
+        prepared = app.prepare_fast_workflow(app.copy.deepcopy(workflow), mapping)
+        self.assertEqual(prepared["sampler"]["inputs"]["model"], ["lora", 0])
+        self.assertEqual(prepared["positive"]["inputs"]["clip"], ["lora", 1])
+        self.assertEqual(prepared["lora"]["inputs"]["strength_model"], 0.8)
+        self.assertEqual(prepared["lora"]["inputs"]["strength_clip"], 0.6)
+        self.assertNotIn("detailer", prepared)
+
     def test_fast_profile_requires_scalar_latent_dimensions(self):
         workflow = {
             "positive": {"class_type": "CLIPTextEncode", "inputs": {"text": "prompt"}},

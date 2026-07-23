@@ -239,7 +239,7 @@ Ready when:
 - [x] Rename the profile file atomically when its profile name changes, and reject filename collisions before modifying anything.
 - [x] List available profiles in the Web UI and clearly show the active profile.
 - [x] Allow selecting which profile is used for production rendering and Preview rendering.
-- [x] Validate every profile independently, including prompt, seed, sampler, VAE, save-output, and preview-bypass mappings.
+- [x] Validate every profile independently, including prompt, seed, sampler, VAE, save-output, and Preview-path mappings.
 - [x] Prevent ambiguous duplicate profile names and report exact invalid or missing profile files.
 - [x] Preserve safe capture behavior when replacing an existing profile and require explicit confirmation for replacement.
 - [x] Keep profile selection in storyboard/job metadata so Logger and recovered render state identify the workflow used.
