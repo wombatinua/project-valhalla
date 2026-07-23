@@ -3394,6 +3394,12 @@ def camera_grammar_stress_test(
     checked = 0
     recipes: set[str] = set()
     tuples: set[tuple[str, str, str, str]] = set()
+    selected_ids = {
+        key: set() for key in (
+            "poses", "actions", "expressions", "shot_sizes", "camera_angles",
+            "framings", "focus_targets",
+        )
+    }
     context: dict[str, Any] | None = None
     stages: list[dict[str, Any]] = []
     for index in range(count):
@@ -3406,6 +3412,13 @@ def camera_grammar_stress_test(
         checked += 1
         if scene.get("explicit_recipe"):
             recipes.add(scene["explicit_recipe"]["id"])
+        for key, section in (
+            ("pose", "poses"), ("action", "actions"),
+            ("expression", "expressions"), ("shot_size", "shot_sizes"),
+            ("camera_angle", "camera_angles"), ("framing", "framings"),
+            ("focus_target", "focus_targets"),
+        ):
+            selected_ids[section].add(scene[key]["id"])
         tuples.add(tuple(
             scene[key]["id"]
             for key in ("shot_size", "camera_angle", "framing", "focus_target")
@@ -3414,7 +3427,178 @@ def camera_grammar_stress_test(
         "checked": checked,
         "recipes": sorted(recipes),
         "camera_tuples": len(tuples),
+        "selected_ids": {
+            section: sorted(item_ids) for section, item_ids in selected_ids.items()
+        },
     }
+
+
+def validate_production_catalog(db: dict[str, Any]) -> dict[str, Any]:
+    """Run deterministic, GPU-free production reachability and stress checks."""
+    templates = [
+        item for item in db["outfit_templates"] if not item.get("disabled", False)
+    ]
+    interiors = [item for item in db["interiors"] if not item.get("disabled", False)]
+    garments = [
+        (section, item)
+        for section, values in db["garments"].items()
+        for item in values
+        if not item.get("disabled", False)
+    ]
+
+    manual_garments: set[str] = set()
+    automatic_garments: set[str] = set()
+    for template in templates:
+        for slot, rule in template["slots"].items():
+            candidates = [
+                garment for garment in db["garments"][rule["catalog"]]
+                if garment_matches_template_slot(
+                    db, template, slot, garment, "progressive"
+                )
+            ]
+            manual_garments.update(item["id"] for item in candidates)
+            preferred = prefer_catalog_category(
+                candidates, catalog_category(template)
+            )
+            automatic_garments.update(item["id"] for item in preferred)
+    unreachable = [
+        f"{section}.{item['id']}"
+        for section, item in garments if item["id"] not in manual_garments
+    ]
+    category_starved = [
+        f"{section}.{item['id']}"
+        for section, item in garments if item["id"] not in automatic_garments
+    ]
+    if unreachable:
+        raise AppError(
+            "Enabled garments unreachable from every outfit recipe: "
+            + ", ".join(unreachable)
+        )
+    if category_starved:
+        raise AppError(
+            "Enabled garments removed by automatic catalog-category preference: "
+            + ", ".join(category_starved)
+        )
+
+    outfit_checks = 0
+    sfw_outfit_checks = 0
+    stage_checks = 0
+    for template_index, template in enumerate(templates):
+        for interior_index, interior in enumerate(interiors):
+            composer = Composer(
+                db, random.Random(700_000 + template_index * 1_000 + interior_index)
+            )
+            outfit = composer.choose_outfit(template, interior, "progressive")
+            composer.validate_outfit_stage_coverage(outfit)
+            outfit_checks += 1
+            stage_checks += len(effective_photoshoot_stages(template))
+            if template_supports_sfw(db, template):
+                safe = composer.choose_outfit(template, interior, "sfw")
+                validate_sfw_outfit(safe)
+                sfw_outfit_checks += 1
+
+    storyboard_checks = 0
+    compiled_scenes = 0
+    for mode in ("photoshoot", "random"):
+        for content_mode in ("sfw", "progressive", "xxx"):
+            for sample in range(4):
+                seed = 800_000 + sample + (10_000 if mode == "random" else 0)
+                seed += {"sfw": 0, "progressive": 1_000, "xxx": 2_000}[content_mode]
+                run = parse_run_config({
+                    "mode": mode,
+                    "content_mode": content_mode,
+                    "count": 12,
+                    "photoshoots": 1,
+                    "prompt_seed": seed,
+                    "inference_seed": seed + 1,
+                    "nsfw_percent": 50,
+                    "plateau_percent": 20,
+                }, db)
+                rng = random.Random(run.prompt_seed)
+                board = build_storyboard(
+                    run, db, Composer(db, rng), rng,
+                    run.nsfw_percent, run.plateau_percent,
+                )
+                removed_by_photoshoot: dict[int, set[str]] = {}
+                for shot in board:
+                    validate_camera_grammar(shot["scene"])
+                    compile_scene(db, shot["scene"])
+                    removed = removed_by_photoshoot.setdefault(
+                        shot["photoshoot_index"], set()
+                    )
+                    visible = set(shot["stage"].get("visible_slots", []))
+                    restored = visible & removed
+                    if restored:
+                        raise AppError(
+                            "Progressive garment validation restored removed slots: "
+                            f"{sorted(restored)}"
+                        )
+                    removed.update(shot["scene"].get("removed_garment_slots", []))
+                    compiled_scenes += 1
+                storyboard_checks += 1
+
+    camera = camera_grammar_stress_test(db)
+    enabled_recipes = {
+        item["id"] for item in db["explicit_recipes"]
+        if not item.get("disabled", False)
+    }
+    missing_recipes = sorted(enabled_recipes - set(camera["recipes"]))
+    if missing_recipes:
+        raise AppError(
+            "Enabled explicit recipes missing from the camera stress sample: "
+            + ", ".join(missing_recipes)
+        )
+    warnings: list[str] = []
+    for section, observed in camera["selected_ids"].items():
+        enabled = {
+            item["id"] for item in db[section] if not item.get("disabled", False)
+        }
+        missing = sorted(enabled - set(observed))
+        if missing:
+            warnings.append(
+                f"{section} not observed in deterministic camera sample: "
+                + ", ".join(missing)
+            )
+
+    return {
+        "templates": len(templates),
+        "interiors": len(interiors),
+        "garments": len(garments),
+        "outfit_checks": outfit_checks,
+        "sfw_outfit_checks": sfw_outfit_checks,
+        "stage_checks": stage_checks,
+        "storyboard_checks": storyboard_checks,
+        "compiled_scenes": compiled_scenes,
+        "camera_checks": camera["checked"],
+        "camera_tuples": camera["camera_tuples"],
+        "explicit_recipes": len(camera["recipes"]),
+        "warnings": warnings,
+    }
+
+
+def print_validation_report(report: dict[str, Any]) -> None:
+    print("Valhalla production validation passed")
+    print(
+        f"  wardrobe: {report['garments']} garments through "
+        f"{report['templates']} templates"
+    )
+    print(
+        f"  outfit matrix: {report['outfit_checks']} progressive and "
+        f"{report['sfw_outfit_checks']} SFW combinations across "
+        f"{report['interiors']} interiors"
+    )
+    print(
+        f"  stages/storyboards: {report['stage_checks']} stage checks and "
+        f"{report['compiled_scenes']} compiled scenes in "
+        f"{report['storyboard_checks']} storyboards"
+    )
+    print(
+        f"  camera grammar: {report['camera_checks']} scenes, "
+        f"{report['camera_tuples']} tuples, "
+        f"{report['explicit_recipes']} explicit recipes"
+    )
+    for warning in report["warnings"]:
+        print(f"  warning: {warning}")
 
 
 
@@ -6108,8 +6292,12 @@ def serve(host: str, port: int, open_browser: bool) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Valhalla Photo Studio local Web UI server")
     parser.add_argument(
-        "command", nargs="?", choices=("serve", "gallery-benchmark"), default="serve",
-        help="Start the production server or an isolated synthetic gallery benchmark",
+        "command", nargs="?", choices=("serve", "validate", "gallery-benchmark"),
+        default="serve",
+        help=(
+            "Start the production server, validate the production catalog, or run "
+            "an isolated synthetic gallery benchmark"
+        ),
     )
     parser.add_argument("--host", help="Override config.json listen_host for this run")
     parser.add_argument("--port", type=int, help="Override config.json listen_port for this run")
@@ -6123,6 +6311,10 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         config, _ = load_config()
+        if args.command == "validate":
+            database, _ = load_database()
+            print_validation_report(validate_production_catalog(database))
+            return 0
         host = args.host if args.host is not None else config["server"]["host"]
         port = args.port if args.port is not None else config["server"]["port"]
         if not 1 <= port <= 65535:

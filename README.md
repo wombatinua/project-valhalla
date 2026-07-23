@@ -71,6 +71,16 @@ Run:
 
 The launcher installs required Python packages if they are missing, reads `server.host` and `server.port` from `config.json`, starts the server, and asks Python to open that address in the default browser. Before startup it detects Python processes running this project's exact `server.py`, displays them, and asks for confirmation before stopping them. Confirmed processes receive `SIGTERM` and a five-second grace period before a revalidated `SIGKILL`. In a non-interactive session the launcher refuses to kill anything and exits instead.
 
+Run the complete GPU-free production validation without starting or stopping the Web UI:
+
+```bash
+python3 server.py validate
+# or
+./launcher.sh validate
+```
+
+The command validates configuration and database structure, proves every enabled garment remains reachable manually and after `normal`/`luxury` preference, resolves every enabled outfit template against every enabled interior, checks SFW outfits and garment-stage contracts, compiles deterministic SFW/progressive/Full-XXX storyboard samples, and runs the 10,000-scene camera-grammar stress test. Proven structural or reachability defects return exit code `1`. Records absent from the deterministic scene sample are reported as warnings because absence from a finite sample is not proof that a compatible record is unreachable. The command never contacts ComfyUI or writes project/output data.
+
 Environment overrides:
 
 ```bash
@@ -290,7 +300,7 @@ Records can be temporarily excluded without deletion:
 }
 ```
 
-Validation rejects duplicate IDs, invalid references, incompatible dependencies, bad weights, invalid stage definitions, and empty required pools before a storyboard or GPU job can begin.
+Startup validation rejects duplicate IDs, invalid references, incompatible dependencies, bad weights, invalid stage definitions, and empty required pools before a storyboard or GPU job can begin. Use `python3 server.py validate` for the more expensive resolver, reachability, storyboard, garment-transition, and camera stress checks before a large GPU batch.
 
 - Output deletion is permanent and always requires confirmation in the Web UI. In the lightbox, `Delete` and macOS `Backspace` open the same confirmation.
 - Deletion is disabled while a render job is queued or running. Bulk deletion removes supported image files only and leaves unrelated files and directories untouched.

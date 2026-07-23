@@ -104,11 +104,11 @@ Ready when:
 
 ### P0 — Standalone validation and statistics
 
-- [ ] Add `python server.py validate` without changing normal Web UI startup.
-- [ ] Stress-test every enabled outfit template through the resolver.
-- [ ] Validate camera tuples, explicit recipes, garment transitions, and stage reachability.
+- [x] Add `python server.py validate` without changing normal Web UI startup.
+- [x] Stress-test every enabled outfit template through the resolver.
+- [x] Validate camera tuples, explicit recipes, garment transitions, and stage reachability.
 - [ ] Find unreachable IDs and records unused by every recipe, template, and configured pool.
-- [ ] Return a non-zero exit code for structural, reachability, or stress-test failures.
+- [x] Return a non-zero exit code for structural, reachability, or stress-test failures.
 - [ ] Add `python server.py stats` for record counts, tags, recipe coverage, and candidate-pool sizes.
 - [ ] Document both commands and make them optionally accessible from `launcher.sh` without adding an interactive terminal wizard.
 

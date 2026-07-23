@@ -55,6 +55,49 @@ class StudioGenerationLimitTests(unittest.TestCase):
 
 
 class CatalogQualityTests(unittest.TestCase):
+    def test_validate_cli_is_read_only_and_does_not_start_the_server(self):
+        report = {
+            "templates": 1, "interiors": 1, "garments": 1,
+            "outfit_checks": 1, "sfw_outfit_checks": 1, "stage_checks": 1,
+            "storyboard_checks": 1, "compiled_scenes": 1,
+            "camera_checks": 10_000, "camera_tuples": 1,
+            "explicit_recipes": 1, "warnings": [],
+        }
+        with (
+            patch.object(app.sys, "argv", ["server.py", "validate"]),
+            patch.object(app, "load_config", return_value=({}, Path("config.json"))),
+            patch.object(app, "load_database", return_value=({}, Path("database.json"))),
+            patch.object(app, "validate_production_catalog", return_value=report) as validate,
+            patch.object(app, "serve") as serve,
+            patch("builtins.print") as output,
+        ):
+            self.assertEqual(app.main(), 0)
+        validate.assert_called_once_with({})
+        serve.assert_not_called()
+        self.assertTrue(any(
+            call.args and call.args[0] == "Valhalla production validation passed"
+            for call in output.call_args_list
+        ))
+
+    def test_production_validation_rejects_an_unreachable_enabled_garment(self):
+        database, _ = app.load_database()
+        broken = copy.deepcopy(database)
+        broken["garments"]["upperwear"].append({
+            "id": "top_validation_orphan",
+            "catalog_category": "normal",
+            "prompt": "validation-only unreachable woven top",
+            "tags": ["validation_orphan"],
+            "allowed_colors": ["color_black"],
+        })
+        with self.assertRaisesRegex(
+            app.AppError, "upperwear.top_validation_orphan"
+        ):
+            app.validate_production_catalog(broken)
+
+    def test_validate_is_an_explicit_cli_command(self):
+        args = app.build_parser().parse_args(["validate"])
+        self.assertEqual(args.command, "validate")
+
     def test_slavic_human_defaults_are_universal_except_explicit_constraints(self):
         database, _ = app.load_database()
         pools = database["settings"]["human_defaults"]["pools"]
@@ -1863,6 +1906,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('kill -TERM "$process_id"', launcher)
         self.assertIn('kill -KILL "$process_id"', launcher)
         self.assertIn("if [ ! -t 0 ]", launcher)
+        self.assertIn('exec "$PYTHON_BIN" "$SERVER" validate', launcher)
 
     def test_storyboard_transfer_is_studio_only_and_workflows_are_in_system(self):
         root = Path(app.__file__).parent

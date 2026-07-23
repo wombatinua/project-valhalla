@@ -95,6 +95,17 @@ stop_leftover_servers() {
 command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python not found: $PYTHON_BIN"
 [ -f "$SERVER" ] || die "Application not found: $SERVER"
 
+case "${1:-serve}" in
+    validate)
+        [ "$#" -eq 1 ] || die "Usage: ./launcher.sh validate"
+        exec "$PYTHON_BIN" "$SERVER" validate
+        ;;
+    serve)
+        [ "$#" -le 1 ] || die "Usage: ./launcher.sh [serve|validate]"
+        ;;
+    *) die "Usage: ./launcher.sh [serve|validate]" ;;
+esac
+
 stop_leftover_servers
 ensure_dependency requests requests
 ensure_dependency PIL Pillow
