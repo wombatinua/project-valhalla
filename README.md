@@ -1,93 +1,58 @@
 # Valhalla Photo Studio
 
-Valhalla Photo Studio is a local, browser-based production interface for composing rule-compatible image prompts and rendering them through a captured Stability Matrix / ComfyUI workflow.
+Valhalla Photo Studio 1.5 is a local, browser-based workspace for planning coherent AI photo sets and rendering them through ComfyUI. It resolves a complete rule-compatible storyboard before using the GPU, so poses, wardrobe, scene geometry, camera direction, content progression, and prompts can be reviewed or edited before an expensive render begins.
 
-The project intentionally does not preserve backward compatibility for internal configuration or storyboard formats. When a format changes, keep the current implementation direct and reject obsolete files instead of adding legacy fields, aliases, or migration paths.
+The application is designed for a private workstation or trusted LAN. It has no cloud service, account system, telemetry, or built-in authentication.
 
-The application now uses a web-first architecture:
+> **Adult-content notice:** the production catalog supports SFW, progressive adult, and explicit solo-adult modes. All configured subjects are adults aged 21–23. Use the application only where its content is lawful and appropriate.
 
-- `server.py` contains the composition engine, ComfyUI client, HTTP API, background job runner, and static-file server.
-- `client/` contains the responsive production interface.
-- `launcher.sh` checks the Python dependency, starts the local server, and opens the browser.
-- `config.json` stores local runtime paths, the ComfyUI address, and active rendering profiles.
-- `database.json` is the manually editable production content catalog.
-- `workflows/` is the default `comfy.workflows_dir` for named ComfyUI API workflow files.
-- `outputs/` is the default `storage.output_dir` for downloaded generated images.
+## Highlights
 
-There is no terminal wizard and no `fzf` dependency. The terminal is used only for server startup and operational logs.
-
-## Interface
-
-The Photo Studio is designed around a review-before-render workflow:
-
-1. Configure the production mode, content direction, batch size, progression, render mode, and seed strategy.
-2. Select **Resolve storyboard** to assemble every compatible shot without using the GPU.
-3. Review stage, pose, action, expression, set, and surface for every shot.
-4. Inspect the authoritative positive prompt and the optional auxiliary negative prompt, or reroll individual compositions.
-5. Select **Generate images** when the storyboard is ready.
-6. Follow live progress and ETA while outputs appear in the gallery.
-
-When the application opens without a recoverable storyboard, Studio performs one automatic resolve using the visible defaults. Manual Resolve remains available for deliberate rerolls and configuration changes.
-
-The UI includes:
-
-- responsive desktop, tablet, and mobile layouts;
-- automatic operating-system light/dark appearance through `prefers-color-scheme`;
-- a session theme switcher for System, Light, and Dark modes;
-- live ComfyUI, workflow, and catalog status;
-- progressive and full-XXX production controls;
-- deterministic prompt seeds plus random, fixed, and stable per-frame inference-seed strategies;
-- production and Preview render profiles;
-- automatic recovery of the active storyboard, settings, render progress, ETA, outputs, and polling after a browser reload;
-- editorially planned storyboard cards with camera grammar, roles, diversity scoring, one-shot reroll/render, prompt inspection, temporary Fast Preview, and compact JSON export/import tied to the exact semantic database version;
-- a dedicated Director’s Desk with exact subject, anatomy, hair, styling, wardrobe, modifier, location, mood, render style, stage, pose/action, surface, editorial role, shot size, angle, framing, focus, and explicit-recipe controls;
-- cancellable FIFO background render jobs that accept additional work while rendering and fail each job clearly on its first generation error;
-- a reload-safe Production Logbook with live frame counts, elapsed/estimated time, current seed, the rendered frame beside its authoritative positive and auxiliary negative prompts, copy actions, a chronological error/completion timeline, and safe history clearing that leaves proofs and the displayed preview intact;
-- shared Studio/Director render controls and draggable, memory-only single-shot Fast Preview windows;
-- a persistent, virtualized output gallery with bounded DOM size, a browser-fullscreen lightbox with a safe-area-aware viewport fallback for iPhone browsers, auto-hiding fullscreen controls, real-size 100% default, adjacent Fit/zoom controls, center-anchored 25–300% scaling with touch pinch zoom, retained settings across images/reloads, timed 1–10 second slideshow, previous/next navigation, swipe, downloads, individual deletion, confirmed bulk deletion, and return-to-grid alignment on the last viewed image;
-- a persistent Privacy Cover that immediately replaces gallery thumbnails, the lightbox image, temporary previews, and Logbook prompts with neutral placeholders, closes Prompt Inspector, and masks the open lightbox filename. Its shortcut is configured in System as middle mouse button (default), `Shift+X`, or both. One middle click covers images and a double middle click within 500 ms reveals them; `Shift+X` remains a direct toggle. Optional Auto cover activates after 1, 5, or 15 minutes without mouse, pointer/touch, or keyboard activity; the browser-local preference defaults to Off. Covering clears image `src`/`srcset` attributes and rebuilds the visible gallery without image URLs so decoded resources become eligible for browser memory reclamation; exact release timing remains browser-controlled. It does not cancel renders or delete files;
-- safe or forced workflow capture from the latest successful ComfyUI run.
+- **Review before render:** resolve complete storyboards without GPU work, inspect every prompt and seed, then render only when the plan is ready.
+- **Coherent photoshoots:** keep the subject, wardrobe, palette, location, mood, and visual treatment fixed while compatible poses and camera direction evolve.
+- **Three content modes:** enforced SFW-only, configurable progressive content, and Full XXX editorial arcs.
+- **Director’s Desk:** edit compatible subject traits, wardrobe, stages, poses, actions, expressions, locations, surfaces, camera grammar, and explicit recipes at set or shot scope.
+- **Deterministic production:** Storyboard seeds reproduce composition; separate image-variation seeds reproduce or vary rendered pixels.
+- **Named ComfyUI profiles:** capture, validate, rename, and select independent Production and Preview workflows without manually editing workflow JSON.
+- **Fast Preview:** render smaller temporary drafts while preserving the selected workflow’s base sampler, LoRA chain, CLIP path, and VAE.
+- **Reliable job handling:** cancellable FIFO render queue, per-frame progress and ETA, reload-safe Logbook state, and clear first-error failure reporting.
+- **Production gallery:** virtualized thumbnails, photoshoot grouping, fullscreen inspection, zoom, slideshow, downloads, and confirmed deletion.
+- **Privacy controls:** instantly hide decoded images and prompts with a configurable shortcut or inactivity timer; covering never deletes files or cancels renders.
+- **Validated catalog:** more than 1,100 subject, wardrobe, location, direction, camera, and treatment records with exact reachability analysis.
 
 ## Requirements
 
+- Linux or another environment capable of running the included POSIX `launcher.sh`
 - Python 3.11 or newer
-- a local or trusted-LAN ComfyUI instance
-- `requests`
+- ComfyUI reachable locally or on a trusted LAN
 - a modern browser
+- a working ComfyUI image-generation workflow
 
-The configured ComfyUI URL defaults to:
+The launcher installs the two Python packages used at runtime if necessary:
 
-```text
-http://127.0.0.1:8188
-```
+- `requests`
+- `Pillow`
 
-## Start
+ComfyUI defaults to `http://127.0.0.1:8188`. Valhalla defaults to port `8765` and may be restricted to loopback or exposed to a trusted LAN through `config.json`.
 
-Run:
+## Quick start
 
-```bash
-./launcher.sh
-```
+1. Start ComfyUI and successfully run the workflow you want Valhalla to control.
+2. From the project directory, start Valhalla:
 
-The launcher installs required Python packages if they are missing, reads `server.host` and `server.port` from `config.json`, starts the server, and asks Python to open that address in the default browser. Before startup it detects Python processes running this project's exact `server.py`, displays them, and asks for confirmation before stopping them. Confirmed processes receive `SIGTERM` and a five-second grace period before a revalidated `SIGKILL`. In a non-interactive session the launcher refuses to kill anything and exits instead.
+   ```bash
+   ./launcher.sh
+   ```
 
-Run the complete GPU-free production validation without starting or stopping the Web UI:
+3. Open **System → Rendering profiles** in Valhalla.
+4. Capture the latest successful ComfyUI workflow, give it a clear profile name, and select it for Production and Preview.
+5. Configure a batch in **Studio**, then choose **Resolve storyboard**.
+6. Review the planned shots or refine them in **Director**.
+7. Choose **Preview storyboard** for drafts or **Render storyboard** for full production.
 
-```bash
-python3 server.py validate
-# or
-./launcher.sh validate
-```
+The launcher opens the Web UI automatically. It detects an existing server process belonging to this project and asks before stopping it. It never kills an unrelated Python process.
 
-The command validates configuration and database structure, proves every enabled garment remains reachable manually and after `normal`/`luxury` preference, resolves every enabled outfit template against every enabled interior, checks SFW outfits and garment-stage contracts, compiles deterministic SFW/progressive/Full-XXX storyboard samples, and runs the 10,000-scene camera-grammar stress test. Proven structural or reachability defects return exit code `1`. Records absent from the deterministic scene sample are reported as warnings because absence from a finite sample is not proof that a compatible record is unreachable. The command never contacts ComfyUI or writes project/output data.
-
-Environment overrides:
-
-```bash
-PYTHON_BIN=python3 ./launcher.sh
-```
-
-You can also start the application directly:
+Direct startup is also available:
 
 ```bash
 python3 server.py
@@ -95,219 +60,109 @@ python3 server.py --host 127.0.0.1 --port 9000
 python3 server.py --no-browser
 ```
 
-### Runtime configuration
+Stop the server with `Ctrl+C`. Closing the browser does not stop the server or an active render job.
 
-All operational settings live in root-level `config.json`, grouped into the required `server`, `comfy`, `storage`, `gallery`, `interface`, and `limits` objects. Every documented key is required; profile selections may be `null`, and `storage.proofs_dir` may be an empty array. Relative paths are resolved from the project root. Restart the server after manually editing the file; this is mandatory for the listen address and also clears thumbnails created with an earlier size setting.
+## Rendering profiles
 
-#### Server
+Valhalla renders through named ComfyUI API workflows stored in `workflows/`. A profile is captured from the latest successful ComfyUI history entry and validated before it can be selected.
 
-| Parameter | Type / range | Default | Purpose |
-|---|---:|---:|---|
-| `server.host` | non-empty string | `127.0.0.1` | Interface on which the Valhalla HTTP server listens. Keep loopback for local-only access; `0.0.0.0` exposes it to the network and should be used only on a trusted network because the app has no authentication. |
-| `server.port` | integer `1–65535` | `8765` | TCP port for the Valhalla Web UI and API. Command-line `--host` and `--port` can override the two listen values for one run. |
+A usable profile must expose unambiguous nodes for:
 
-#### ComfyUI
+- positive conditioning;
+- seed control;
+- the main sampler and latent input;
+- VAE decoding;
+- image output.
 
-Every ComfyUI connection, workflow, and timing setting is grouped under the required `comfy` object.
+Negative conditioning is optional. If a workflow has no connected negative text encoder, Valhalla treats its positive prompt as the complete structural source of truth.
 
-| Parameter | Type / range | Default | Purpose |
-|---|---:|---:|---|
-| `comfy.url` | non-empty URL string | `http://127.0.0.1:8188` | Base URL used for workflow discovery, queueing, status polling, and image download. |
-| `comfy.workflows_dir` | path string | `./workflows` | Directory containing named `*.workflow.json` rendering profiles. Capturing, renaming, importing, and deleting profiles operate here. |
-| `comfy.http_timeout_seconds` | number `0.1–3600` | `15` | Per-request timeout for normal ComfyUI HTTP operations such as workflow history, queue submission, polling requests, and generated-image downloads. It is not the total render timeout. |
-| `comfy.status_timeout_seconds` | number `0.1–300` | `2` | Short timeout used only by the system-status check that decides whether ComfyUI is shown as online. |
-| `comfy.status_refresh_seconds` | number `1–3600` | `10` | Interval between automatic ComfyUI/system checks while the browser tab is visible. Checks pause for hidden tabs and run immediately when the tab becomes visible again. The refresh icon still forces a manual check. |
-| `comfy.poll_interval_seconds` | number `0.05–60` | `1` | Delay between ComfyUI history checks while waiting for one render. Lower values update sooner but create more requests. |
-| `comfy.generation_timeout_seconds` | number `1–86400` | `600` | Total time allowed for one queued ComfyUI prompt to finish. Exceeding it fails that image even if individual HTTP requests have not timed out. |
-| `comfy.preview_max_edge` | integer multiple of 64, `256–2048` | `512` | Maximum width or height used only by Preview rendering. The original aspect ratio and orientation are retained as closely as latent-safe 64 px steps allow; Production dimensions are unchanged. |
-| `comfy.profiles.production` | profile ID string or `null` | project profile | Rendering profile used for full production jobs. `null` disables production rendering until a profile is selected. |
-| `comfy.profiles.preview` | profile ID string or `null` | project profile | Rendering profile used for fast storyboard and temporary shot previews. It may point to the same profile as Production. |
+Production and Preview may use the same profile or different profiles. Preview reduces the detected latent dimensions to `comfy.preview_max_edge` while keeping orientation and approximate aspect ratio. It prunes downstream refiners/detailers but deliberately retains upstream LoRA nodes because they are part of the visual design.
 
-#### Storage and output files
+If `comfy.workflow_source` is set to `live`, Valhalla reads the latest compatible ComfyUI workflow instead of the selected saved profiles. Saved profiles are recommended for reproducible production.
 
-| Parameter | Type / range | Default | Purpose |
-|---|---:|---:|---|
-| `storage.output_dir` | path string | `./outputs` | The only directory where new production renders are saved. It is always included as a Proofs source. |
-| `storage.proofs_dir` | path string or array | `[]` | Extra recursively scanned read/delete sources for Proofs. They are scanned in configured order before the non-recursive `storage.output_dir`; duplicate resolved paths are ignored. If a source is an ancestor of `storage.output_dir`, the complete output subtree is excluded from that source and treated only as live output. The combined UI is sorted by filename, whose generated prefix contains the run timestamp. Rendering never writes here. |
-| `storage.output_format` | `png`, `jpeg`, or `jpg` | `png` | Format for newly saved renders. Both JPEG spellings produce files with the `.jpg` suffix. Existing PNG, JPG, and JPEG files can coexist in Proofs. |
-| `storage.jpeg_quality` | integer `1–100` | `95` | JPEG encoder quality for new JPEG outputs. It has no effect when `storage.output_format` is `png`. |
-| `storage.strip_exif` | boolean | `true` | Removes EXIF metadata from newly saved images. Before stripping, EXIF orientation is applied to the pixels so the displayed orientation remains correct. |
+## Production workflow
 
-#### Gallery thumbnails
+### Modes
 
-| Parameter | Type / range | Default | Purpose |
-|---|---:|---:|---|
-| `gallery.thumbnail_cache_mb` | integer `0–4096` | `512` | Maximum server RAM used by the LRU cache of encoded thumbnails. Higher values reduce regeneration while revisiting large galleries. `0` disables retention without disabling thumbnails. |
-| `gallery.thumbnail_max_edge` | integer `64–4096` | `512` | Maximum width or height, in pixels, of a generated thumbnail. The aspect ratio is preserved. Larger values improve zoomed card detail but cost more CPU, RAM, network transfer, and browser decode memory. |
+- **Photoshoot** creates coherent sets with progressive, non-reversing garment and content stages.
+- **Random** rebuilds the subject context and scene for every frame.
+- **SFW only** server-enforces fully covered stages and removes incompatible garments, actions, poses, intensities, and imports.
+- **Full XXX** starts explicitly and plans a seeded editorial arc across concrete recipe, pose, action, camera, and intensity families, reserving a compatible peak closing frame.
 
-#### Interface privacy
+### Seeds
 
-| Parameter | Type / range | Default | Purpose |
-|---|---:|---:|---|
-| `interface.privacy.auto_cover_minutes` | two increasing integers `1–1440` | `[5, 15]` | The two inactivity intervals offered beside `Off` in System → Options → Auto cover. Changing the values changes the button labels and timers after the server is restarted and the page is reloaded. A previously selected interval that is no longer offered safely resets to `Off`. |
+- **Storyboard seed** controls the complete compositional plan.
+- **Image variation seed** changes rendered pixels without rebuilding direction.
+- Variation can be fixed, fresh for every frame, or deterministically derived per photoshoot and shot.
 
-#### Rendering and in-memory state
+Storyboard export stores the selected catalog IDs, workflow profile, prompts, and effective seeds. Imports are accepted only when their semantic database fingerprint matches the current catalog.
 
-| Parameter | Type / range | Default | Purpose |
-|---|---:|---:|---|
-| `limits.max_scene_attempts` | integer `1–100000` | `100` | Maximum retries used when resolving a compatible outfit, fixed photoshoot context, scene, or distinct photoshoot. Raising it can rescue restrictive databases but makes impossible combinations take longer to fail. |
-| `limits.max_storyboards` | integer `1–10000` | `20` | Maximum number of storyboard records retained in server memory. Oldest records are discarded first; generated files are never removed by this limit. |
-| `limits.max_jobs` | integer `1–10000` | `40` | Maximum render-job records held in memory. When full, the oldest inactive job is removed; if every record is queued or running, adding another job is rejected. |
-| `limits.max_previews` | integer `1–1000` | `8` | Maximum temporary shot-preview records retained in memory. These previews are not written to `storage.output_dir`. |
+### Rendering and outputs
 
-`database.json` contains creative catalog data, selection rules, pools, weights, and production defaults—not server/runtime configuration.
+Production jobs are immutable snapshots placed in a FIFO queue. Cancellation takes effect between images. Generated images are written to `storage.output_dir`; temporary shot previews remain in memory and are discarded when closed.
 
-### Gallery benchmark
+Output deletion is permanent and requires confirmation. Deletion is disabled while a render job is active. Restarting Valhalla clears in-memory planning and job history but never removes generated files.
 
-Test large-gallery behavior without rendering or copying thousands of images:
+## Configuration
+
+Runtime settings live in `config.json`. Relative paths are resolved from the project directory.
+
+| Section | Important settings |
+|---|---|
+| `server` | listen host and port; keep loopback unless trusted-LAN access is required |
+| `comfy` | ComfyUI URL, workflow source, profiles directory, Production/Preview selections, timeouts, Preview size |
+| `storage` | output directory, additional proof directories, PNG/JPEG output, JPEG quality, EXIF stripping |
+| `gallery` | thumbnail size and bounded in-memory thumbnail cache |
+| `interface` | privacy auto-cover intervals |
+| `limits` | scene retries and retained in-memory storyboards, jobs, and previews |
+
+Restart the server after editing `config.json`. The application has no authentication, so do not bind it to an untrusted network.
+
+Creative records and selection rules live in `database.json`, not `config.json`. Records can be temporarily removed from selection with `"disabled": true`.
+
+## Validation and catalog statistics
+
+Run the complete GPU-free production audit before a large render batch or after changing `database.json`:
 
 ```bash
-python3 server.py gallery-benchmark --count 2000
+./launcher.sh validate
+# equivalent: python3 server.py validate
 ```
 
-The read-only benchmark requires at least one existing image in a configured Proofs source. It exposes 2,000 unique synthetic gallery records that cycle through at most ten real images, gives every thumbnail a unique browser URL to exercise network transfer and decoding, opens directly on Proofs, disables deletion, and reports both the record count and current `.output-card` DOM count. The server still reuses its RAM thumbnail cache, so no image copies are created. Stop it with `Ctrl+C`, then start the normal production server again.
+Validation checks configuration and catalog structure, exact record reachability, every outfit/interior combination, SFW contracts, garment transitions, representative storyboards in every mode, all explicit recipes, and 10,000 camera-grammar scenes. It never contacts ComfyUI or writes outputs. Proven failures return a non-zero exit code; finite-sample gaps are warnings only when the exact analyzer proves a valid route.
 
-In browser developer tools, record initial network transfer and browser memory, scroll from the first record to the last, open and navigate the lightbox, and confirm that the displayed DOM-card count remains bounded rather than approaching 2,000.
+Inspect diversity and narrow candidate pools with:
 
-Keep the default loopback host unless access from another machine is explicitly required. The application has no user authentication and is intended for a trusted local environment.
-
-## HTTP layout
-
-The Web UI is served from `/`. All application endpoints are under `/api`. `--host` and `--port` remain available as one-run overrides without modifying `config.json`.
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `GET` | `/api/status` | ComfyUI, workflow, output, and catalog status |
-| `POST` | `/api/storyboards` | Validate configuration and resolve a complete storyboard |
-| `GET` | `/api/storyboards/{id}` | Retrieve a resolved storyboard |
-| `GET` | `/api/storyboards/{id}/export` | Export a compact, database-bound storyboard JSON |
-| `GET` | `/api/storyboards/{id}/director?shot={number}` | Read current and compatible Director controls |
-| `POST` | `/api/storyboards/{id}/director` | Apply one validated SET- or shot-level direction |
-| `POST` | `/api/storyboards/import` | Validate and restore a complete exported storyboard |
-| `POST` | `/api/storyboards/{id}/shots/{number}/reroll` | Resolve a new compatible composition for one shot |
-| `POST` | `/api/jobs` | Append a storyboard render job to the production queue |
-| `GET` | `/api/jobs` | Discover the active render job and recover browser state after reload |
-| `GET` | `/api/jobs/{id}` | Read render progress, ETA, errors, and outputs |
-| `POST` | `/api/jobs/{id}/cancel` | Request cancellation between images |
-| `POST` | `/api/previews` | Start a temporary Fast Preview for one storyboard shot |
-| `GET` | `/api/previews/{id}` | Read temporary preview status |
-| `GET` | `/api/previews/{id}/image` | Read the completed in-memory preview image |
-| `DELETE` | `/api/previews/{id}` | Discard the temporary preview and its in-memory bytes |
-| `GET` | `/api/workflow/profiles` | List captured rendering profiles and active selections |
-| `GET` | `/api/workflow/capture-candidate` | Inspect the latest successful ComfyUI workflow and suggest a model-based name |
-| `POST` | `/api/workflow/capture` | Capture or explicitly replace a named rendering profile |
-| `POST` | `/api/workflow/profiles/select` | Select Production and Preview profiles |
-| `GET` | `/api/outputs` | List images across all configured proof directories |
-| `GET` | `/api/outputs/{relative-path}?source={source}` | View or download an image from its proof source |
-| `DELETE` | `/api/outputs/{relative-path}?source={source}` | Permanently delete one image from its proof source |
-| `DELETE` | `/api/outputs` | Permanently delete every image across all configured proof directories |
-
-Storyboard and job state is intentionally in memory. Restarting the server clears browser-session planning state but never removes generated files.
-
-## Production modes
-
-### SFW only
-
-SFW only keeps every frame fully covered. It excludes lingerie, topless, nude, and explicit stages; prevents visible breasts, nipples, pubic area, or genitals; removes explicit recipes from resolution; and limits Director stage and intensity controls to compatible covered choices. The rule is enforced by the server for automatic resolution, rerolls, Director edits, and storyboard imports.
-
-### Photoshoot
-
-A photoshoot keeps the model, outfit, palette, interior, mood, and photography treatment fixed within each set. Stages progress forward across the configured shot count. Multiple photoshoots in one run are assembled as distinct sets.
-
-### Random
-
-Random mode resolves a complete independent context for every shot. The photoshoot count and progressive percentage controls are hidden because they do not apply.
-
-### Progressive content
-
-`NSFW ending` controls the percentage of final photoshoot frames assigned to topless, nude, and explicit stages. `Explicit plateau` controls how much of the complete run remains at the final explicit level. The plateau cannot exceed the NSFW ending.
-
-Global structure controls are compared with the active resolved storyboard. Changing mode, content, counts, progression, or the Storyboard seed creates an explicit **Pending settings** state; render and per-shot preview actions first update the storyboard instead of silently using stale frames. The active and pending configurations remain visible together. When manual Director or shot adjustments exist, rebuilding requires confirmation. The NSFW controls show both percentages and calculated frame counts, clamp Explicit plateau to NSFW ending, and disable the plateau at 0%. Image variation seed and strategy remain non-structural and apply immediately without rebuilding direction.
-
-### Full XXX
-
-Full XXX begins at explicit intensity from the first frame and plans directly over enabled concrete recipes. Each photoshoot owns deterministic weighted shuffle bags for recipe, pose, action, shot-size, and camera-angle families; compatible candidates are exhausted before refill and refill boundaries cannot repeat the preceding choice. The final frame is reserved for a compatible peak recipe and peak editorial role. The same seeded rules apply to Random Full XXX, so a Storyboard seed reproduces the complete arc rather than merely reproducing independent random frames.
-
-## Seeds
-
-The UI calls the prompt seed **Storyboard seed** because it controls all compositional decisions. Leaving it empty creates a new seed and immediately writes the effective value back into the field; entering a value reproduces the same resolved storyboard.
-
-Each global seed field has its own `↻` action. Refreshing Storyboard seed resolves a new direction; refreshing Image variation seed recalculates only frame variations and preserves Director edits.
-
-The UI calls the inference seed **Image variation seed** because it changes rendered pixels without changing the direction. **Unique and repeatable per shot** derives a stable, distinct seed for every set/shot from the entered base seed. **Same variation for every shot** deliberately reuses one literal seed. **Fresh random variation per shot** creates independent seeds. Studio and Director provide **New variation** for changing only one shot’s inference seed; its prompt, composition and Director settings remain intact. The chosen strategy and every effective frame seed are stored in storyboard export.
-
-After a storyboard exists, changing the Storyboard seed automatically resolves a replacement after a short typing delay because it controls the direction. Changing the Image variation seed or its mode updates only frame seeds in place: scenes, prompts, manually selected directions, and custom Director values remain intact. Studio cards and Director are refreshed together.
-
-The prompt compiler enforces the database-declared diffusion priority `subject → camera/direction → anatomy → traits/garments → location/treatment`, removes exact duplicate fragments, and reports prompt-lint warnings without silently changing or truncating Director choices. Named negative profiles are applied only to relevant stages: opaque coverage constraints never inherit explicit/censorship negatives, while explicit anatomy receives its recipe-specific visibility constraints.
-
-`prompt_defaults.conditioning_policy` defines the positive prompt as the only structural source of truth. Resolver compatibility, garment layering, visibility gating, camera grammar, and stage contracts must therefore remain correct when no negative encoder exists. The compiled negative prompt is an optional auxiliary hint: workflows with a connected negative text encoder receive it, while positive-only or zeroed-negative workflows ignore it without becoming invalid. Rendering profile details explicitly report which mode was detected.
-
-The compact storyboard format stores catalog references by ID and includes a semantic SHA-256 fingerprint of the complete database. Import succeeds only against the matching database content; reordering JSON keys does not break compatibility, but changing catalog data does. Imported storyboards remain fully reviewable, rerollable, and renderable.
-
-## Director’s Desk
-
-Resolve or import a storyboard, then open **Director** in the sidebar. The editor is organized in production order: identity, face, hair, body and anatomy, styling, wardrobe, scene and treatment, camera and editorial intent, then shot direction. Every compatible database preset is available through its relevant control. Current selections remain selected, curated database-pool values carry a **Default** marker, and the global search locates fields by both setting and preset text.
-
-Subject, wardrobe, location, mood, and render-style changes apply to the complete photoshoot SET; in Random mode they affect only that independent shot. Stage, surface, camera, editorial role, explicit recipe, pose, action, and expression affect the selected shot. Director exposes every stage compatible with the active outfit recipe, including safe, terminal, and explicit variants. A manually selected stage may intentionally depart from automatic progression and immediately rebuilds all compatible shot controls. Incompatible records remain excluded, and all updates are rejected while that storyboard is rendering.
-
-The planner keeps the model, wardrobe, location, mood, and treatment coherent per set while varying compatible surfaces and compositions. It assigns every shot an editorial role and resolves shot size, angle, framing, and focus against stage, pose, action, intensity, and surface. Each surface resolves to an explicit physical zone (bed, bed edge, wall, vanity, window, rug, sofa, chair, pool edge, bath, or garden surface) with standing, seated, reclining, kneeling, supported, and close-up capabilities; cross-family conflicts report the zone, interior, surface, and pose IDs. Exact removed garment slots accumulate across a progressive set and cannot reappear. Their transition prompt describes state only, avoiding a second hand action that could contradict the selected shot action.
-
-Cross-field camera validation rejects contradictory tuples after resolution, during Director edits, and on storyboard import. Intimate actions require intimate focus and a three-quarter-or-closer treatment; intimate macro cannot use environmental framing; and rear-display recipes require rear-compatible angle, focus, and framing. Diagnostics include the exact conflicting catalog IDs.
-
-Quick actions provide constrained remixes for the subject, current wardrobe recipe, complete scene/treatment, or selected shot. Director edits remain part of the in-memory storyboard and are preserved by compact JSON export.
-
-Covered and lingerie stages use an anatomy-neutral positive contract built entirely from opaque garment construction: uninterrupted chest fabric, uniform color and weave, and a clean smooth surface. Breast size, shape, areola, and nipple vocabulary is omitted completely until the stage explicitly exposes that anatomy; safety therefore does not depend on a negative-prompt encoder being present. Lingerie stages accept only opaque non-exposing bras. The named `prompt_defaults.negative_profiles.covered_opaque` profile remains an optional additional guard for workflows that support negative conditioning. Long socks, tights, pantyhose, and stockings are structurally incompatible with jeans, trousers, leggings, and other leg-covering bottoms; ankle socks use an explicit positive layer order beneath the trouser hems.
-
-## Workflow capture
-
-First complete a representative workflow successfully in ComfyUI. Then open **Studio files → Rendering profiles**. The manager detects the main model name, proposes an editable profile name, and saves the graph as a recognizable `<profile>.workflow.json` file under `comfy.workflows_dir`.
-
-Safe capture refuses to overwrite a matching profile unless **Replace matching profile** is enabled. Production and Preview can select different profiles. Profiles are independently validated, can be renamed or deleted from the manager, and every queued render snapshots its selected profile name. Active selections are stored under `comfy.profiles` in root-level `config.json`; selected profiles cannot be deleted, and profile files cannot be renamed or deleted while the render queue is active.
-
-## Preview render
-
-Preview render patches the captured graph to keep the base sampler, its complete upstream LoRA model/CLIP chain, and the VAE output while pruning downstream refiners/detailers. It also scales the detected empty latent to `comfy.preview_max_edge` (512 px by default), preserves orientation and approximate aspect ratio in 64 px latent-safe steps, and never changes Production dimensions. Profiles whose Preview path does not expose unambiguous scalar width and height inputs are rejected with an actionable diagnostic. The synchronized Studio and Director split-buttons switch between **Preview storyboard** and **Render storyboard**, and their primary action runs the selected workflow. Individual **Preview** buttons always use the preview workflow. The refresh action targets the shot currently open in Director, falling back to the displayed preview shot elsewhere. Only its glyph spins during rendering; the button container remains stationary. While a replacement preview renders, the previous image remains visible; it is swapped and discarded only after the new preview succeeds. Preview activity, prompts, seed and elapsed time are shown in Logbook. Closing the draggable preview window discards its temporary image without adding anything to Proofs.
-
-While production is active, using **Preview storyboard** or **Render storyboard** again appends another immutable storyboard snapshot to the FIFO render queue. The current image is never interrupted, queued jobs start automatically in submission order, and cancelling the active job advances to the next queued job after the current image finishes.
-
-## Database
-
-`database.json` contains more than 1,100 semantically distinct production records covering adult-model traits, garments, modifiers, outfit templates, private locations, physical zones, surfaces, poses, actions, expressions, moods, camera grammar, explicit recipes, intimate arousal appearance, and photography treatments. Intimate arousal modifiers are selected deterministically only for explicit recipes with a visible intimate focus; they are excluded from rear, breast-focus, nude, and clothed compositions. Mechanical Studio/Editorial copies are prohibited: every selectable record must describe a distinct trait, garment construction, place, composition, or action. Combinatorial variety comes from composing real items with compatible colors, patterns, fabric textures, and surface finishes rather than duplicating records.
-
-Full-XXX direction includes asymmetric side-lying, half-roll, overhead, and edge-seated open-leg compositions plus non-penetrative intimate hand direction. These records use the normal pose/action compatibility system and are available to both automatic resolution and Director.
-
-Catalog wording is optimized for the captured Lumina2 workflow’s Qwen text encoder and remains broadly suitable for modern natural-language image conditioning: short concrete visual phrases, common garment/interior/anatomy/photography vocabulary, no internal taxonomy jargon, no duplicate prompt fragments, and no catalog fragment longer than 48 words. Database validation enforces these constraints. Clothing supports compatible color, pattern, and fabric-texture composition; suitable beds, sofas, chairs, rugs, cushions, and other textile surfaces support independent color and texture finishes. The compiler always preserves the complete deduplicated prompt; unusually long prompts produce a diagnostic warning instead of being modified.
-
-The catalog follows the order in which a scene is assembled, so related material stays easy to find:
-
-1. `settings` — defaults, progression, limits, and server timing.
-2. `human_model_parts` — subject identity, face, hair, body, and styling.
-3. `colors`, `patterns`, `fabric_textures`, `garments`, `outfit_templates` — wardrobe building blocks and complete outfits.
-4. `poses`, `actions`, `props`, `expressions` — what the subject is doing and how it reads.
-5. `location_zones`, `interiors`, `furniture` — explicit zone capabilities, location, and physical scene context.
-6. `moods`, `photography_styles` — atmosphere and visual treatment.
-7. `prompt_defaults` — final prompt compiler defaults and safety exclusions.
-
-Within `human_model_parts`, traits progress from identity and complexion through face and hair to body and styling. Garments progress from upper/lower/full-body layers through lingerie, legwear, footwear, and accessories.
-
-Records can be temporarily excluded without deletion:
-
-```json
-{
-  "id": "example_item",
-  "prompt": "example prompt fragment",
-  "disabled": true
-}
+```bash
+./launcher.sh stats
+# equivalent: python3 server.py stats
 ```
 
-Startup validation rejects duplicate IDs, invalid references, incompatible dependencies, bad weights, invalid stage definitions, and empty required pools before a storyboard or GPU job can begin. Use `python3 server.py validate` for the more expensive resolver, reachability, storyboard, garment-transition, and camera stress checks before a large GPU batch.
+Statistics include record and tag counts, manual versus automatic reachability, recipe coverage, and minimum/median/maximum garment-slot and furniture pools.
 
-- Output deletion is permanent and always requires confirmation in the Web UI. In the lightbox, `Delete` and macOS `Backspace` open the same confirmation.
-- Deletion is disabled while a render job is queued or running. Bulk deletion removes supported image files only and leaves unrelated files and directories untouched.
-## Operational notes
+Run the regression suite with:
 
-- Generated files are written to `storage.output_dir` in `config.json`.
-- A render cancellation takes effect after the current ComfyUI image finishes.
-- Closing the browser does not stop the server or an active render job.
-- Stop the server with `Ctrl+C` in the launcher terminal.
-- ComfyUI connection failures and workflow validation errors appear as non-blocking UI notifications and structured API errors.
+```bash
+PYTHONPATH=.:tests python3 -m unittest discover -s tests
+```
+
+## Project layout
+
+```text
+server.py       composition engine, ComfyUI client, HTTP server, validation CLI
+client/         browser interface
+database.json   creative catalog and compatibility rules
+config.json     local runtime configuration
+workflows/      captured ComfyUI rendering profiles
+outputs/        default production output directory
+launcher.sh     dependency check and application launcher
+tests/          deterministic regression and stress tests
+```
+
+## Privacy and operational boundaries
+
+- Everything runs locally unless `config.json` points to another trusted ComfyUI host.
+- The privacy cover hides images and prompts in the UI; it is not encryption or access control.
+- Server and storyboard state is held in memory; generated image files remain on disk.
+- Valhalla does not include an image-quality detector or identity/reference-image pipeline.
+- ComfyUI errors and invalid workflows are reported before or during the affected job without silently skipping failed frames.

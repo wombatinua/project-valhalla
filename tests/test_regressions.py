@@ -61,7 +61,7 @@ class CatalogQualityTests(unittest.TestCase):
             "outfit_checks": 1, "sfw_outfit_checks": 1, "stage_checks": 1,
             "storyboard_checks": 1, "compiled_scenes": 1,
             "camera_checks": 10_000, "camera_tuples": 1,
-            "explicit_recipes": 1, "warnings": [],
+            "explicit_recipes": 1, "reachable_records": 1, "warnings": [],
         }
         with (
             patch.object(app.sys, "argv", ["server.py", "validate"]),
@@ -97,6 +97,32 @@ class CatalogQualityTests(unittest.TestCase):
     def test_validate_is_an_explicit_cli_command(self):
         args = app.build_parser().parse_args(["validate"])
         self.assertEqual(args.command, "validate")
+
+    def test_stats_is_an_explicit_cli_command(self):
+        args = app.build_parser().parse_args(["stats"])
+        self.assertEqual(args.command, "stats")
+
+    def test_exact_catalog_analysis_reaches_every_enabled_record(self):
+        database, _ = app.load_database()
+        analysis = app.catalog_reachability(database)
+        self.assertEqual(analysis["unreachable"], {})
+        self.assertEqual(
+            analysis["reachable"]["garments"], analysis["enabled"]["garments"]
+        )
+        self.assertEqual(
+            analysis["reachable"]["human_traits"],
+            analysis["enabled"]["human_traits"],
+        )
+        self.assertEqual(
+            analysis["reachable"]["poses"], analysis["enabled"]["poses"]
+        )
+        self.assertEqual(
+            analysis["reachable"]["actions"], analysis["enabled"]["actions"]
+        )
+        stats = app.catalog_statistics(database, analysis)
+        self.assertEqual(stats["unreachable"], {})
+        self.assertEqual(stats["sections"]["garments"], 437)
+        self.assertGreater(len(stats["pool_summaries"]["garment_slot"]["narrow"]), 0)
 
     def test_slavic_human_defaults_are_universal_except_explicit_constraints(self):
         database, _ = app.load_database()
@@ -1884,6 +1910,14 @@ class OutputDeletionRegressionTests(unittest.TestCase):
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_release_version_is_consistent_across_server_and_ui(self):
+        html = (Path(app.__file__).parent / "client" / "client.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(app.APP_VERSION, "1.5.0")
+        self.assertEqual(app.ValhallaHandler.server_version, "Valhalla/1.5.0")
+        self.assertIn('<span class="version">v1.5.0</span>', html)
+
     def test_primary_workspace_names_and_headers_use_photography_terms(self):
         root = Path(app.__file__).parent
         html = (root / "client" / "client.html").read_text(encoding="utf-8")
@@ -1906,7 +1940,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn('kill -TERM "$process_id"', launcher)
         self.assertIn('kill -KILL "$process_id"', launcher)
         self.assertIn("if [ ! -t 0 ]", launcher)
-        self.assertIn('exec "$PYTHON_BIN" "$SERVER" validate', launcher)
+        self.assertIn('exec "$PYTHON_BIN" "$SERVER" "$1"', launcher)
 
     def test_storyboard_transfer_is_studio_only_and_workflows_are_in_system(self):
         root = Path(app.__file__).parent

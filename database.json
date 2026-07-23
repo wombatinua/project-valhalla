@@ -15545,6 +15545,24 @@
       "weight": 1.0
     },
     {
+      "id": "recipe_rear_squat",
+      "prompt": "rear squat explicit composition",
+      "menu_label": "Rear squat",
+      "plateau_kind": "provocative_rear",
+      "pose_tags": [
+        "squatting",
+        "provocative_rear"
+      ],
+      "action_tags": [
+        "provocative_action"
+      ],
+      "shot_size": "shot_rear_closeup",
+      "camera_angle": "angle_rear",
+      "focus_target": "focus_rear",
+      "intensity": "explicit",
+      "weight": 1.0
+    },
+    {
       "id": "recipe_bent_over",
       "prompt": "bent-over rear explicit composition",
       "menu_label": "Bent over",
@@ -16438,7 +16456,8 @@
       "tags": [
         "explicit_pose",
         "provocative_rear",
-        "open_legs"
+        "open_legs",
+        "bent_over"
       ],
       "allowed_levels": [
         "explicit"
@@ -16526,7 +16545,8 @@
       "tags": [
         "explicit_pose",
         "provocative_rear",
-        "open_legs"
+        "open_legs",
+        "standing"
       ],
       "requires_tags": [
         "genitals"
@@ -18957,8 +18977,7 @@
     {"id": "zone_chair", "prompt": "on or beside the chair", "match_any_tags": ["chair", "bench"], "capabilities": ["standing", "seated", "kneeling", "supported", "closeup"], "environment_tags": ["indoor", "outdoor"]},
     {"id": "zone_pool_edge", "prompt": "at the pool edge", "match_any_tags": ["pool_edge"], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["pool"]},
     {"id": "zone_bath", "prompt": "in the private bathing area", "match_any_tags": ["bathtub"], "capabilities": ["seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["bathroom"]},
-    {"id": "zone_garden_surface", "prompt": "on a private garden surface", "match_any_tags": ["garden", "nature", "tree"], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["outdoor"]},
-    {"id": "zone_general", "prompt": "within the selected private setting", "match_any_tags": [], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["indoor", "outdoor", "pool"]}
+    {"id": "zone_garden_surface", "prompt": "on a private garden surface", "match_any_tags": ["garden", "nature", "tree"], "capabilities": ["standing", "seated", "reclining", "kneeling", "supported", "closeup"], "environment_tags": ["outdoor"]}
   ],
   "interiors": [
     {

@@ -96,14 +96,14 @@ command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "Python not found: $PYTHON_BIN"
 [ -f "$SERVER" ] || die "Application not found: $SERVER"
 
 case "${1:-serve}" in
-    validate)
-        [ "$#" -eq 1 ] || die "Usage: ./launcher.sh validate"
-        exec "$PYTHON_BIN" "$SERVER" validate
+    validate|stats)
+        [ "$#" -eq 1 ] || die "Usage: ./launcher.sh [serve|validate|stats]"
+        exec "$PYTHON_BIN" "$SERVER" "$1"
         ;;
     serve)
-        [ "$#" -le 1 ] || die "Usage: ./launcher.sh [serve|validate]"
+        [ "$#" -le 1 ] || die "Usage: ./launcher.sh [serve|validate|stats]"
         ;;
-    *) die "Usage: ./launcher.sh [serve|validate]" ;;
+    *) die "Usage: ./launcher.sh [serve|validate|stats]" ;;
 esac
 
 stop_leftover_servers

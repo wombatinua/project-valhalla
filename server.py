@@ -30,6 +30,9 @@ class AppError(RuntimeError):
     """An expected, user-facing application error."""
 
 
+APP_VERSION = "1.5.0"
+
+
 def weighted_choice(rng: random.Random, items: list[dict[str, Any]]) -> dict[str, Any]:
     items = [item for item in items if not item.get("disabled", False)]
     if not items:
@@ -3433,6 +3436,485 @@ def camera_grammar_stress_test(
     }
 
 
+def _human_trait_reachability(
+    db: dict[str, Any], use_defaults: bool,
+) -> set[str]:
+    """Enumerate exact dependency states while discarding tags no later rule reads."""
+    parts = db["human_model_parts"]
+    order = [category for category in HUMAN_SELECTION_ORDER if category in parts]
+    order.extend(category for category in parts if category not in order)
+    referenced_by_category = [
+        set().union(*(
+            set(item.get("requires_tags", []))
+            | set(item.get("requires_any_tags", []))
+            | set(item.get("excludes_tags", []))
+            for item in parts[category]
+        ))
+        for category in order
+    ]
+    future_tags: list[set[str]] = [set() for _ in order]
+    accumulated: set[str] = set()
+    for index in range(len(order) - 1, -1, -1):
+        accumulated |= referenced_by_category[index]
+        future_tags[index] = set(accumulated)
+    defaults = db["settings"].get("human_defaults", {}).get("pools", {})
+    states: set[frozenset[str]] = {frozenset()}
+    reachable: set[str] = set()
+    for index, category in enumerate(order):
+        candidates = [
+            item for item in parts[category] if not item.get("disabled", False)
+        ]
+        if use_defaults and defaults.get(category):
+            allowed = set(defaults[category])
+            candidates = [item for item in candidates if item["id"] in allowed]
+        next_states: set[frozenset[str]] = set()
+        relevant_later = future_tags[index + 1] if index + 1 < len(order) else set()
+        for state in states:
+            available = set(state)
+            for item in candidates:
+                if not compatible_with_requirements(item, available):
+                    continue
+                reachable.add(item["id"])
+                next_states.add(frozenset(
+                    (available | tags(item)) & relevant_later
+                ))
+        states = next_states
+        if not states:
+            break
+    return reachable
+
+
+def catalog_reachability(db: dict[str, Any]) -> dict[str, Any]:
+    """Compute deterministic manual and automatic catalog reachability."""
+    enabled = {
+        section: [item for item in db[section] if not item.get("disabled", False)]
+        for section in (
+            "colors", "patterns", "fabric_textures", "outfit_templates",
+            "interiors", "furniture", "location_zones", "poses", "actions",
+            "props", "expressions", "moods", "photography_styles",
+            "shot_sizes", "camera_angles", "framings", "focus_targets",
+            "editorial_roles", "explicit_recipes", "intimate_arousal_modifiers",
+        )
+    }
+    reachable: dict[str, set[str]] = {section: set() for section in enabled}
+    automatic: dict[str, set[str]] = {section: set() for section in enabled}
+    candidate_pools: list[dict[str, Any]] = []
+
+    garment_enabled = {
+        section: [item for item in values if not item.get("disabled", False)]
+        for section, values in db["garments"].items()
+    }
+    garment_reachable: set[str] = set()
+    garment_automatic: set[str] = set()
+    template_stage_states: list[tuple[dict[str, Any], set[str]]] = []
+    wardrobe_categories = set(
+        db["settings"]["scene_defaults"]["wardrobe_categories"]
+    )
+    for template in enabled["outfit_templates"]:
+        template_has_required_candidates = True
+        visible_tag_unions: dict[str, set[str]] = {}
+        for slot, rule in template["slots"].items():
+            candidates = [
+                item for item in garment_enabled[rule["catalog"]]
+                if garment_matches_template_slot(
+                    db, template, slot, item, "progressive"
+                )
+            ]
+            preferred = prefer_catalog_category(
+                candidates, catalog_category(template)
+            )
+            candidate_pools.append({
+                "kind": "garment_slot",
+                "id": f"{template['id']}.{slot}",
+                "size": len(preferred),
+                "manual_size": len(candidates),
+            })
+            garment_reachable.update(item["id"] for item in candidates)
+            if catalog_category(template) in wardrobe_categories:
+                garment_automatic.update(item["id"] for item in preferred)
+            if rule.get("required", False) and not candidates:
+                template_has_required_candidates = False
+            visible_tag_unions[slot] = set().union(
+                *(tags(item) for item in candidates), set()
+            )
+        if template_has_required_candidates:
+            reachable["outfit_templates"].add(template["id"])
+            if catalog_category(template) in wardrobe_categories:
+                automatic["outfit_templates"].add(template["id"])
+        for stage in effective_photoshoot_stages(template):
+            garment_tags = set().union(*(
+                visible_tag_unions.get(slot, set())
+                for slot in stage.get("visible_slots", [])
+            ), set())
+            template_stage_states.append((stage, garment_tags))
+            if stage["level"] == "explicit" and "panties" in template["slots"]:
+                panties_aside = copy.deepcopy(stage)
+                panties_aside["plateau_kind"] = "panties_aside"
+                panties_aside["visible_slots"] = [
+                    slot for slot in (
+                        "panties", "legwear", "footwear", "accessories"
+                    ) if slot in template["slots"]
+                ]
+                panties_aside["body_visibility"] = [
+                    "breasts", "nipples", "pubic_area", "genitals"
+                ]
+                panties_tags = set().union(*(
+                    visible_tag_unions.get(slot, set())
+                    for slot in panties_aside["visible_slots"]
+                ), set())
+                template_stage_states.append((panties_aside, panties_tags))
+
+    reachable["colors"].update(
+        color["id"] for color in enabled["colors"]
+        if any(
+            not garment.get("allowed_colors")
+            or color["id"] in garment.get("allowed_colors", [])
+            for garments in garment_enabled.values() for garment in garments
+            if garment["id"] in garment_reachable
+        )
+    )
+    automatic["colors"] = set(reachable["colors"])
+    for section in ("patterns", "fabric_textures"):
+        for item in enabled[section]:
+            if set(item["allowed_garment_ids"]) & garment_reachable:
+                reachable[section].add(item["id"])
+            if set(item["allowed_garment_ids"]) & garment_automatic:
+                automatic[section].add(item["id"])
+
+    environment_categories = set(
+        db["settings"]["scene_defaults"]["environment_categories"]
+    )
+    environment_states: dict[
+        tuple[frozenset[str], str], tuple[set[str], dict[str, Any]]
+    ] = {}
+    for interior in enabled["interiors"]:
+        furniture_candidates = [
+            item for item in enabled["furniture"]
+            if compatible_with_requirements(item, tags(interior))
+            and category_allows(interior, item)
+        ]
+        candidate_pools.append({
+            "kind": "furniture",
+            "id": interior["id"],
+            "size": len(prefer_catalog_category(
+                furniture_candidates, catalog_category(interior)
+            )),
+            "manual_size": len(furniture_candidates),
+        })
+        if furniture_candidates:
+            reachable["interiors"].add(interior["id"])
+            if catalog_category(interior) in environment_categories:
+                automatic["interiors"].add(interior["id"])
+        preferred = prefer_catalog_category(
+            furniture_candidates, catalog_category(interior)
+        )
+        for furniture in furniture_candidates:
+            try:
+                zone = resolve_location_zone(db, interior, furniture)
+            except AppError:
+                continue
+            reachable["furniture"].add(furniture["id"])
+            reachable["location_zones"].add(zone["id"])
+            state_tags = (
+                tags(interior) | tags(furniture)
+                | set(zone.get("capabilities", []))
+            )
+            environment_states[(frozenset(state_tags), zone["id"])] = (
+                state_tags, zone
+            )
+        if catalog_category(interior) in environment_categories:
+            for furniture in preferred:
+                try:
+                    zone = resolve_location_zone(db, interior, furniture)
+                except AppError:
+                    continue
+                automatic["furniture"].add(furniture["id"])
+                automatic["location_zones"].add(zone["id"])
+
+    reachable["moods"].update(item["id"] for item in enabled["moods"])
+    reachable["photography_styles"].update(
+        item["id"] for item in enabled["photography_styles"]
+    )
+    scene_pools = db["settings"]["scene_defaults"].get("pools", {})
+    for section, pool_key in (
+        ("moods", "moods"), ("photography_styles", "photography_styles"),
+    ):
+        configured = set(scene_pools.get(pool_key, []))
+        automatic[section].update(
+            item["id"] for item in enabled[section]
+            if not configured or item["id"] in configured
+        )
+    reachable["editorial_roles"].update(
+        item["id"] for item in enabled["editorial_roles"]
+    )
+    automatic["editorial_roles"].update(reachable["editorial_roles"])
+    reachable["explicit_recipes"].update(
+        item["id"] for item in enabled["explicit_recipes"]
+    )
+    automatic["explicit_recipes"].update(reachable["explicit_recipes"])
+
+    direction_contexts: set[
+        tuple[frozenset[str], str, str, str | None, str | None, str]
+    ] = set()
+    direction_sections = (
+        "poses", "actions", "props", "shot_sizes", "camera_angles",
+        "framings", "focus_targets",
+    )
+    direction_relevant_tags = set().union(*(
+        set(item.get("requires_tags", []))
+        | set(item.get("requires_any_tags", []))
+        | set(item.get("excludes_tags", []))
+        for section in direction_sections for item in enabled[section]
+    ))
+    camera_relevant_tags = set().union(*(
+        set(item.get("requires_tags", []))
+        | set(item.get("requires_any_tags", []))
+        | set(item.get("excludes_tags", []))
+        for section in ("shot_sizes", "camera_angles", "framings", "focus_targets")
+        for item in enabled[section]
+    ))
+    recipes_by_id = {item["id"]: item for item in enabled["explicit_recipes"]}
+    for stage, garment_tags in template_stage_states:
+        recipes: list[dict[str, Any] | None] = [None]
+        if stage["level"] == "explicit":
+            recipes = [
+                recipe for recipe in enabled["explicit_recipes"]
+                if not stage.get("plateau_kind")
+                or recipe.get("plateau_kind") == stage["plateau_kind"]
+            ]
+            if not recipes:
+                recipes = [None]
+        for environment_tags, zone in environment_states.values():
+            base = (
+                set(stage.get("body_visibility", []))
+                | {stage["level"]}
+                | set(stage.get("visible_slots", []))
+                | garment_tags | environment_tags
+            )
+            for recipe in recipes:
+                available = base | (tags(recipe) if recipe else set())
+                intensity = recipe.get("intensity", "explicit") if recipe else {
+                    "covered": "fashion", "lingerie": "sensual",
+                    "topless": "erotic", "nude": "nude",
+                    "explicit": "explicit",
+                }[stage["level"]]
+                plateau = stage.get("plateau_kind") or (
+                    recipe.get("plateau_kind") if recipe else None
+                )
+                direction_contexts.add((
+                    frozenset(available & direction_relevant_tags),
+                    stage["level"], intensity,
+                    plateau, recipe["id"] if recipe else None, zone["id"],
+                ))
+
+    camera_contexts: set[
+        tuple[frozenset[str], str, str, str | None, str | None, str, str]
+    ] = set()
+    zones_by_id = {item["id"]: item for item in enabled["location_zones"]}
+    for frozen_tags, level, intensity, plateau, recipe_id, zone_id in direction_contexts:
+        available = set(frozen_tags)
+        recipe = recipes_by_id.get(recipe_id or "")
+        pose_candidates = []
+        for pose in enabled["poses"]:
+            if (
+                level not in pose.get("allowed_levels", [level])
+                or not item_allows_intensity(pose, intensity)
+                or not compatible_with_requirements(pose, available)
+            ):
+                continue
+            if level == "explicit" and "explicit_pose" not in tags(pose):
+                continue
+            if level in {"topless", "nude"} and not (
+                tags(pose) & {"erotic_pose", "topless_pose", "nude_pose", "open_legs"}
+            ):
+                continue
+            if plateau == "provocative_rear" and "provocative_rear" not in tags(pose):
+                continue
+            if plateau == "intimate_closeup" and "intimate_closeup" not in tags(pose):
+                continue
+            if plateau == "masturbation" and "masturbation_pose" not in tags(pose):
+                continue
+            if plateau == "panties_aside" and (
+                "open_legs" not in tags(pose) or "provocative_rear" in tags(pose)
+            ):
+                continue
+            if recipe and recipe.get("pose_tags") and not set(
+                recipe["pose_tags"]
+            ).issubset(tags(pose)):
+                continue
+            if not recipe_focus_compatible(pose, recipe, "pose"):
+                continue
+            try:
+                validate_pose_zone(pose, zones_by_id[zone_id])
+            except AppError:
+                continue
+            pose_candidates.append(pose)
+            reachable["poses"].add(pose["id"])
+        for pose in pose_candidates:
+            action_tags = available | tags(pose)
+            for action in enabled["actions"]:
+                if (
+                    level not in action.get("allowed_levels", [level])
+                    or not item_allows_intensity(action, intensity)
+                    or not compatible_with_requirements(action, action_tags)
+                    or hands_required(pose) + hands_required(action) > 2
+                ):
+                    continue
+                if level == "explicit" and "explicit_action" not in tags(action):
+                    continue
+                if level in {"topless", "nude"} and not (
+                    tags(action) & {"erotic_action", "undressing_action"}
+                ):
+                    continue
+                required_plateau_tag = {
+                    "provocative_rear": "provocative_action",
+                    "intimate_closeup": "closeup_action",
+                    "masturbation": "masturbation_action",
+                    "panties_aside": "panties_aside_action",
+                }.get(plateau or "")
+                if required_plateau_tag and required_plateau_tag not in tags(action):
+                    continue
+                if recipe and recipe.get("action_tags") and not set(
+                    recipe["action_tags"]
+                ).issubset(tags(action)):
+                    continue
+                if not recipe_focus_compatible(action, recipe, "action"):
+                    continue
+                reachable["actions"].add(action["id"])
+                required_expression = set(action.get("requires_expression_tags", []))
+                for expression in enabled["expressions"]:
+                    if not item_allows_intensity(expression, intensity):
+                        continue
+                    if required_expression and not required_expression.issubset(tags(expression)):
+                        continue
+                    if not required_expression and level in {"covered", "lingerie"} and expression["id"] not in {
+                        "expression_confident", "expression_soft_smile",
+                        "expression_dreamy", "expression_playful",
+                        "expression_serene", "expression_shy_sultry",
+                    }:
+                        continue
+                    if level in {"topless", "nude"} and tags(expression) & {
+                        "pleasure_expression", "intense_pleasure_expression",
+                    }:
+                        continue
+                    reachable["expressions"].add(expression["id"])
+                required_prop = set(action.get("requires_prop_tags", []))
+                for prop in enabled["props"]:
+                    if (
+                        compatible_with_requirements(prop, available | tags(action))
+                        and (not required_prop or required_prop.issubset(tags(prop)))
+                        and hands_required(pose) + hands_required(action) + hands_required(prop) <= 2
+                    ):
+                        reachable["props"].add(prop["id"])
+                camera_contexts.add((
+                    frozenset(
+                        (available | tags(pose) | tags(action))
+                        & camera_relevant_tags
+                    ),
+                    level, intensity, plateau, recipe_id, pose["id"], action["id"],
+                ))
+
+    index = {
+        item["id"]: item for item in iter_content_items(db)
+        if not item.get("disabled", False)
+    }
+    all_role_tags = set().union(
+        *(tags(item) for item in enabled["editorial_roles"]), set()
+    )
+    for frozen_tags, level, intensity, plateau, recipe_id, pose_id, action_id in camera_contexts:
+        recipe = recipes_by_id.get(recipe_id or "")
+        camera_tags = set(frozen_tags) | all_role_tags
+        stage = {"level": level, "plateau_kind": plateau}
+        scene_base = {
+            "stage": stage, "explicit_recipe": recipe,
+            "pose": index[pose_id], "action": index[action_id],
+        }
+
+        def eligible(section: str, available: set[str]) -> list[dict[str, Any]]:
+            return [
+                item for item in enabled[section]
+                if level in item.get("allowed_levels", [level])
+                and item_allows_intensity(item, intensity)
+                and compatible_with_requirements(item, available)
+            ]
+
+        shot_sizes = eligible("shot_sizes", camera_tags)
+        if recipe and recipe.get("shot_size"):
+            shot_sizes = [x for x in shot_sizes if x["id"] == recipe["shot_size"]]
+        for shot_size in shot_sizes:
+            angle_tags = camera_tags | tags(shot_size)
+            angles = eligible("camera_angles", angle_tags)
+            if recipe and recipe.get("camera_angle"):
+                angles = [x for x in angles if x["id"] == recipe["camera_angle"]]
+            for angle in angles:
+                framing_tags = angle_tags | tags(angle)
+                for framing in eligible("framings", framing_tags):
+                    focus_tags = framing_tags | tags(framing)
+                    focuses = eligible("focus_targets", focus_tags)
+                    if recipe and recipe.get("focus_target"):
+                        focuses = [x for x in focuses if x["id"] == recipe["focus_target"]]
+                    for focus in focuses:
+                        scene = {
+                            **scene_base,
+                            "shot_size": shot_size, "camera_angle": angle,
+                            "framing": framing, "focus_target": focus,
+                        }
+                        try:
+                            validate_camera_grammar(scene)
+                        except AppError:
+                            continue
+                        reachable["shot_sizes"].add(shot_size["id"])
+                        reachable["camera_angles"].add(angle["id"])
+                        reachable["framings"].add(framing["id"])
+                        reachable["focus_targets"].add(focus["id"])
+
+    if any(
+        recipe.get("focus_target") == "focus_intimate"
+        for recipe in enabled["explicit_recipes"]
+    ):
+        reachable["intimate_arousal_modifiers"].update(
+            item["id"] for item in enabled["intimate_arousal_modifiers"]
+        )
+    for section in (
+        "poses", "actions", "props", "expressions", "shot_sizes",
+        "camera_angles", "framings", "focus_targets",
+        "intimate_arousal_modifiers",
+    ):
+        automatic[section] = set(reachable[section])
+
+    human_manual = _human_trait_reachability(db, False)
+    human_automatic = _human_trait_reachability(db, True)
+    human_enabled = {
+        item["id"]
+        for values in db["human_model_parts"].values()
+        for item in values if not item.get("disabled", False)
+    }
+    section_enabled = {
+        section: {item["id"] for item in items}
+        for section, items in enabled.items()
+    }
+    section_enabled["garments"] = {
+        item["id"] for items in garment_enabled.values() for item in items
+    }
+    reachable["garments"] = garment_reachable
+    automatic["garments"] = garment_automatic
+    section_enabled["human_traits"] = human_enabled
+    reachable["human_traits"] = human_manual
+    automatic["human_traits"] = human_automatic
+    unreachable = {
+        section: sorted(item_ids - reachable.get(section, set()))
+        for section, item_ids in section_enabled.items()
+        if item_ids - reachable.get(section, set())
+    }
+    return {
+        "enabled": section_enabled,
+        "reachable": reachable,
+        "automatic": automatic,
+        "unreachable": unreachable,
+        "candidate_pools": candidate_pools,
+    }
+
+
 def validate_production_catalog(db: dict[str, Any]) -> dict[str, Any]:
     """Run deterministic, GPU-free production reachability and stress checks."""
     templates = [
@@ -3479,6 +3961,14 @@ def validate_production_catalog(db: dict[str, Any]) -> dict[str, Any]:
             "Enabled garments removed by automatic catalog-category preference: "
             + ", ".join(category_starved)
         )
+
+    reachability = catalog_reachability(db)
+    if reachability["unreachable"]:
+        details = "; ".join(
+            f"{section}: {', '.join(item_ids)}"
+            for section, item_ids in sorted(reachability["unreachable"].items())
+        )
+        raise AppError(f"Enabled catalog records have no compatible route: {details}")
 
     outfit_checks = 0
     sfw_outfit_checks = 0
@@ -3572,6 +4062,9 @@ def validate_production_catalog(db: dict[str, Any]) -> dict[str, Any]:
         "camera_checks": camera["checked"],
         "camera_tuples": camera["camera_tuples"],
         "explicit_recipes": len(camera["recipes"]),
+        "reachable_records": sum(
+            len(item_ids) for item_ids in reachability["reachable"].values()
+        ),
         "warnings": warnings,
     }
 
@@ -3597,8 +4090,101 @@ def print_validation_report(report: dict[str, Any]) -> None:
         f"{report['camera_tuples']} tuples, "
         f"{report['explicit_recipes']} explicit recipes"
     )
+    print(
+        f"  exact reachability: {report['reachable_records']} enabled records "
+        "have a compatible route"
+    )
     for warning in report["warnings"]:
         print(f"  warning: {warning}")
+
+
+def catalog_statistics(
+    db: dict[str, Any], reachability: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    analysis = reachability or catalog_reachability(db)
+    section_counts = {
+        section: len(item_ids)
+        for section, item_ids in analysis["enabled"].items()
+    }
+    tag_counts: dict[str, int] = {}
+    for item in iter_content_items(db):
+        if item.get("disabled", False):
+            continue
+        for tag in tags(item):
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    pool_summaries: dict[str, dict[str, Any]] = {}
+    for kind in ("garment_slot", "furniture"):
+        rows = [row for row in analysis["candidate_pools"] if row["kind"] == kind]
+        sizes = sorted(row["size"] for row in rows)
+        middle = len(sizes) // 2
+        median = (
+            sizes[middle]
+            if len(sizes) % 2
+            else (sizes[middle - 1] + sizes[middle]) / 2
+        )
+        narrow = sorted(
+            (row for row in rows if row["size"] <= 2),
+            key=lambda row: (row["size"], row["id"]),
+        )
+        pool_summaries[kind] = {
+            "count": len(rows),
+            "minimum": min(sizes),
+            "median": median,
+            "maximum": max(sizes),
+            "narrow": narrow,
+        }
+    return {
+        "total_records": sum(section_counts.values()),
+        "sections": section_counts,
+        "manual_reachable": {
+            section: len(analysis["reachable"].get(section, set()))
+            for section in section_counts
+        },
+        "automatic_reachable": {
+            section: len(analysis["automatic"].get(section, set()))
+            for section in section_counts
+        },
+        "unreachable": analysis["unreachable"],
+        "pool_summaries": pool_summaries,
+        "unique_tags": len(tag_counts),
+        "top_tags": sorted(
+            tag_counts.items(), key=lambda item: (-item[1], item[0])
+        )[:15],
+    }
+
+
+def print_catalog_statistics(report: dict[str, Any]) -> None:
+    print(f"Valhalla catalog statistics: {report['total_records']} enabled records")
+    print(
+        f"  tags: {report['unique_tags']} unique; most common "
+        + ", ".join(f"{tag}={count}" for tag, count in report["top_tags"])
+    )
+    for section in sorted(report["sections"]):
+        enabled_count = report["sections"][section]
+        manual = report["manual_reachable"][section]
+        automatic_count = report["automatic_reachable"][section]
+        print(
+            f"  {section}: {enabled_count} enabled, {manual} reachable, "
+            f"{automatic_count} in automatic pools"
+        )
+    if report["unreachable"]:
+        for section, item_ids in sorted(report["unreachable"].items()):
+            print(f"  unreachable {section}: {', '.join(item_ids)}")
+    else:
+        print("  unreachable: none")
+    for kind, summary in report["pool_summaries"].items():
+        print(
+            f"  {kind} pools: {summary['count']} pools, "
+            f"min/median/max {summary['minimum']}/{summary['median']:g}/"
+            f"{summary['maximum']}, {len(summary['narrow'])} with at most 2 candidates"
+        )
+        for row in summary["narrow"][:20]:
+            print(
+                f"    narrow {row['id']}: {row['size']} automatic, "
+                f"{row['manual_size']} manual"
+            )
+        if len(summary["narrow"]) > 20:
+            print(f"    ... {len(summary['narrow']) - 20} more narrow pools")
 
 
 
@@ -6009,7 +6595,7 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
     progression = settings.get("photoshoot_progression", {})
     return {
         "app": "Valhalla Photo Studio",
-        "version": "2.1.0",
+        "version": APP_VERSION,
         "comfy": comfy,
         "workflow": {
             "ready": live_workflow or bool(workflow_profiles["production"] and workflow_profiles["preview"]),
@@ -6031,7 +6617,7 @@ def application_status(check_comfy: bool = True) -> dict[str, Any]:
 
 
 class ValhallaHandler(BaseHTTPRequestHandler):
-    server_version = "Valhalla/2.1.0"
+    server_version = f"Valhalla/{APP_VERSION}"
 
     def log_message(self, fmt: str, *args: Any) -> None:
         print(f"[{self.log_date_time_string()}] {fmt % args}")
@@ -6292,11 +6878,12 @@ def serve(host: str, port: int, open_browser: bool) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Valhalla Photo Studio local Web UI server")
     parser.add_argument(
-        "command", nargs="?", choices=("serve", "validate", "gallery-benchmark"),
+        "command", nargs="?",
+        choices=("serve", "validate", "stats", "gallery-benchmark"),
         default="serve",
         help=(
-            "Start the production server, validate the production catalog, or run "
-            "an isolated synthetic gallery benchmark"
+            "Start the production server, validate or summarize the production "
+            "catalog, or run an isolated synthetic gallery benchmark"
         ),
     )
     parser.add_argument("--host", help="Override config.json listen_host for this run")
@@ -6314,6 +6901,10 @@ def main() -> int:
         if args.command == "validate":
             database, _ = load_database()
             print_validation_report(validate_production_catalog(database))
+            return 0
+        if args.command == "stats":
+            database, _ = load_database()
+            print_catalog_statistics(catalog_statistics(database))
             return 0
         host = args.host if args.host is not None else config["server"]["host"]
         port = args.port if args.port is not None else config["server"]["port"]
