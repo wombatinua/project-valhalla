@@ -1,6 +1,8 @@
 # Valhalla Photo Studio
 
-Valhalla Photo Studio 1.5 is a local, browser-based workspace for planning coherent AI photo sets and rendering them through ComfyUI. It resolves a complete rule-compatible storyboard before using the GPU, so poses, wardrobe, scene geometry, camera direction, content progression, and prompts can be reviewed or edited before an expensive render begins.
+Valhalla Photo Studio 1.5 is a local production workspace for generating coherent SFW and NSFW photoshoots of adult women with your own ComfyUI instance. It turns creative direction into complete, automatically composed prompts, keeps the subject and visual story consistent across a set, and sends the approved shots to ComfyUI for image inference.
+
+The browser interface brings the full workflow together: storyboard planning, prompt automation, compatible scene and wardrobe selection, shot-level direction, Preview and Production rendering, progress tracking, and a built-in gallery manager for organizing and reviewing the resulting images. Every rule-compatible storyboard is resolved before GPU work begins, so poses, wardrobe, scene geometry, camera direction, content progression, prompts, and seeds can be inspected or edited before an expensive render.
 
 The application is designed for a private workstation or trusted LAN. It has no cloud service, account system, telemetry, or built-in authentication.
 
