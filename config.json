@@ -14,8 +14,8 @@
     "preview_max_edge": 512,
     "workflow_source": "profiles",
     "profiles": {
-      "production": "cielbleu-v2-innie-detailslider",
-      "preview": "cielbleu-v2-innie-detailslider"
+      "production": "cielbleu-v2-normal-detailslider",
+      "preview": "cielbleu-v2-normal-detailslider"
     }
   },
   "storage": {

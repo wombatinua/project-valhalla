@@ -98,7 +98,15 @@
           </details>
           <input class="hidden" id="storyboard-file" type="file" accept="application/json,.json">
         </div>
-        <div class="topbar-actions hidden" id="outputs-topbar-actions"><button class="button ghost danger hidden" id="delete-all-outputs">Delete all</button></div>
+        <div class="topbar-actions hidden" id="outputs-topbar-actions">
+          <div class="gallery-size-control" role="group" aria-label="Thumbnail size" title="Adjust thumbnail size · Ctrl/Cmd + wheel over the gallery">
+            <button type="button" id="gallery-size-smaller" aria-label="Smaller thumbnails">−</button>
+            <label><span>Size</span><input id="gallery-size" type="range" min="120" max="360" step="10" aria-label="Thumbnail size"></label>
+            <button type="button" id="gallery-size-larger" aria-label="Larger thumbnails">+</button>
+            <button type="button" class="gallery-size-reset" id="gallery-size-reset" aria-label="Reset thumbnail size" title="Reset thumbnail size"><output id="gallery-size-output" for="gallery-size">100%</output></button>
+          </div>
+          <button class="button ghost danger hidden" id="delete-all-outputs">Delete all</button>
+        </div>
         <div class="topbar-actions hidden" id="logbook-topbar-actions"><button class="button ghost danger" id="clear-logger">Clear logbook</button></div>
       </header>
 

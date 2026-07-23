@@ -28,6 +28,11 @@ function loadPreviewWindowSessions() {
   return sessions;
 }
 
+const GALLERY_CARD_DEFAULT = 230;
+const GALLERY_CARD_MIN = 120;
+const GALLERY_CARD_MAX = 360;
+const storedGalleryCardSize = localStorage.getItem('valhalla-gallery-thumbnail-size');
+
 const state = {
   storyboard: null,
   director: null,
@@ -49,6 +54,9 @@ const state = {
   galleryBenchmark: false,
   galleryView: sessionStorage.getItem('valhalla-gallery-view') === 'flat' ? 'flat' : 'photoshoots',
   galleryGroup: sessionStorage.getItem('valhalla-gallery-group') || null,
+  galleryCardSize: storedGalleryCardSize !== null && Number.isFinite(Number(storedGalleryCardSize))
+    ? Math.min(GALLERY_CARD_MAX, Math.max(GALLERY_CARD_MIN, Number(storedGalleryCardSize)))
+    : GALLERY_CARD_DEFAULT,
   flatScrollY: 0,
   flatFocusKey: null,
   deletedOutputs: new Set(),
@@ -109,6 +117,8 @@ const OUTPUT_VIRTUALIZATION_THRESHOLD = 100;
 let outputLayout = null;
 let outputRenderFrame = null;
 let outputRenderSignature = '';
+let gallerySizeFrame = null;
+let pendingGalleryCardSize = null;
 let privacyMiddleClickAt = 0;
 const PRIVACY_UNLOCK_DOUBLE_CLICK_MS = 500;
 let privacyIdleTimer = null;
@@ -1533,10 +1543,9 @@ function measureOutputGrid() {
   if (!width) return null;
   const mobile = window.matchMedia('(max-width: 560px)').matches;
   const gap = mobile ? 8 : 14;
-  const columns = mobile ? 2 : Math.max(1, Math.floor((width + gap) / (180 + gap)));
-  const cardWidth = mobile
-    ? (width - gap) / columns
-    : Math.min(230, (width - gap * (columns - 1)) / columns);
+  const targetWidth = Math.min(state.galleryCardSize, width);
+  const columns = Math.max(1, Math.floor((width + gap) / (targetWidth + gap)));
+  const cardWidth = Math.min(targetWidth, (width - gap * (columns - 1)) / columns);
   const cardHeight = cardWidth * 1.25;
   const rowStride = cardHeight + gap;
   const rows = Math.ceil(outputEntryCount() / columns);
@@ -1618,6 +1627,9 @@ function renderVirtualOutputs(force = false) {
     outputGrid.innerHTML = '';
     return;
   }
+  outputGrid.style.setProperty('--output-columns', String(outputLayout.columns));
+  outputGrid.style.setProperty('--output-card-width', `${outputLayout.cardWidth}px`);
+  outputGrid.style.setProperty('--output-gap', `${outputLayout.gap}px`);
   if (entryCount <= OUTPUT_VIRTUALIZATION_THRESHOLD) {
     outputGrid.classList.remove('virtualized');
     outputGrid.style.paddingTop = '';
@@ -1645,9 +1657,6 @@ function renderVirtualOutputs(force = false) {
   );
   const start = firstRow * columns;
   const end = Math.min(entryCount, (lastRow + 1) * columns);
-  outputGrid.style.setProperty('--output-columns', String(columns));
-  outputGrid.style.setProperty('--output-card-width', `${outputLayout.cardWidth}px`);
-  outputGrid.style.setProperty('--output-gap', `${outputLayout.gap}px`);
   outputGrid.style.paddingTop = `${firstRow * rowStride}px`;
   outputGrid.style.paddingBottom = `${Math.max(0, rows - lastRow - 1) * rowStride}px`;
   const signature = `${state.galleryView}:${state.galleryGroup}:${start}:${end}:${columns}:${outputLayout.width}:${entryCount}:${state.outputs.length}`;
@@ -1656,6 +1665,44 @@ function renderVirtualOutputs(force = false) {
   outputGrid.innerHTML = outputEntriesHtml(start, end, outputLayout);
   syncDeleteControls();
   updateGalleryBenchmarkSummary();
+}
+
+function galleryViewportAnchor() {
+  const layout = outputLayout || measureOutputGrid();
+  const entryCount = outputEntryCount();
+  if (!layout || !entryCount) return null;
+  const gridTop = window.scrollY + outputGrid.getBoundingClientRect().top;
+  if (window.scrollY < gridTop) return null;
+  const row = Math.min(layout.rows - 1, Math.max(0, Math.floor((window.scrollY - gridTop) / layout.rowStride)));
+  return {
+    index: Math.min(entryCount - 1, row * layout.columns),
+    offset: window.scrollY - (gridTop + row * layout.rowStride),
+  };
+}
+
+function syncGallerySizeControls() {
+  $('#gallery-size').value = String(state.galleryCardSize);
+  $('#gallery-size-output').textContent = `${Math.round(state.galleryCardSize / GALLERY_CARD_DEFAULT * 100)}%`;
+}
+
+function setGalleryCardSize(value, { preserveAnchor = true } = {}) {
+  const next = Math.min(GALLERY_CARD_MAX, Math.max(GALLERY_CARD_MIN, Math.round(Number(value) / 10) * 10));
+  if (!Number.isFinite(next) || next === state.galleryCardSize) return;
+  const anchor = preserveAnchor ? galleryViewportAnchor() : null;
+  state.galleryCardSize = next;
+  localStorage.setItem('valhalla-gallery-thumbnail-size', String(next));
+  syncGallerySizeControls();
+  outputRenderSignature = '';
+  renderVirtualOutputs(true);
+  if (!anchor) return;
+  requestAnimationFrame(() => {
+    const layout = measureOutputGrid();
+    if (!layout) return;
+    const gridTop = window.scrollY + outputGrid.getBoundingClientRect().top;
+    const row = Math.floor(anchor.index / layout.columns);
+    window.scrollTo({ top: Math.max(0, gridTop + row * layout.rowStride + anchor.offset), behavior: 'auto' });
+    renderVirtualOutputs(true);
+  });
 }
 
 function scheduleVirtualOutputRender(force = false) {
@@ -2052,6 +2099,26 @@ outputGrid.addEventListener('keydown', (event) => {
 $$('#gallery-view-toggle button').forEach((button) => {
   button.addEventListener('click', () => setGalleryView(button.dataset.galleryView));
 });
+
+$('#gallery-size').addEventListener('input', (event) => setGalleryCardSize(event.currentTarget.value));
+$('#gallery-size-smaller').addEventListener('click', () => setGalleryCardSize(state.galleryCardSize - 20));
+$('#gallery-size-larger').addEventListener('click', () => setGalleryCardSize(state.galleryCardSize + 20));
+$('#gallery-size-reset').addEventListener('click', () => setGalleryCardSize(GALLERY_CARD_DEFAULT));
+window.addEventListener('wheel', (event) => {
+  if (!(event.ctrlKey || event.metaKey)) return;
+  event.preventDefault();
+  if (!outputGrid.contains(event.target)) return;
+  const direction = event.deltaY < 0 ? 10 : -10;
+  pendingGalleryCardSize = (pendingGalleryCardSize ?? state.galleryCardSize) + direction;
+  if (gallerySizeFrame != null) return;
+  gallerySizeFrame = requestAnimationFrame(() => {
+    gallerySizeFrame = null;
+    const next = pendingGalleryCardSize;
+    pendingGalleryCardSize = null;
+    setGalleryCardSize(next);
+  });
+}, { passive: false });
+syncGallerySizeControls();
 
 window.addEventListener('scroll', () => scheduleVirtualOutputRender(), { passive: true });
 window.addEventListener('pagehide', rememberProofsPosition);

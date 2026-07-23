@@ -37,7 +37,9 @@
         ],
         "height": [],
         "body_frame": [],
-        "body_state": [],
+        "body_state": [
+          "body_state_none"
+        ],
         "waist": [],
         "hips": [],
         "breast_size": [

@@ -18,9 +18,39 @@ The application is designed for a private workstation or trusted LAN. It has no 
 - **Named ComfyUI profiles:** capture, validate, rename, and select independent Production and Preview workflows without manually editing workflow JSON.
 - **Fast Preview:** render smaller temporary drafts while preserving the selected workflow’s base sampler, LoRA chain, CLIP path, and VAE.
 - **Reliable job handling:** cancellable FIFO render queue, per-frame progress and ETA, reload-safe Logbook state, and clear first-error failure reporting.
-- **Production gallery:** virtualized thumbnails, photoshoot grouping, fullscreen inspection, zoom, slideshow, downloads, and confirmed deletion.
+- **Production gallery:** virtualized thumbnails, photoshoot grouping, persistent thumbnail scaling (slider or Ctrl/Cmd + wheel), fullscreen inspection, zoom, slideshow, downloads, and confirmed deletion.
 - **Privacy controls:** instantly hide decoded images and prompts with a configurable shortcut or inactivity timer; covering never deletes files or cancels renders.
 - **Validated catalog:** more than 1,100 subject, wardrobe, location, direction, camera, and treatment records with exact reachability analysis.
+
+## Interface tour
+
+### Plan and direct
+
+| Photo Studio | Director's Desk |
+|---|---|
+| [![Photo Studio with run setup and a resolved storyboard](screenshots/1-studio.jpg)](screenshots/1-studio.jpg) | [![Director's Desk with shot navigation and compatible controls](screenshots/2-director.jpg)](screenshots/2-director.jpg) |
+| Resolve and review complete productions before committing GPU time. | Refine subject, wardrobe, scene, camera, and shot direction with compatible controls. |
+
+### Review coherent photoshoots
+
+| Photoshoot overview | One complete photoshoot |
+|---|---|
+| [![Proof Gallery grouped into coherent photoshoots](screenshots/3-proofs-photoshoots.jpg)](screenshots/3-proofs-photoshoots.jpg) | [![Proof Gallery showing all images from one photoshoot](screenshots/4-proofs-photoshoot.jpg)](screenshots/4-proofs-photoshoot.jpg) |
+| Browse large productions as recognizable sets. | Open a set to inspect, download, or manage its individual shots. |
+
+### Browse and inspect outputs
+
+| All images | Fullscreen lightbox |
+|---|---|
+| [![Virtualized all-images gallery](screenshots/5-proofs-all-images.jpg)](screenshots/5-proofs-all-images.jpg) | [![Fullscreen image inspection lightbox](screenshots/6-proofs-lightbox.jpg)](screenshots/6-proofs-lightbox.jpg) |
+| Move through the complete virtualized output collection. | Inspect full images with fit, zoom, navigation, slideshow, download, and deletion controls. |
+
+### Monitor and configure production
+
+| Production Logbook | Rendering profiles |
+|---|---|
+| [![Production Logbook with progress, rendered image, and prompts](screenshots/7-logbook.jpg)](screenshots/7-logbook.jpg) | [![ComfyUI rendering profile manager](screenshots/8-rendering-profiles.jpg)](screenshots/8-rendering-profiles.jpg) |
+| Track progress, timing, outputs, prompts, seeds, and generation events. | Capture and select independent ComfyUI workflows for Production and Preview. |
 
 ## Requirements
 

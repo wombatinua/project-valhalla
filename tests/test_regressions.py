@@ -133,6 +133,7 @@ class CatalogQualityTests(unittest.TestCase):
             {"breasts_very_small", "breasts_small", "breasts_small_full"},
         )
         self.assertEqual(pools["manicure"], ["manicure_none"])
+        self.assertEqual(pools["body_state"], ["body_state_none"])
         self.assertEqual(
             set(pools["pubic_hair"]), {"pubic_shaved", "pubic_full_natural"}
         )
@@ -147,7 +148,7 @@ class CatalogQualityTests(unittest.TestCase):
         )
         constrained = {
             "ethnic_appearance", "hair_color", "manicure", "breast_size",
-            "pubic_hair",
+            "pubic_hair", "body_state",
         }
         self.assertTrue(all(not values for key, values in pools.items() if key not in constrained))
 
@@ -165,12 +166,17 @@ class CatalogQualityTests(unittest.TestCase):
                 if not item.get("disabled", False)
             ), category)
 
-        observed_lengths = {
-            app.Composer(database, app.random.Random(seed)).choose_human()["hair_length"]["id"]
+        humans = [
+            app.Composer(database, app.random.Random(seed)).choose_human()
             for seed in range(250)
-        }
+        ]
+        observed_lengths = {human["hair_length"]["id"] for human in humans}
         self.assertIn("hair_length_short", observed_lengths)
         self.assertIn("hair_length_chin", observed_lengths)
+        self.assertEqual(
+            {human["body_state"]["id"] for human in humans},
+            {"body_state_none"},
+        )
 
     def test_classical_ballet_is_a_reachable_complete_luxury_outfit(self):
         database, _ = app.load_database()
@@ -2179,8 +2185,26 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("repeat(var(--output-columns), var(--output-card-width))", css)
         self.assertIn("outputGrid.style.paddingTop", js)
         self.assertNotIn("position: absolute; inset: 0 auto auto 0", css)
-        self.assertIn(".output-grid:not(.virtualized)", css)
+        self.assertIn("var(--output-card-width, 230px)", css)
         self.assertNotIn("state.outputs.map((item, index)", js)
+
+    def test_output_gallery_thumbnail_size_is_persistent_and_modifier_scoped(self):
+        root = Path(app.__file__).parent
+        html = (root / "client" / "client.html").read_text(encoding="utf-8")
+        js = (root / "client" / "client.js").read_text(encoding="utf-8")
+        css = (root / "client" / "client.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="gallery-size" type="range"', html)
+        self.assertIn("localStorage.getItem('valhalla-gallery-thumbnail-size')", js)
+        self.assertIn("storedGalleryCardSize !== null", js)
+        self.assertIn("localStorage.setItem('valhalla-gallery-thumbnail-size'", js)
+        self.assertIn("if (!(event.ctrlKey || event.metaKey)) return", js)
+        self.assertIn("window.addEventListener('wheel'", js)
+        self.assertIn("if (!outputGrid.contains(event.target)) return", js)
+        self.assertIn("}, { passive: false })", js)
+        self.assertIn("function galleryViewportAnchor()", js)
+        self.assertIn("anchor.index / layout.columns", js)
+        self.assertIn("var(--output-card-width, 230px)", css)
 
     def test_output_gallery_groups_photoshoots_by_run_and_set_filename(self):
         root = Path(app.__file__).parent
