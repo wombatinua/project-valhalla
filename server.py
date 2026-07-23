@@ -863,6 +863,76 @@ def prefer_catalog_category(
     return preferred or candidates
 
 
+OPAQUE_LINGERIE_BLOCKED_TAGS = {
+    "explicit", "sheer", "transparent", "open_cup", "crotchless",
+}
+CHEST_GARMENT_SLOTS = {"upperwear", "full_body", "outerwear", "bra"}
+
+
+def garment_compatible_with_template_stages(
+    template: dict[str, Any], slot: str, garment: dict[str, Any]
+) -> bool:
+    """Keep anatomy-neutral lingerie stages from selecting revealing underwear."""
+    if slot not in {"bra", "panties"}:
+        if not (tags(garment) & {"sheer", "transparent"}):
+            return True
+        for stage in template.get("stages", []):
+            visible = set(stage.get("visible_slots", []))
+            if (
+                stage.get("level") == "covered"
+                and slot in visible
+                and slot in CHEST_GARMENT_SLOTS
+                and "bra" not in template["slots"]
+                and not any(
+                    other != slot
+                    and other in CHEST_GARMENT_SLOTS
+                    and template["slots"][other].get("required", False)
+                    for other in visible
+                )
+            ):
+                return False
+        return True
+    anatomy = {"breasts", "nipples"} if slot == "bra" else {"pubic_area", "genitals"}
+    requires_opaque = any(
+        stage.get("level") == "lingerie"
+        and slot in stage.get("visible_slots", [])
+        and not (anatomy & set(stage.get("body_visibility", [])))
+        for stage in template.get("stages", [])
+    )
+    return not requires_opaque or not (tags(garment) & OPAQUE_LINGERIE_BLOCKED_TAGS)
+
+
+def garment_matches_template_slot(
+    db: dict[str, Any], template: dict[str, Any], slot: str,
+    garment: dict[str, Any], content_mode: str = "progressive",
+) -> bool:
+    """Apply the same structural slot contract in Composer and Director."""
+    rule = template["slots"][slot]
+    garment_tags = tags(garment)
+    visible_in_sfw = any(
+        is_sfw_stage(stage) and slot in stage.get("visible_slots", [])
+        for stage in effective_photoshoot_stages(template)
+    )
+    return (
+        garment in db["garments"][rule["catalog"]]
+        and not garment.get("disabled", False)
+        and category_allows(template, garment)
+        and garment_allowed_by_layer_rules(db, template["id"], slot, garment["id"])
+        and set(rule.get("required_tags", [])).issubset(garment_tags)
+        and (
+            not rule.get("required_any_tags")
+            or bool(set(rule["required_any_tags"]) & garment_tags)
+        )
+        and not (set(rule.get("excludes_tags", [])) & garment_tags)
+        and garment_compatible_with_template_stages(template, slot, garment)
+        and (
+            content_mode != "sfw"
+            or not visible_in_sfw
+            or not (garment_tags & SFW_BLOCKED_GARMENT_TAGS)
+        )
+    )
+
+
 def hands_required(item: dict[str, Any] | None) -> int:
     return int((item or {}).get("hands_required", 0))
 
@@ -1138,8 +1208,35 @@ def is_sfw_stage(stage: dict[str, Any]) -> bool:
     )
 
 
-def template_supports_sfw(template: dict[str, Any]) -> bool:
-    return any(is_sfw_stage(stage) for stage in effective_photoshoot_stages(template))
+def template_supports_sfw(db: dict[str, Any], template: dict[str, Any]) -> bool:
+    """Return whether the template has a realizable fully covered outfit."""
+    safe_stages = [
+        stage for stage in effective_photoshoot_stages(template)
+        if is_sfw_stage(stage)
+    ]
+    if not safe_stages:
+        return False
+    candidates: dict[str, list[dict[str, Any]]] = {
+        slot: [
+            garment for garment in db["garments"][rule["catalog"]]
+            if garment_matches_template_slot(db, template, slot, garment, "sfw")
+        ]
+        for slot, rule in template["slots"].items()
+    }
+    if any(
+        rule.get("required", False) and not candidates[slot]
+        for slot, rule in template["slots"].items()
+    ):
+        return False
+    for stage in safe_stages:
+        visible = set(stage.get("visible_slots", []))
+        chest = visible & {"upperwear", "full_body", "outerwear", "bra"}
+        genitals = visible & {"lowerwear", "full_body", "panties"}
+        if not any(template["slots"][slot].get("required", False) and candidates[slot] for slot in chest):
+            return False
+        if not any(template["slots"][slot].get("required", False) and candidates[slot] for slot in genitals):
+            return False
+    return True
 
 
 def validate_sfw_outfit(outfit: dict[str, Any]) -> None:
@@ -1403,35 +1500,25 @@ class Composer:
             template for template in self.db["outfit_templates"]
             if not template.get("disabled", False)
             and template["catalog_category"] == selected_category
-            and (content_mode != "sfw" or template_supports_sfw(template))
+            and (content_mode != "sfw" or template_supports_sfw(self.db, template))
         ]
         return weighted_choice(self.rng, candidates)
 
-    def _choose_outfit_once(self, template: dict[str, Any]) -> dict[str, Any]:
+    def _choose_outfit_once(
+        self, template: dict[str, Any], content_mode: str = "progressive"
+    ) -> dict[str, Any]:
         selected: dict[str, dict[str, Any]] = {}
         group_tags: dict[str, set[str]] = {}
         for slot, rule in template["slots"].items():
             required = bool(rule.get("required", False))
             if not required and self.rng.random() > float(rule.get("chance", 1)):
                 continue
-            candidates = list(self.db["garments"][rule["catalog"]])
             candidates = [
-                item for item in candidates
-                if category_allows(template, item)
-                and not item.get("disabled", False)
-                if garment_allowed_by_layer_rules(
-                    self.db, template["id"], slot, item["id"]
+                item for item in self.db["garments"][rule["catalog"]]
+                if garment_matches_template_slot(
+                    self.db, template, slot, item, content_mode
                 )
             ]
-            required_tags = set(rule.get("required_tags", []))
-            if required_tags:
-                candidates = [item for item in candidates if required_tags.issubset(tags(item))]
-            required_any_tags = set(rule.get("required_any_tags", []))
-            if required_any_tags:
-                candidates = [item for item in candidates if required_any_tags & tags(item)]
-            excluded_tags = set(rule.get("excludes_tags", []))
-            if excluded_tags:
-                candidates = [item for item in candidates if not excluded_tags & tags(item)]
             match_group = rule.get("match_group")
             if match_group and match_group in group_tags:
                 candidates = [
@@ -1528,14 +1615,29 @@ class Composer:
         garments = outfit["garments"]
         bra = garments.get("bra")
         for stage in outfit["template"].get("stages", []):
-            visible = [
-                garments[slot] for slot in stage.get("visible_slots", [])
+            visible_by_slot = {
+                slot: garments[slot] for slot in stage.get("visible_slots", [])
                 if slot in garments
-            ]
-            if stage.get("level") == "covered" and any(
-                "sheer" in tags(item) for item in visible
-            ) and (
-                bra is None or tags(bra) & {"sheer", "explicit"}
+            }
+            visible = list(visible_by_slot.values())
+            sheer_chest = any(
+                slot in CHEST_GARMENT_SLOTS
+                and tags(item) & {"sheer", "transparent"}
+                for slot, item in visible_by_slot.items()
+            )
+            opaque_visible_chest = any(
+                slot in CHEST_GARMENT_SLOTS
+                and not (tags(item) & OPAQUE_LINGERIE_BLOCKED_TAGS)
+                for slot, item in visible_by_slot.items()
+            )
+            opaque_underlying_bra = (
+                bra is not None
+                and not (tags(bra) & OPAQUE_LINGERIE_BLOCKED_TAGS)
+            )
+            if (
+                stage.get("level") == "covered"
+                and sheer_chest
+                and not (opaque_visible_chest or opaque_underlying_bra)
             ):
                 raise AppError(
                     "A covered sheer outfit requires one opaque non-explicit bra beneath it"
@@ -1543,10 +1645,23 @@ class Composer:
             if (
                 stage.get("level") == "lingerie"
                 and bra in visible
-                and tags(bra) & {"explicit", "sheer", "transparent", "open_cup"}
+                and not garment_compatible_with_template_stages(
+                    outfit["template"], "bra", bra
+                )
             ):
                 raise AppError(
                     "A lingerie stage with covered anatomy requires an opaque bra"
+                )
+            panties = garments.get("panties")
+            if (
+                stage.get("level") == "lingerie"
+                and panties in visible
+                and not garment_compatible_with_template_stages(
+                    outfit["template"], "panties", panties
+                )
+            ):
+                raise AppError(
+                    "A lingerie stage with covered anatomy requires opaque panties"
                 )
 
     def choose_outfit(
@@ -1559,7 +1674,7 @@ class Composer:
         last_error = "no compatible outfit"
         for _ in range(attempts):
             try:
-                outfit = self._choose_outfit_once(template)
+                outfit = self._choose_outfit_once(template, content_mode)
                 self.validate_outfit_stage_coverage(outfit)
                 if content_mode == "sfw":
                     validate_sfw_outfit(outfit)
@@ -2186,8 +2301,13 @@ def compile_scene(db: dict[str, Any], scene: dict[str, Any]) -> tuple[str, str, 
             "(fully opaque upper-body garment:1.5), uninterrupted fabric across the "
             "entire chest, uniform garment color and weave, clean smooth garment surface"
         ),
-        "lingerie": "(fully opaque lingerie top or bra:1.5), uninterrupted fabric across "
-        "the entire chest, uniform material and color, clean smooth garment surface",
+        "lingerie": (
+            "(fully opaque lingerie top or bra:1.5), uninterrupted fabric across "
+            "the entire chest, uniform material and color, clean smooth garment surface"
+            if covered_chest else
+            "revealing lingerie composition, breasts and nipples visibly framed by "
+            "the lingerie construction"
+        ),
         "topless": "topless, bare breasts and visible nipples, lower-body garments visible",
         "nude": "fully nude body, bare breasts, visible nipples, pubic area and genitals visible",
         "explicit": "explicit adult pose, bare breasts, visible nipples, pubic area and genitals visible",
@@ -2390,10 +2510,14 @@ def prompt_lint(scene: dict[str, Any], positive: str) -> list[str]:
         warnings.append("Subject identity is repeated")
     if scene["stage"]["level"] == "covered" and any(term in folded for term in ("fully nude", "exposed genitals")):
         warnings.append("Covered stage contains exposed-content wording")
-    coverage_anchors = {
-        "covered": "fully opaque",
-        "lingerie": "fully opaque lingerie top or bra",
-    }
+    coverage_anchors = {"covered": "fully opaque"}
+    if (
+        scene["stage"]["level"] == "lingerie"
+        and not ({"breasts", "nipples"} & set(
+            scene["stage"].get("body_visibility", [])
+        ))
+    ):
+        coverage_anchors["lingerie"] = "fully opaque lingerie top or bra"
     expected_anchor = coverage_anchors.get(scene["stage"]["level"])
     if expected_anchor and expected_anchor not in folded:
         warnings.append("Clothing coverage contract is missing")
@@ -3818,7 +3942,7 @@ class WebState:
                 if not item.get("disabled", False)
                 and (
                     record["args"].content_mode != "sfw"
-                    or template_supports_sfw(item)
+                    or template_supports_sfw(db, item)
                 )
             ],
         }]
@@ -3827,13 +3951,9 @@ class WebState:
             candidates = [
                 item for item in db["garments"][rule["catalog"]]
                 if not item.get("disabled", False)
-                and category_allows(template, item)
-                and set(rule.get("required_tags", [])).issubset(tags(item))
-                and (
-                    not rule.get("required_any_tags")
-                    or set(rule["required_any_tags"]) & tags(item)
+                and garment_matches_template_slot(
+                    db, template, slot, item, record["args"].content_mode
                 )
-                and not set(rule.get("excludes_tags", [])) & tags(item)
                 and set(item.get("requires_environment_tags", [])).issubset(tags(context["interior"]))
                 and not set(item.get("excludes_environment_tags", [])) & tags(context["interior"])
                 and (
@@ -3974,6 +4094,7 @@ class WebState:
                     or key == "editorial_role"
                     or key not in {"furniture", "editorial_role"}
                     and shot["stage"]["level"] in item.get("allowed_levels", [shot["stage"]["level"]])
+                    and item_allows_intensity(item, shot["scene"]["intensity"])
                     and compatible_with_requirements(item, camera_tags)
                 )
             ]
@@ -4078,8 +4199,14 @@ class WebState:
                 compatible = [
                     item for item in compatible
                     if stage["level"] in item.get("allowed_levels", [stage["level"]])
+                    and item_allows_intensity(item, shot["scene"]["intensity"])
                     and compatible_with_requirements(item, available)
                 ]
+                if stage.get("sfw"):
+                    compatible = [
+                        item for item in compatible
+                        if not (tags(item) & SFW_BLOCKED_DIRECTION_TAGS)
+                    ]
                 if stage["level"] == "explicit":
                     compatible = [item for item in compatible if "explicit_pose" in tags(item)]
                 elif stage["level"] in {"topless", "nude"}:
@@ -4106,9 +4233,15 @@ class WebState:
                 compatible = [
                     item for item in compatible
                     if stage["level"] in item.get("allowed_levels", [stage["level"]])
+                    and item_allows_intensity(item, shot["scene"]["intensity"])
                     and compatible_with_requirements(item, action_tags)
                     and hands_required(shot["scene"]["pose"]) + hands_required(item) <= 2
                 ]
+                if stage.get("sfw"):
+                    compatible = [
+                        item for item in compatible
+                        if not (tags(item) & SFW_BLOCKED_DIRECTION_TAGS)
+                    ]
                 if stage["level"] == "explicit":
                     compatible = [item for item in compatible if "explicit_action" in tags(item)]
                 elif stage["level"] in {"topless", "nude"}:
@@ -4131,9 +4264,36 @@ class WebState:
                     if recipe_focus_compatible(item, recipe, "action")
                 ]
             else:
+                compatible = [
+                    item for item in compatible
+                    if item_allows_intensity(item, shot["scene"]["intensity"])
+                ]
                 required = set(shot["scene"]["action"].get("requires_expression_tags", []))
                 if required:
                     compatible = [item for item in compatible if required.issubset(tags(item))]
+                    if stage["level"] == "lingerie":
+                        subtle = [
+                            item for item in compatible
+                            if item["id"] == "expression_shy_sultry"
+                        ]
+                        compatible = subtle or compatible
+                elif stage["level"] in {"covered", "lingerie"}:
+                    natural_expressions = {
+                        "expression_confident", "expression_soft_smile",
+                        "expression_dreamy", "expression_playful",
+                        "expression_serene", "expression_shy_sultry",
+                    }
+                    compatible = [
+                        item for item in compatible
+                        if item["id"] in natural_expressions
+                    ]
+                elif stage["level"] in {"topless", "nude"}:
+                    compatible = [
+                        item for item in compatible
+                        if not tags(item) & {
+                            "pleasure_expression", "intense_pleasure_expression",
+                        }
+                    ]
             direction_fields.append({
                 "key": f"shot.{key}", "label": label, "scope": "shot",
                 "value": current_item["id"],
@@ -4214,6 +4374,18 @@ class WebState:
         progression = db["settings"].get("photoshoot_progression", {})
         nsfw = float(progression.get("nsfw_final_percent", 50) if args.nsfw_percent is None else args.nsfw_percent)
         plateau = float(progression.get("explicit_plateau_percent", 30) if args.plateau_percent is None else args.plateau_percent)
+        xxx_fallback_plan = (
+            full_xxx_recipe_plan(db, args.count, record["rng"])
+            if (
+                recalculate_stages
+                and args.content_mode == "xxx"
+                and any(
+                    not record["shots"][index]["stage"].get("planned_recipe_id")
+                    for index in indices
+                )
+            ) else []
+        )
+        recipes_by_id = {item["id"]: item for item in db["explicit_recipes"]}
         replacements = []
         for index in indices:
             old = record["shots"][index]
@@ -4223,7 +4395,12 @@ class WebState:
                     sfw_stage(context["outfit"]["template"], old["shot_index"], args.count, args.mode, record["rng"])
                     if args.content_mode == "sfw"
                     else (
-                        full_xxx_stage(context["outfit"]["template"], old["shot_index"], args.count, args.mode, record["rng"])
+                        full_xxx_stage(
+                            context["outfit"]["template"],
+                            recipes_by_id.get(old["stage"].get("planned_recipe_id"))
+                            or xxx_fallback_plan[old["shot_index"]],
+                            old["shot_index"],
+                        )
                         if args.content_mode == "xxx"
                         else stage_for_index(
                             context["outfit"]["template"], old["shot_index"], args.count,
@@ -4231,7 +4408,15 @@ class WebState:
                         )
                     )
                 )
-            scene = record["composer"].resolve_scene(context, stage)
+            scene_overrides = {}
+            if stage.get("planned_recipe_id"):
+                scene_overrides = {
+                    "explicit_recipe": stage["planned_recipe_id"],
+                    "intensity": stage.get("planned_intensity", "explicit"),
+                }
+            scene = record["composer"].resolve_scene(
+                context, stage, scene_overrides
+            )
             self._apply_director_customs(old, scene, context)
             if preserve_photography:
                 scene["photography_style"] = context["photography_style"]
@@ -4440,7 +4625,10 @@ class WebState:
             template = index.get(value)
             if template not in db["outfit_templates"]:
                 raise AppError("Unknown outfit recipe")
-            if record["args"].content_mode == "sfw" and not template_supports_sfw(template):
+            if (
+                record["args"].content_mode == "sfw"
+                and not template_supports_sfw(db, template)
+            ):
                 raise AppError("This outfit recipe has no SFW-compatible covered stage")
             context["outfit"] = record["composer"].choose_outfit(
                 template, context["interior"], record["args"].content_mode
@@ -4506,6 +4694,7 @@ class WebState:
             else:
                 raise AppError("Unknown wardrobe field")
             validate_outfit_layers(db, outfit)
+            record["composer"].validate_outfit_stage_coverage(outfit)
             if record["args"].content_mode == "sfw":
                 validate_sfw_outfit(outfit)
             record["composer"].validate_outfit_environment(outfit, context["interior"])

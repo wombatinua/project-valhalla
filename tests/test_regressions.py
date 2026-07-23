@@ -293,13 +293,16 @@ class DirectorRegressionTests(unittest.TestCase):
         board = state.create_storyboard(config)
         return state, board["id"]
 
-    def test_all_stage_levels_are_available_even_for_full_xxx(self):
+    def test_all_outfit_compatible_stage_levels_are_available_even_for_full_xxx(self):
         state, storyboard_id = self.make_storyboard(content_mode="xxx")
         fields = director_fields(state.director_payload(storyboard_id, 1))
         levels = {option["prompt"] for option in fields["shot.stage"]["options"]}
-        self.assertTrue(
-            {"covered", "lingerie", "topless", "nude", "explicit"}.issubset(levels)
-        )
+        template = state.get_storyboard(storyboard_id)["shots"][0]["context"]["outfit"]["template"]
+        expected = {
+            stage["level"] for stage in app.effective_photoshoot_stages(template)
+        }
+        self.assertTrue(expected.issubset(levels))
+        self.assertIn("explicit", levels)
 
     def test_sfw_only_resolves_fully_covered_scenes_in_both_modes(self):
         blocked = app.SFW_BLOCKED_VISIBILITY
@@ -357,6 +360,43 @@ class DirectorRegressionTests(unittest.TestCase):
             {option["id"] for option in fields["shot.intensity"]["options"]},
             {"fashion", "sensual"},
         )
+
+    def test_sfw_director_lists_only_realizable_outfit_and_direction_options(self):
+        state, storyboard_id = self.make_storyboard(
+            content_mode="sfw", count=4, prompt_seed=1101
+        )
+        fields = director_fields(state.director_payload(storyboard_id, 1))
+        database = state.get_storyboard(storyboard_id)["db"]
+        listed_templates = {
+            option["id"] for option in fields["outfit.template"]["options"]
+        }
+        self.assertEqual(listed_templates, {
+            template["id"] for template in database["outfit_templates"]
+            if not template.get("disabled", False)
+            and app.template_supports_sfw(database, template)
+        })
+        for option in fields["outfit.template"]["options"]:
+            fresh, fresh_id = self.make_storyboard(
+                content_mode="sfw", count=4, prompt_seed=1101
+            )
+            fresh.update_director(fresh_id, {
+                "shot": 1, "field": "outfit.template", "value": option["id"],
+            })
+        shot = state.get_storyboard(storyboard_id)["shots"][0]
+        for key, section in (
+            ("shot.pose", "poses"), ("shot.action", "actions"),
+            ("shot.expression", "expressions"),
+        ):
+            index = {item["id"]: item for item in database[section]}
+            for option in fields[key]["options"]:
+                item = index[option["id"]]
+                self.assertTrue(app.item_allows_intensity(
+                    item, shot["scene"]["intensity"]
+                ))
+                if key != "shot.expression":
+                    self.assertFalse(
+                        app.tags(item) & app.SFW_BLOCKED_DIRECTION_TAGS
+                    )
         with self.assertRaisesRegex(app.AppError, "SFW only"):
             state.update_director(storyboard_id, {
                 "shot": 1, "field": "shot.intensity", "value": "explicit",
@@ -425,12 +465,17 @@ class DirectorRegressionTests(unittest.TestCase):
                 payload["positive_prompt"],
             )
             positive = payload["positive_prompt"].casefold()
+            lingerie_marker = (
+                "revealing lingerie composition"
+                if {"breasts", "nipples"} & set(shot["stage"].get("body_visibility", []))
+                else "fully opaque lingerie top or bra"
+            )
             stage_marker = {
                 "covered": "fully opaque upper-body garment",
-                "lingerie": "fully opaque lingerie top or bra",
+                "lingerie": lingerie_marker,
                 "topless": "topless",
                 "nude": "fully nude body",
-                "explicit": "explicit adult pose",
+                "explicit": "explicit composition",
             }[shot["stage"]["level"]]
             self.assertLess(positive.index("pregnant"), positive.index(stage_marker))
             self.assertLess(
@@ -591,6 +636,31 @@ class DirectorRegressionTests(unittest.TestCase):
             for shot in second_state.get_storyboard(second_id)["shots"]
         ]
         self.assertEqual([recipe["id"] for recipe in recipes], second)
+
+    def test_full_xxx_outfit_change_preserves_planned_recipe_arc(self):
+        state, storyboard_id = self.make_storyboard(
+            count=12, prompt_seed=880022, content_mode="xxx"
+        )
+        before = [
+            shot["stage"]["planned_recipe_id"]
+            for shot in state.get_storyboard(storyboard_id)["shots"]
+        ]
+        fields = director_fields(state.director_payload(storyboard_id, 1))
+        alternative = next(
+            option["id"] for option in fields["outfit.template"]["options"]
+            if option["id"] != fields["outfit.template"]["value"]
+        )
+        state.update_director(storyboard_id, {
+            "shot": 1, "field": "outfit.template", "value": alternative,
+        })
+        shots = state.get_storyboard(storyboard_id)["shots"]
+        self.assertEqual(
+            [shot["stage"]["planned_recipe_id"] for shot in shots], before
+        )
+        self.assertTrue(all(
+            shot["scene"]["explicit_recipe"]["id"] == planned
+            for shot, planned in zip(shots, before)
+        ))
 
     def test_progressive_intensity_is_monotonic_and_recipe_compatible(self):
         order = {level: index for index, level in enumerate(app.INTENSITY_LEVELS)}
@@ -923,6 +993,30 @@ class DirectorRegressionTests(unittest.TestCase):
                     item = next(item for item in record["db"]["actions"] if item["id"] == option["id"])
                     self.assertTrue(app.recipe_focus_compatible(item, recipe, "action"))
         self.assertGreater(checked, 40)
+
+    def test_rear_kneeling_and_intimate_display_records_are_reachable(self):
+        database, _ = app.load_database()
+        composer = app.Composer(database, app.random.Random(0))
+        context = composer.fixed_context()
+        explicit = next(
+            stage for stage in app.effective_photoshoot_stages(
+                context["outfit"]["template"]
+            )
+            if stage["level"] == "explicit"
+        )
+        for pose_id in ("pose_explicit_rear_kneeling", "pose_curated_09"):
+            scene = composer.resolve_scene(context, explicit, {
+                "explicit_recipe": "recipe_rear_kneeling", "pose": pose_id,
+            })
+            self.assertEqual(scene["pose"]["id"], pose_id)
+            self.assertEqual(scene["explicit_recipe"]["id"], "recipe_rear_kneeling")
+        scene = composer.resolve_scene(context, explicit, {
+            "explicit_recipe": "recipe_intimate_macro",
+            "action": "action_intimate_closeup_display",
+        })
+        self.assertEqual(
+            scene["action"]["id"], "action_intimate_closeup_display"
+        )
 
     def test_automatic_garment_transition_describes_state_not_second_action(self):
         state, storyboard_id = self.make_storyboard(count=12, prompt_seed=24680)
@@ -2327,6 +2421,133 @@ class PreviewVisualAuditTests(unittest.TestCase):
 
 
 class VisualCompatibilityRegressionTests(unittest.TestCase):
+    def test_every_enabled_garment_is_reachable_through_a_matching_outfit_recipe(self):
+        database, _ = app.load_database()
+        enabled_templates = [
+            template for template in database["outfit_templates"]
+            if not template.get("disabled", False)
+        ]
+        unreachable = []
+        for section, garments in database["garments"].items():
+            for garment in garments:
+                if garment.get("disabled", False):
+                    continue
+                reachable = any(
+                    rule["catalog"] == section
+                    and app.garment_matches_template_slot(
+                        database, template, slot, garment, "progressive"
+                    )
+                    for template in enabled_templates
+                    for slot, rule in template["slots"].items()
+                )
+                if not reachable:
+                    unreachable.append(f"{section}.{garment['id']}")
+        self.assertEqual(unreachable, [])
+
+    def test_every_enabled_garment_survives_automatic_category_preference(self):
+        database, _ = app.load_database()
+        reachable = set()
+        for template in database["outfit_templates"]:
+            if template.get("disabled", False):
+                continue
+            for slot, rule in template["slots"].items():
+                candidates = [
+                    garment for garment in database["garments"][rule["catalog"]]
+                    if app.garment_matches_template_slot(
+                        database, template, slot, garment, "progressive"
+                    )
+                ]
+                candidates = app.prefer_catalog_category(
+                    candidates, app.catalog_category(template)
+                )
+                reachable.update(garment["id"] for garment in candidates)
+
+        unreachable = [
+            f"{section}.{garment['id']}"
+            for section, garments in database["garments"].items()
+            for garment in garments
+            if not garment.get("disabled", False) and garment["id"] not in reachable
+        ]
+        self.assertEqual(unreachable, [])
+
+    def test_every_outfit_template_resolves_for_every_enabled_interior(self):
+        database, _ = app.load_database()
+        enabled_interiors = [
+            item for item in database["interiors"] if not item.get("disabled", False)
+        ]
+        enabled_templates = [
+            item for item in database["outfit_templates"] if not item.get("disabled", False)
+        ]
+        checked = 0
+        sfw_checked = 0
+        for template_index, template in enumerate(enabled_templates):
+            for interior_index, interior in enumerate(enabled_interiors):
+                composer = app.Composer(
+                    database,
+                    app.random.Random(100_000 + template_index * 1_000 + interior_index),
+                )
+                outfit = composer.choose_outfit(template, interior, "progressive")
+                composer.validate_outfit_stage_coverage(outfit)
+                checked += 1
+                if app.template_supports_sfw(database, template):
+                    sfw_outfit = composer.choose_outfit(template, interior, "sfw")
+                    app.validate_sfw_outfit(sfw_outfit)
+                    sfw_checked += 1
+        self.assertEqual(checked, len(enabled_templates) * len(enabled_interiors))
+        self.assertEqual(
+            sfw_checked,
+            sum(
+                app.template_supports_sfw(database, template)
+                for template in enabled_templates
+            ) * len(enabled_interiors),
+        )
+
+    def test_every_director_outfit_recipe_is_selectable_and_stage_safe(self):
+        database, _ = app.load_database()
+        for template in database["outfit_templates"]:
+            if template.get("disabled", False):
+                continue
+            state = app.WebState()
+            board = state.create_storyboard({
+                "mode": "photoshoot", "content_mode": "progressive",
+                "count": 12, "photoshoots": 1,
+                "prompt_seed": 424242, "inference_seed": 515151,
+                "nsfw_percent": 50, "plateau_percent": 20,
+            })
+            state.update_director(board["id"], {
+                "shot": 1, "field": "outfit.template", "value": template["id"],
+            })
+            record = state.get_storyboard(board["id"])
+            outfit = record["shots"][0]["context"]["outfit"]
+            self.assertEqual(outfit["template"]["id"], template["id"])
+            record["composer"].validate_outfit_stage_coverage(outfit)
+            fields = director_fields(state.director_payload(board["id"], 1))
+            baseline = app.copy.deepcopy(record)
+            for slot in ("bra", "panties"):
+                field = fields.get(f"outfit.garments.{slot}")
+                if field is None:
+                    continue
+                for option in field["options"]:
+                    if not option["id"]:
+                        continue
+                    garment = next(
+                        item for item in database["garments"][slot]
+                        if item["id"] == option["id"]
+                    )
+                    self.assertTrue(app.garment_compatible_with_template_stages(
+                        template, slot, garment
+                    ))
+            for key, field in fields.items():
+                if not key.startswith("outfit.garments."):
+                    continue
+                for option in field["options"]:
+                    if option.get("current", False):
+                        continue
+                    state.storyboards[board["id"]] = app.copy.deepcopy(baseline)
+                    state.update_director(board["id"], {
+                        "shot": 1, "field": key, "value": option["id"],
+                    })
+
     def test_random_scenes_obey_physical_and_wardrobe_contracts(self):
         database, _ = app.load_database()
         composer = app.Composer(database, app.random.Random(20260721))
@@ -2390,6 +2611,8 @@ class VisualCompatibilityRegressionTests(unittest.TestCase):
             fixed = composer.fixed_context()
             for stage in fixed["outfit"]["template"]["stages"]:
                 if stage["level"] != "lingerie" or "bra" not in stage.get("visible_slots", []):
+                    continue
+                if {"breasts", "nipples"} & set(stage.get("body_visibility", [])):
                     continue
                 bra = fixed["outfit"]["garments"]["bra"]
                 self.assertFalse(app.tags(bra) & {"explicit", "sheer", "transparent", "open_cup"})

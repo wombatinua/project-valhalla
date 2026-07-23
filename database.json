@@ -206,6 +206,9 @@
           "dress_bodycon",
           "dress_linen",
           "dress_lace_mini",
+          "dress_sequin_mini",
+          "dress_velvet",
+          "dress_satin_cowl",
           "dress_casual_bodycon_mini",
           "dress_scoopneck_shaping",
           "dress_square_neck_mini",
@@ -9854,6 +9857,27 @@
         ]
       },
       {
+        "id": "bra_satin_full_cup_luxury",
+        "catalog_category": "luxury",
+        "prompt": "fully opaque silk-satin full-cup bra with refined pearl-edged seams",
+        "tags": [
+          "silk",
+          "lingerie",
+          "luxury",
+          "elegant"
+        ],
+        "mix_tags": [
+          "silk",
+          "luxury_lingerie",
+          "elegant_lingerie"
+        ],
+        "allowed_colors": [
+          "color_black",
+          "color_ivory",
+          "color_champagne"
+        ]
+      },
+      {
         "id": "bra_simple_01",
         "catalog_category": "normal",
         "prompt": "plain cotton bra",
@@ -10508,6 +10532,27 @@
         "mix_tags": [
           "luxury_lingerie",
           "erotic_lingerie"
+        ],
+        "allowed_colors": [
+          "color_ivory",
+          "color_champagne",
+          "color_black"
+        ]
+      },
+      {
+        "id": "panties_satin_full_brief_luxury",
+        "catalog_category": "luxury",
+        "prompt": "fully opaque silk-satin full briefs with refined pearl-edged seams",
+        "tags": [
+          "silk",
+          "lingerie",
+          "luxury",
+          "elegant"
+        ],
+        "mix_tags": [
+          "silk",
+          "luxury_lingerie",
+          "elegant_lingerie"
         ],
         "allowed_colors": [
           "color_ivory",
@@ -12769,18 +12814,34 @@
         "upperwear": {
           "catalog": "upperwear",
           "required": true,
-          "required_tags": [
+          "required_any_tags": [
             "casual",
-            "normal_clothes"
+            "everyday",
+            "home",
+            "outdoor",
+            "elegant",
+            "formal"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "fetish",
+            "sheer"
           ],
           "color_group": "main"
         },
         "lowerwear": {
           "catalog": "lowerwear",
           "required": true,
-          "required_tags": [
+          "required_any_tags": [
             "casual",
-            "normal_clothes"
+            "everyday",
+            "home",
+            "outdoor"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "fetish",
+            "sheer"
           ]
         },
         "bra": {
@@ -12830,6 +12891,41 @@
             "casual",
             "normal_clothes"
           ]
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.55,
+          "required_any_tags": [
+            "casual",
+            "everyday",
+            "home",
+            "outdoor",
+            "normal_clothes",
+            "elegant",
+            "formal"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "fetish"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.45,
+          "required_any_tags": [
+            "casual",
+            "everyday",
+            "outdoor",
+            "elegant",
+            "formal"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "fetish",
+            "luxury"
+          ]
         }
       },
       "stages": [
@@ -12840,7 +12936,9 @@
             "upperwear",
             "lowerwear",
             "legwear",
-            "footwear"
+            "footwear",
+            "outerwear",
+            "accessories"
           ],
           "body_visibility": []
         },
@@ -12850,9 +12948,531 @@
           "visible_slots": [
             "bra",
             "panties",
-            "legwear"
+            "legwear",
+            "accessories"
           ],
           "body_visibility": []
+        }
+      ]
+    },
+    {
+      "id": "template_day_dress",
+      "catalog_category": "normal",
+      "weight": 2,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_any_tags": [
+            "casual",
+            "everyday",
+            "normal_clothes",
+            "outdoor"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "fetish",
+            "sheer"
+          ]
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "everyday"
+          ],
+          "color_group": "lingerie"
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_any_tags": [
+            "everyday",
+            "lace"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "fetish",
+            "luxury"
+          ],
+          "color_group": "lingerie"
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.75,
+          "required_any_tags": [
+            "casual",
+            "everyday",
+            "home",
+            "outdoor"
+          ]
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.55,
+          "required_any_tags": [
+            "casual",
+            "everyday",
+            "home",
+            "outdoor",
+            "normal_clothes"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "fetish"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.45,
+          "required_any_tags": [
+            "casual",
+            "everyday",
+            "outdoor"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "fetish",
+            "luxury"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "day_dress_dressed",
+          "level": "covered",
+          "visible_slots": [
+            "full_body",
+            "footwear",
+            "outerwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "day_dress_lingerie",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "accessories"
+          ],
+          "body_visibility": []
+        }
+      ]
+    },
+    {
+      "id": "template_satin_separates",
+      "catalog_category": "luxury",
+      "weight": 1.25,
+      "slots": {
+        "upperwear": {
+          "catalog": "upperwear",
+          "required": true,
+          "required_tags": [
+            "silk"
+          ],
+          "color_group": "satin"
+        },
+        "lowerwear": {
+          "catalog": "lowerwear",
+          "required": true,
+          "required_tags": [
+            "silk"
+          ],
+          "color_group": "satin"
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "lingerie"
+          ],
+          "color_group": "lingerie",
+          "match_group": "lingerie"
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "lingerie"
+          ],
+          "color_group": "lingerie",
+          "match_group": "lingerie"
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.75,
+          "required_any_tags": [
+            "silk",
+            "boudoir",
+            "home"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.55,
+          "required_tags": [
+            "boudoir"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.5,
+          "required_any_tags": [
+            "elegant",
+            "luxury"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "satin_separates_dressed",
+          "level": "covered",
+          "visible_slots": [
+            "upperwear",
+            "lowerwear",
+            "outerwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "satin_separates_lingerie",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "satin_separates_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template_classic_lingerie_normal",
+      "catalog_category": "normal",
+      "weight": 1.5,
+      "slots": {
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "lingerie"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "sheer",
+            "fetish"
+          ],
+          "color_group": "lingerie"
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "lingerie"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "sheer",
+            "fetish"
+          ],
+          "color_group": "lingerie"
+        },
+        "legwear": {
+          "catalog": "legwear",
+          "required": false,
+          "chance": 0.65,
+          "required_any_tags": [
+            "stockings",
+            "pantyhose",
+            "fishnet"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.7,
+          "required_any_tags": [
+            "elegant",
+            "boudoir",
+            "erotic"
+          ]
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.45,
+          "required_any_tags": [
+            "elegant",
+            "formal",
+            "boudoir"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.65,
+          "required_any_tags": [
+            "elegant",
+            "formal",
+            "boudoir",
+            "erotic"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "classic_lingerie_layered",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "legwear",
+            "footwear",
+            "outerwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "classic_lingerie_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "legwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template_revealing_boudoir",
+      "catalog_category": "normal",
+      "weight": 1,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_any_tags": [
+            "lingerie",
+            "fetish",
+            "explicit"
+          ]
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_any_tags": [
+            "explicit",
+            "sheer"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "lingerie"
+          ]
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.65,
+          "required_any_tags": [
+            "boudoir",
+            "home"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.65,
+          "required_any_tags": [
+            "boudoir",
+            "fetish"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "revealing_boudoir_layered",
+          "level": "lingerie",
+          "visible_slots": [
+            "full_body",
+            "bra",
+            "panties",
+            "outerwear",
+            "footwear"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples",
+            "pubic_area",
+            "genitals"
+          ]
+        },
+        {
+          "id": "revealing_boudoir_bra",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "footwear"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples",
+            "pubic_area",
+            "genitals"
+          ]
+        },
+        {
+          "id": "revealing_boudoir_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "footwear"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples",
+            "pubic_area",
+            "genitals"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "template_pearl_boudoir",
+      "catalog_category": "luxury",
+      "weight": 0.75,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_any_tags": [
+            "lingerie",
+            "boudoir",
+            "explicit"
+          ]
+        },
+        "bra": {
+          "catalog": "bra",
+          "required": true,
+          "required_tags": [
+            "luxury",
+            "sheer"
+          ]
+        },
+        "panties": {
+          "catalog": "panties",
+          "required": true,
+          "required_tags": [
+            "luxury"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "sheer"
+          ]
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.8,
+          "required_any_tags": [
+            "luxury",
+            "silk",
+            "boudoir"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.65,
+          "required_tags": [
+            "boudoir"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.7,
+          "required_tags": [
+            "luxury"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "pearl_boudoir_layered",
+          "level": "lingerie",
+          "visible_slots": [
+            "full_body",
+            "bra",
+            "panties",
+            "outerwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        },
+        {
+          "id": "pearl_boudoir_reveal",
+          "level": "lingerie",
+          "visible_slots": [
+            "bra",
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
+        },
+        {
+          "id": "pearl_boudoir_topless",
+          "level": "topless",
+          "visible_slots": [
+            "panties",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": [
+            "breasts",
+            "nipples"
+          ]
         }
       ]
     },
@@ -12913,8 +13533,10 @@
           "catalog": "outerwear",
           "required": false,
           "chance": 0.7,
-          "required_tags": [
-            "office"
+          "required_any_tags": [
+            "office",
+            "elegant",
+            "formal"
           ]
         }
       },
@@ -13241,6 +13863,16 @@
           "required_tags": [
             "boudoir"
           ]
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.7,
+          "required_any_tags": [
+            "boudoir",
+            "home",
+            "silk"
+          ]
         }
       },
       "stages": [
@@ -13249,7 +13881,8 @@
           "level": "covered",
           "visible_slots": [
             "full_body",
-            "footwear"
+            "footwear",
+            "outerwear"
           ],
           "body_visibility": []
         },
@@ -13644,7 +14277,7 @@
           "catalog": "bra",
           "required": true,
           "required_tags": [
-            "explicit"
+            "lingerie"
           ],
           "color_group": "lingerie",
           "match_group": "lingerie"
@@ -13653,7 +14286,7 @@
           "catalog": "panties",
           "required": true,
           "required_tags": [
-            "explicit"
+            "lingerie"
           ],
           "color_group": "lingerie",
           "match_group": "lingerie"
@@ -14049,6 +14682,18 @@
           "required": true,
           "required_tags": [
             "swimwear"
+          ],
+          "excludes_tags": [
+            "explicit",
+            "sheer"
+          ]
+        },
+        "lowerwear": {
+          "catalog": "lowerwear",
+          "required": false,
+          "chance": 0.65,
+          "required_tags": [
+            "swimwear"
           ]
         },
         "footwear": {
@@ -14082,6 +14727,7 @@
           "level": "covered",
           "visible_slots": [
             "full_body",
+            "lowerwear",
             "outerwear",
             "footwear",
             "accessories"
@@ -14090,6 +14736,77 @@
         },
         {
           "id": "poolside_swimsuit",
+          "level": "lingerie",
+          "visible_slots": [
+            "full_body",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        }
+      ]
+    },
+    {
+      "id": "template_revealing_swimwear",
+      "catalog_category": "normal",
+      "weight": 0.75,
+      "slots": {
+        "full_body": {
+          "catalog": "full_body",
+          "required": true,
+          "required_tags": [
+            "swimwear",
+            "explicit"
+          ]
+        },
+        "lowerwear": {
+          "catalog": "lowerwear",
+          "required": false,
+          "chance": 0.6,
+          "required_tags": [
+            "swimwear"
+          ]
+        },
+        "footwear": {
+          "catalog": "footwear",
+          "required": false,
+          "chance": 0.6,
+          "required_tags": [
+            "swimwear"
+          ]
+        },
+        "outerwear": {
+          "catalog": "outerwear",
+          "required": false,
+          "chance": 0.7,
+          "required_tags": [
+            "swimwear"
+          ]
+        },
+        "accessories": {
+          "catalog": "accessories",
+          "required": false,
+          "chance": 0.7,
+          "required_tags": [
+            "swimwear"
+          ]
+        }
+      },
+      "stages": [
+        {
+          "id": "revealing_swimwear_layered",
+          "level": "lingerie",
+          "visible_slots": [
+            "full_body",
+            "lowerwear",
+            "outerwear",
+            "footwear",
+            "accessories"
+          ],
+          "body_visibility": []
+        },
+        {
+          "id": "revealing_swimwear_minimal",
           "level": "lingerie",
           "visible_slots": [
             "full_body",
@@ -14206,6 +14923,14 @@
             "fetish"
           ]
         },
+        "legwear": {
+          "catalog": "legwear",
+          "required": false,
+          "chance": 0.8,
+          "required_tags": [
+            "fishnet"
+          ]
+        },
         "footwear": {
           "catalog": "footwear",
           "required": true,
@@ -14229,6 +14954,7 @@
           "visible_slots": [
             "full_body",
             "panties",
+            "legwear",
             "footwear",
             "accessories"
           ],
@@ -14239,6 +14965,7 @@
           "level": "topless",
           "visible_slots": [
             "panties",
+            "legwear",
             "footwear",
             "accessories"
           ],
@@ -14251,6 +14978,7 @@
           "id": "fishnet_explicit",
           "level": "explicit",
           "visible_slots": [
+            "legwear",
             "footwear",
             "accessories"
           ],
@@ -14869,6 +15597,24 @@
       "plateau_kind": "provocative_rear",
       "pose_tags": [
         "all_fours",
+        "provocative_rear"
+      ],
+      "action_tags": [
+        "provocative_action"
+      ],
+      "shot_size": "shot_rear_closeup",
+      "camera_angle": "angle_rear",
+      "focus_target": "focus_rear",
+      "intensity": "explicit",
+      "weight": 1.0
+    },
+    {
+      "id": "recipe_rear_kneeling",
+      "prompt": "rear kneeling explicit composition",
+      "menu_label": "Rear kneeling",
+      "plateau_kind": "provocative_rear",
+      "pose_tags": [
+        "kneeling",
         "provocative_rear"
       ],
       "action_tags": [
@@ -16777,6 +17523,9 @@
         "explicit",
         "explicit_action",
         "closeup_action"
+      ],
+      "requires_tags": [
+        "genitals"
       ],
       "requires_expression_tags": [
         "aroused_expression"
